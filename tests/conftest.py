@@ -8,7 +8,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEV_TESTS_DIR = REPO_ROOT / "dev_tests"
+DEV_TESTS_DIR = REPO_ROOT / "archive" / "dev_tests"
 LEGACY_FORTRAN_DIR = REPO_ROOT / "legacy_fortran"
 
 
@@ -82,4 +82,3 @@ def copy_dev_tests_workspace(tmp_path):
         ),
     )
     return target
-

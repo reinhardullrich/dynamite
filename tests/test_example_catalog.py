@@ -30,16 +30,16 @@ DEV_TEST_SHELL_EXAMPLES = [
 ]
 
 YAML_EXAMPLE_CONFIGS = [
-    "dev_tests/bartest.yaml",
-    "dev_tests/bayes_losvd/IC0719_dynamite_config.yaml",
-    "dev_tests/dif_dm_halos_config.yaml",
-    "dev_tests/reimplement_nnls_config1.yaml",
-    "dev_tests/reimplement_nnls_config2.yaml",
-    "dev_tests/test_slurm_config.yaml",
-    "dev_tests/user_test_config.yaml",
-    "dev_tests/user_test_config_ml.yaml",
-    "dev_tests/user_test_config_ml_gas.yaml",
-    "dev_tests/user_test_config_specificmodels.yaml",
+    "archive/dev_tests/bartest.yaml",
+    "archive/dev_tests/bayes_losvd/IC0719_dynamite_config.yaml",
+    "archive/dev_tests/dif_dm_halos_config.yaml",
+    "archive/dev_tests/reimplement_nnls_config1.yaml",
+    "archive/dev_tests/reimplement_nnls_config2.yaml",
+    "archive/dev_tests/test_slurm_config.yaml",
+    "archive/dev_tests/user_test_config.yaml",
+    "archive/dev_tests/user_test_config_ml.yaml",
+    "archive/dev_tests/user_test_config_ml_gas.yaml",
+    "archive/dev_tests/user_test_config_specificmodels.yaml",
     "docs/tutorial_notebooks/FCC167_config.yaml",
     "docs/tutorial_notebooks/NGC4550_config.yaml",
     "docs/tutorial_notebooks/NGC6278_config.yaml",
@@ -47,9 +47,9 @@ YAML_EXAMPLE_CONFIGS = [
 ]
 
 NOTEBOOK_EXAMPLES = [
-    "dev_tests/Rmax-vs-zmax-test.ipynb",
-    "dev_tests/bayes_losvd/DYNMAITE_and_BAYES_LOSVD.ipynb",
-    "dev_tests/orbit_densities.ipynb",
+    "archive/dev_tests/Rmax-vs-zmax-test.ipynb",
+    "archive/dev_tests/bayes_losvd/DYNMAITE_and_BAYES_LOSVD.ipynb",
+    "archive/dev_tests/orbit_densities.ipynb",
     "docs/tutorial_notebooks/1_data_prep_for_gauss_hermite.ipynb",
     "docs/tutorial_notebooks/2_quickstart.ipynb",
     "docs/tutorial_notebooks/3_model_iterations_and_plots.ipynb",
@@ -142,4 +142,3 @@ def test_external_chi2_example_returns_documented_constant():
 
     chi2_ext = module.Chi2Ext("arg1", "arg2")
     assert chi2_ext.chi2(model_id=0, config=fake_config) == 42.0
-

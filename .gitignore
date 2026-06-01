@@ -42,14 +42,14 @@ legacy_fortran/triaxnnls_CRcut
 legacy_fortran/triaxnnls_noCRcut
 legacy_fortran/triaxnnls_bar
 
-# Dynamite dev_tests #
-dev_tests/NGC6278_output/*
-dev_tests/bartest_output
-dev_tests/test_all
-dev_tests/bayes_losvd/IC0719_input/
-dev_tests/bayes_losvd/IC0719_output/
-dev_tests/Data_prep/Dyn_input/ATLAS3D/*
-dev_tests/Data_prep/Dyn_input/CALIFA/*
+# Archived Dynamite dev_tests generated outputs #
+archive/dev_tests/NGC6278_output/*
+archive/dev_tests/bartest_output
+archive/dev_tests/test_all
+archive/dev_tests/bayes_losvd/IC0719_input/
+archive/dev_tests/bayes_losvd/IC0719_output/
+archive/dev_tests/Data_prep/Dyn_input/ATLAS3D/*
+archive/dev_tests/Data_prep/Dyn_input/CALIFA/*
 
 # Documentation build files #
 docs/_build/
