@@ -1,10 +1,10 @@
 # How DYNAMITE Works
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 This is an internal AI/agent guide for the local DYNAMITE fork. It is written
 to make future work easier without modifying upstream source, upstream docs,
-legacy Fortran, or development tests.
+orblib Fortran, or development tests.
 
 ## Scope And Boundaries
 
@@ -17,7 +17,7 @@ Important boundaries:
 - `docs/` is upstream DYNAMITE Sphinx documentation and should not receive
   local AI notes.
 - `dynamite/` is the upstream Python package.
-- `legacy_fortran/` is the upstream legacy numerical backend.
+- `orblib_fortran/` is the active orbit-library Fortran backend.
 - `dev_tests/` contains upstream development tests, sample configs, input data,
   and notebooks.
 
@@ -93,7 +93,12 @@ dynamite/
   requirements.txt      Python runtime dependencies
   .github/workflows/    Upstream CI
   dynamite/             Python package
-  legacy_fortran/       Legacy Fortran backend and bundled numerical code
+  orblib_fortran/       Active orbit-library Fortran backend
+    source/             Human-written Fortran source
+      numerics/         Bundled numerical routines
+      unused/           Inactive retained Fortran sources
+    build/              Ignored generated object/module files
+    bin/                Ignored compiled runtime executables
   docs/                 Upstream Sphinx docs and tutorial notebooks
   dev_tests/            Upstream development tests, configs, sample data
 ```
@@ -109,13 +114,12 @@ Do not flatten this. Flattening would break imports and packaging.
 
 `setup.py` declares the package name as `dynamite`, requires Python `>=3.10`,
 uses `setuptools.find_packages()`, reads dependencies from `requirements.txt`,
-and includes compiled legacy Fortran executable paths as package data.
+and includes compiled orblib Fortran executable paths as package data.
 
-The upstream README describes the full traditional installation sequence:
+The current local README describes the active installation sequence:
 
-1. Install GALAHAD in `legacy_fortran/galahad-2.3/`.
-2. Compile Fortran programs in `legacy_fortran/`.
-3. Install the Python package from the repository root:
+1. Compile Fortran programs in `orblib_fortran/`.
+2. Install the Python package from the repository root:
 
 ```bash
 python -m pip install .
@@ -311,10 +315,10 @@ threshold or a threshold expressed as a fraction of `sqrt(2*nobs)` into
 
 ### legacy_settings
 
-`legacy_settings.directory` identifies the legacy Fortran executable directory.
+`legacy_settings.directory` identifies the active Fortran executable directory.
 
 If the value is `default`, `Configuration` resolves it to the repository's
-`legacy_fortran` directory. A trailing slash is removed.
+`orblib_fortran/bin` directory. A trailing slash is removed.
 
 ### io_settings
 
@@ -731,35 +735,36 @@ one non-Plummer dark component raises an error in the legacy input path.
 
 ## Fortran Backend Relationship
 
-The Python package treats `legacy_fortran/` as an executable numerical backend.
+The Python package treats `orblib_fortran/` as an executable numerical backend.
 
-Typical roles:
+Active roles:
 
 - generate orbit initial conditions
 - integrate tube and box orbits
 - build orbit libraries
 - compute mass grids
-- run legacy non-negative least-squares solving
 
-Important executable names from packaging or code context include:
+Active executable names from packaging or code context include:
 
 - `orbitstart`
 - `orbitstart_bar`
-- `orblib`
 - `orblib_new_mirror`
 - `orblib_bar`
-- `partgen`
 - `triaxmass`
 - `triaxmass_bar`
 - `triaxmassbin`
 - `triaxmassbin_bar`
-- `triaxnnls_CRcut`
-- `triaxnnls_noCRcut`
-- `triaxnnls_bar`
 
 The Fortran layer is not just optional historical code for full traditional
-runs. It is part of the model execution path unless a workflow is specifically
-configured to avoid the legacy weight solver where possible.
+runs. Orbit-library generation still depends on these executables. Generated
+object files and Fortran module files are kept under `orblib_fortran/build/`;
+the final executables are kept under `orblib_fortran/bin/`. A config value of
+`legacy_settings.directory: default` resolves to that bin directory.
+
+The old `triaxnnls_*` GALAHAD/NNLS solver sources are archived under
+`archive/legacy_nnls_fortran/`. The untested `orbgen`/`partgen` utilities are
+archived under `archive/legacy_orbgen_partgen/`. They are not part of the
+active `orblib_fortran` build.
 
 ## Weight Solving
 
@@ -787,7 +792,8 @@ These become:
 
 ### LegacyWeightSolver
 
-The legacy solver calls Fortran NNLS-style programs:
+The Python `LegacyWeightSolver` class still calls old Fortran NNLS-style
+programs:
 
 - `triaxnnls_CRcut`
 - `triaxnnls_noCRcut`
@@ -797,6 +803,10 @@ It prepares old-format kinematic input files, writes `nn.in`, runs the solver,
 and reads the solver outputs.
 
 It supports the `CRcut` setting for the counter-rotating orbit problem.
+
+Those Fortran executables are archived rather than active in the current tree.
+Do not select this solver path as an active runtime path unless it is
+explicitly restored or pointed at a controlled archived build.
 
 ### NNLS
 
@@ -901,7 +911,7 @@ scientifically grounded. The main caveats from the local audits are:
 - barred-model support needs benchmarking caution
 - cored-log halo density domains need attention
 - modelling priors influence results
-- failure handling in legacy Fortran paths may be weak
+- failure handling in orblib Fortran paths may be weak
 - solver status should be checked carefully
 - build and dependency environments matter
 
@@ -919,7 +929,7 @@ When modifying this fork:
 2. Read `aidocs/KNOWLEDGE.md`.
 3. Keep local AI notes in `aidocs/`.
 4. Avoid editing upstream `docs/` unless explicitly asked.
-5. Avoid editing `legacy_fortran/` unless the task is specifically about the
+5. Avoid editing `orblib_fortran/` unless the task is specifically about the
    Fortran backend.
 6. Avoid editing `dev_tests/` unless the task is specifically about tests or
    examples.
@@ -1003,7 +1013,7 @@ For a normal code task:
 For a documentation-only task like this one:
 
 1. Keep edits in `aidocs/`.
-2. Do not touch upstream `docs/`, package code, legacy Fortran, or dev tests.
+2. Do not touch upstream `docs/`, package code, orblib Fortran, or dev tests.
 3. Update the local index and current-state files.
 4. Verify no forbidden paths changed with `git status --short`.
 
@@ -1016,5 +1026,5 @@ AGENTS.md
 aidocs/
 ```
 
-No upstream source, upstream docs, legacy Fortran, or dev-test files should be
+No upstream source, upstream docs, orblib Fortran, or dev-test files should be
 modified by this documentation pass.

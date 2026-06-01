@@ -15,32 +15,19 @@ __pycache__/
 /dist/
 /dynamite.egg-info/
 
-# GALAHAD Fortran library files #
-legacy_fortran/galahad-2.3/bin/sys/*
-legacy_fortran/galahad-2.3/makefiles/*
-legacy_fortran/galahad-2.3/modules/*
-legacy_fortran/galahad-2.3/objects/*
-legacy_fortran/galahad-2.3/versions/*
-!legacy_fortran/galahad-2.3/bin/sys/.gitkeep
-!legacy_fortran/galahad-2.3/makefiles/.gitkeep
-!legacy_fortran/galahad-2.3/modules/.gitkeep
-!legacy_fortran/galahad-2.3/objects/.gitkeep
-!legacy_fortran/galahad-2.3/versions/.gitkeep
-
-# Legacy Fortran files #
-legacy_fortran/*.mod
-legacy_fortran/*.o
-legacy_fortran/orbitstart
-legacy_fortran/orbitstart_bar
-legacy_fortran/orblib_bar
-legacy_fortran/orblib_new_mirror
-legacy_fortran/triaxmass
-legacy_fortran/triaxmass_bar
-legacy_fortran/triaxmassbin
-legacy_fortran/triaxmassbin_bar
-legacy_fortran/triaxnnls_CRcut
-legacy_fortran/triaxnnls_noCRcut
-legacy_fortran/triaxnnls_bar
+# Orblib Fortran files #
+orblib_fortran/*.mod
+orblib_fortran/*.o
+orblib_fortran/bin/
+orblib_fortran/build/
+orblib_fortran/orbitstart
+orblib_fortran/orbitstart_bar
+orblib_fortran/orblib_bar
+orblib_fortran/orblib_new_mirror
+orblib_fortran/triaxmass
+orblib_fortran/triaxmass_bar
+orblib_fortran/triaxmassbin
+orblib_fortran/triaxmassbin_bar
 
 # Archived Dynamite dev_tests generated outputs #
 archive/dev_tests/NGC6278_output/*

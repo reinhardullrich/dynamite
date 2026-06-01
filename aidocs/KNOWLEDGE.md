@@ -43,7 +43,8 @@ changes from the original project.
 - `aidocs/dynamite_code_map.md`: map of major DYNAMITE modules and
   responsibilities.
 - `aidocs/fortran_orbit_library_engine.md`: detailed analysis of the active
-  Fortran orbit-library backend in `legacy_fortran/orblib_f_new_mirror.f90`,
+  Fortran orbit-library backend in
+  `orblib_fortran/source/orblib_f_new_mirror.f90`,
   including module responsibilities, runtime connections, compute hotspots,
   multiprocessing boundaries, and replacement risks.
 - `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
@@ -62,9 +63,13 @@ changes from the original project.
 
 - `dynamite/`: upstream Python package. This nested `dynamite/dynamite` layout
   is normal for this Python project and should not be flattened.
-- `legacy_fortran/`: legacy Fortran backend for orbit starts, orbit
-  integration, orbit-library construction, mass calculations, and legacy
-  non-negative least-squares/GALAHAD workflows.
+- `orblib_fortran/`: active Fortran backend for orbit starts, orbit
+  integration, orbit-library construction, and mass calculations. Human-written
+  Fortran source lives under `orblib_fortran/source/`, with bundled numerical
+  routine sources under `orblib_fortran/source/numerics/` and inactive retained
+  Fortran sources under `orblib_fortran/source/unused/`; generated
+  object/module files live under ignored `orblib_fortran/build/` after
+  compilation; final executables live under ignored `orblib_fortran/bin/`.
 - `tests/`: local pytest baseline for Fortran replacement work. The default
   suite covers fixture contracts, extracted historical workflow facts, and
   small Fortran kernel parity checks; opt-in slow/legacy tests include a
@@ -73,6 +78,10 @@ changes from the original project.
 - `docs/`: upstream Sphinx documentation.
 - `archive/dev_tests/`: archived upstream development tests, notebooks, sample
   configurations, and historical fixtures kept for human reference.
+- `archive/legacy_nnls_fortran/`: archived legacy NNLS/GALAHAD Fortran solver
+  sources, no longer part of the active `orblib_fortran` build.
+- `archive/legacy_orbgen_partgen/`: archived untested `orbgen`/`partgen`
+  particle/orbit export utilities, no longer part of the active Fortran tree.
 - `.github/workflows/ci.yml`: upstream CI workflow.
 - `requirements.txt` and `setup.py`: upstream Python packaging inputs.
 
@@ -151,11 +160,13 @@ Current local audit environment:
 
 - Python dependencies are installed in `.venv/`.
 - `pip check` passed after the local editable install.
-- GNU Fortran 13.3.0 at `/usr/bin/gfortran` was used for `make nogal`.
-- Full GALAHAD-linked `make all` was built locally with
-  `GALAHADDIR=legacy_fortran/galahad-2.3` and
-  `GALAHADTYPE=pc.lnx.gfo/double` after re-adding generated `gltr.o` and
-  `hsl_ma57d.o` to the local GALAHAD static archives.
+- GNU Fortran 13.3.0 at `/usr/bin/gfortran` was used for the active
+  no-GALAHAD Fortran build.
+- `orblib_fortran/Makefile` and `orblib_fortran/Makefile.linux` write object
+  files to `orblib_fortran/build/obj/` and module files to
+  `orblib_fortran/build/mod/`. Runtime executables are written to
+  `orblib_fortran/bin/`, and Python's default `legacy_settings.directory`
+  resolves to that bin directory.
 - Use `MPLCONFIGDIR=/tmp/dynamite-mplconfig` for local/headless Matplotlib
   commands to avoid config-cache warnings.
 - For future fresh setup, `uv` is acceptable and likely faster, but the current

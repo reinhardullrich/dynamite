@@ -158,9 +158,9 @@ In case of installation option (A), the installation of DYNAMITE consists of thr
 
 NOTE: this section (Installation of GALAHAD) only applies to DYNAMITE installation option (A).
 
-GALAHAD is a "library of thread-safe Fortran 90 packages for large-scale nonlinear optimization". The DYNAMITE code comes with Version 2.3.  An updated version of GALAHAD could be obtained `here <http://www.galahad.rl.ac.uk/doc.html>`_ (last updated in 2018), but the most recent version seems to not work. The GALAHAD package included in DYNAMITE can be found in the folder ``.../legacy_fortran``.
+GALAHAD is a "library of thread-safe Fortran 90 packages for large-scale nonlinear optimization". The DYNAMITE code comes with Version 2.3.  An updated version of GALAHAD could be obtained `here <http://www.galahad.rl.ac.uk/doc.html>`_ (last updated in 2018), but the most recent version seems to not work. The GALAHAD package included in DYNAMITE can be found in the folder ``.../orblib_fortran``.
 
-For the installation go into the folder ``.../legacy_fortran/galahad-2.3/`` and type ::
+For the installation go into the folder ``.../orblib_fortran/galahad-2.3/`` and type ::
 
     ./install_galahad
 
@@ -225,7 +225,7 @@ Prompts from ``./install_galahad``. The answers for the recommended installation
 
 **Enter alternative directory for CUTEr:**
 
-  | ``/home/.../dynamite/legacy_fortran/cuter`` (Note: Put your full directory path here)
+  | ``/home/.../dynamite/orblib_fortran/cuter`` (Note: Put your full directory path here)
 
 **Do you now wish to compile the package subset you selected earlier?**
 
@@ -289,7 +289,7 @@ When using MacOS:
 
 **Enter alternative directory for CUTEr:**
 
-  | ``/Users/.../dynamite/legacy_fortran/cuter`` (Note: Put your full directory path here)
+  | ``/Users/.../dynamite/orblib_fortran/cuter`` (Note: Put your full directory path here)
 
 **Do you now wish to compile the package subset you selected earlier?**
 
@@ -318,23 +318,23 @@ Set environment variables and path as prompted at the end of successful Galahad 
 Output from GALAHAD::
 
     Remember to set the environment variable
-     GALAHAD to /home/.../legacy_fortran/galahad-2.3
+     GALAHAD to /home/.../orblib_fortran/galahad-2.3
     In addition, please update your MANPATH to include
-       /home/.../legacy_fortran/galahad-2.3/man
+       /home/.../orblib_fortran/galahad-2.3/man
     and your PATH to include
-       /home/.../legacy_fortran/galahad-2.3/bin
+       /home/.../orblib_fortran/galahad-2.3/bin
 
 Update in .bashrc::
 
-    export GALAHAD="/home/.../legacy_fortran/galahad-2.3"
-    export MANPATH="$MANPATH:/home/.../legacy_fortran/galahad-2.3/man"
-    export PATH="$PATH:/home/.../legacy_fortran/galahad-2.3/bin"
+    export GALAHAD="/home/.../orblib_fortran/galahad-2.3"
+    export MANPATH="$MANPATH:/home/.../orblib_fortran/galahad-2.3/man"
+    export PATH="$PATH:/home/.../orblib_fortran/galahad-2.3/bin"
 
 
 2. Compiling the Fortran programs
 ----------------------------------
 
-Go to the ``.../legacy_fortran`` folder. Before you proceed, it may be necessary to make the following change to the ``Makefile``:
+Go to the ``.../orblib_fortran`` folder. Before you proceed, it may be necessary to make the following change to the ``Makefile``:
 
 * DYNAMITE installation option (A) only (i.e., including the ``LegacyWeightSolver``): Select the appropriate choice of ``GALAHADTYPE`` variable depending on your system (comment out the options that don't apply).
 
@@ -346,7 +346,7 @@ DYNAMITE installation option (A)
 
     make all
 
-Your terminal will likely express several warnings again, but these are not critical and refer to different coding conventions in earlier Fortran versions. Now, take a look in the directory ``.../legacy_fortran`` and check that you have .f90 files and executables (no file name extension) for:
+Your terminal will likely express several warnings again, but these are not critical and refer to different coding conventions in earlier Fortran versions. Now, take a look in the directory ``.../orblib_fortran`` and check that you have .f90 files and executables (no file name extension) for:
 
 * orbitstart
 * orbitstart_bar
@@ -365,7 +365,7 @@ DYNAMITE installation option (B)
 
     make nogal
 
-Your terminal will likely express several warnings again, but these are not critical and refer to different coding conventions in earlier Fortran versions. Now, take a look in the directory ``.../legacy_fortran`` and check that you have .f90 files and executables (no file name extension) for:
+Your terminal will likely express several warnings again, but these are not critical and refer to different coding conventions in earlier Fortran versions. Now, take a look in the directory ``.../orblib_fortran`` and check that you have .f90 files and executables (no file name extension) for:
 
 * orbitstart
 * orbitstart_bar
@@ -415,7 +415,7 @@ DYNAMITE should now be installed and ready to be run! You can now try the exampl
 Uninstalling DYNAMITE from the system
 -------------------------------------
 
-To remove all compiled Fortran codes, go back to ``.../legacy_fortran``, and type the following command from the terminal::
+To remove all compiled Fortran codes, go back to ``.../orblib_fortran``, and type the following command from the terminal::
 
     make distclean
 
@@ -491,7 +491,7 @@ Troubleshooting
 Fortran code calls fail
 -----------------------
 
-Try to clean up and recompile. In ``.../legacy_fortran``, issue one of the following, depending on your installation option::
+Try to clean up and recompile. In ``.../orblib_fortran``, issue one of the following, depending on your installation option::
 
     make distclean
     make all
@@ -545,14 +545,14 @@ Warning about ipywidgets
 
 Again, this is a warning about a dependency of PyMC and is only relevant if you plan to use the DYNAMITE Coloring module. As ipywidgets is only used to display interactive HTML widgets within Jupyter Notebooks they are dispensable for DYNAMITE's functionality. Hence, the warning can be ignored.
 
-Compile errors when building legacy Fortran code
+Compile errors when building orblib Fortran code
 ------------------------------------------------
 
 If you get errors of the kind::
 
     f951: sorry, unimplemented: Graphite loop optimizations cannot be used (isl is not available) (-fgraphite, -fgraphite-identity, -floop-nest-optimize, -floop-parallelize-all)
 
-it may be indicative of gfortran being built without isl. If you cannot or do not want to re-build the compiler (e.g., on a cluster), then open the ``Makefile`` in ``.../legacy_fortran`` and change the line::
+it may be indicative of gfortran being built without isl. If you cannot or do not want to re-build the compiler (e.g., on a cluster), then open the ``Makefile`` in ``.../orblib_fortran`` and change the line::
 
        flags +=    -funroll-loops -ftree-loop-linear
 

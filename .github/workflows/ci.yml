@@ -46,11 +46,11 @@ jobs:
 
       - name: Build Fortran executables
         run: make nogal
-        working-directory: legacy_fortran
+        working-directory: orblib_fortran
 
       - name: Verify build artifacts
         run: |
-          ls -R legacy_fortran
+          ls -R orblib_fortran
           # Example:
           # test -x ./bin/my_fortran_executable
 

@@ -344,7 +344,7 @@ class LegacyWeightSolver(WeightSolver):
                     text = f'...failed! {cmdstr} exit code {p.returncode}. ' \
                            f'Message: {p.stdout.decode("UTF-8")}'
                     if p.returncode == 127: # command not found
-                        text += 'Check DYNAMITE legacy_fortran executables.'
+                        text += 'Check DYNAMITE orblib_fortran executables.'
                         self.logger.error(text)
                         os.chdir(cur_dir)
                         raise FileNotFoundError(text)

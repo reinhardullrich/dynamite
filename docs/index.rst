@@ -43,8 +43,8 @@ To get started with DYNAMITE,
 1. Get the latest stable version from our `GitHub release page <https://github.com/dynamics-of-stellar-systems/dynamite/releases>`_. If you want the current version in development, you can also download this from our `GitHub page <https://github.com/dynamics-of-stellar-systems/dynamite>`_.
 2. Install. The `installation page <https://dynamics.univie.ac.at/dynamite_docs/getting_started/installation.html>`_ has the full instructions. An overview is:
 
-  a. (optional) Install Galahad: in the directory ``legacy_fortran/galahad-2.3/`` run the command ``./install_Galahad``
-  b. Compile the Fortran programs: in the directory ``legacy_fortran/``  run the command ``make all`` if you have installed Galahad, or the command ``make nogal`` if you have not installed it
+  a. (optional) Install Galahad: in the directory ``orblib_fortran/galahad-2.3/`` run the command ``./install_Galahad``
+  b. Compile the Fortran programs: in the directory ``orblib_fortran/``  run the command ``make all`` if you have installed Galahad, or the command ``make nogal`` if you have not installed it
   c. Install DYNAMITE Python package: in the main directory run the command ``python setup.py install``
 
 3. Run orbit-based models! The following program will run a single model,

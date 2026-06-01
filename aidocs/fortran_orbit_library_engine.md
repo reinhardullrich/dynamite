@@ -2,9 +2,10 @@
 
 Date: 2026-06-02
 
-Scope: `legacy_fortran/orblib_f_new_mirror.f90`, the two executable drivers
-that use it (`orblibprogram.f90` and `orblibprogram_bar.f90`), and the Python
-runtime boundary in `dynamite/orblib.py` and `dynamite/model_iterator.py`.
+Scope: `orblib_fortran/source/orblib_f_new_mirror.f90`, the two executable
+drivers that use it (`orblibprogram.f90` and `orblibprogram_bar.f90`), and the
+Python runtime boundary in `dynamite/orblib.py` and
+`dynamite/model_iterator.py`.
 
 This note focuses on what the orbit-library Fortran code does, how it is wired
 into DYNAMITE, where the expensive computation is, and what a replacement would
@@ -426,7 +427,7 @@ These changes do not replace the Fortran numerical kernel.
 ### What Is Moderately Replaceable
 
 The Python side already replaced projected and intrinsic mass calculations for
-the Python `NNLS` weight solver path. The legacy Fortran mass helpers are not
+the Python `NNLS` weight solver path. The orblib Fortran mass helpers are not
 central to this orbit-library engine.
 
 ### What Is Hard To Replace

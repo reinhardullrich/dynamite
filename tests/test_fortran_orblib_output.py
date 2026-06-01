@@ -74,7 +74,7 @@ def assert_losvd_matches_reference(actual, reference_path):
 
 
 @pytest.mark.slow
-@pytest.mark.legacy_fortran
+@pytest.mark.orblib_fortran
 def test_fortran_orblib_losvd_output_matches_reference_fixture(tmp_path, monkeypatch):
     workspace = copy_orblib_fixture_workspace(tmp_path)
     set_orbit_random_seed(workspace / "user_test_config.yaml", seed=4242)

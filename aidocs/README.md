@@ -17,7 +17,7 @@ project's Sphinx documentation tree.
 - `dynamite_overview.md`: high-level overview of the upstream project.
 - `dynamite_code_map.md`: shorter code map and runtime-flow sketch.
 - `fortran_orbit_library_engine.md`: detailed analysis of
-  `legacy_fortran/orblib_f_new_mirror.f90`, its runtime connections,
+  `orblib_fortran/source/orblib_f_new_mirror.f90`, its runtime connections,
   computational hotspots, multiprocessing boundaries, and replacement risks.
 - `audits/dynamite_python_audit.md`: Python-side audit notes.
 - `audits/dynamite_fortran_audit.md`: Fortran-side audit notes.

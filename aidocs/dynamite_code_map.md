@@ -5,9 +5,12 @@
 ```text
 dynamite/
   dynamite/          Main Python package
-  legacy_fortran/    Fortran numerical backend and bundled solver code
+  orblib_fortran/    Active Fortran orbit-library backend
+    source/          Human-written Fortran source
+    build/           Ignored compiler object/module files
+    bin/             Ignored runtime executables
+  archive/           Archived dev tests and legacy Fortran solver/utilities
   docs/              Sphinx docs, API docs, tutorials, images, notebooks
-  dev_tests/         Development tests, configs, sample data, notebooks
   setup.py           Python packaging metadata
   requirements.txt   Python dependency list
   README.md          Short project description and basic install/use notes
@@ -136,8 +139,8 @@ This is the closest thing to the high-level "run everything" engine.
 `dynamite/orblib.py`
 
 Creates orbit libraries for a model. The main implementation is
-`LegacyOrbitLibrary`, which prepares input files for the Fortran backend and
-then runs the legacy orbit programs.
+`LegacyOrbitLibrary`, which prepares input files for the active Fortran backend
+and then runs the orblib executables from `orblib_fortran/bin/`.
 
 Generated output includes files such as:
 
@@ -156,7 +159,7 @@ kinematics.
 
 Solver options include:
 
-- `LegacyWeightSolver`: calls legacy Fortran NNLS-style code.
+- `LegacyWeightSolver`: compatibility path for legacy Fortran NNLS-style code.
 - `NNLS`: Python-based non-negative least-squares approach, using SciPy or
   optionally cvxopt.
 
@@ -181,20 +184,19 @@ These modules produce diagnostic plots and derived science products, including:
 
 ## Installation Shape
 
-The README describes a three-stage full installation:
+The current local README describes a two-stage active installation:
 
-1. Install GALAHAD from `legacy_fortran/galahad-2.3/`.
-2. Compile the Fortran programs in `legacy_fortran/`.
-3. Install the Python package with `python -m pip install .`.
+1. Compile the active Fortran programs in `orblib_fortran/`.
+2. Install the Python package with `python -m pip install .`.
 
-There is also documentation for using the Python NNLS solvers without the full
-legacy GALAHAD path in some cases, but the repository is clearly designed around
-a compiled numerical backend.
+The active Fortran build writes executables to `orblib_fortran/bin/`, object
+files to `orblib_fortran/build/obj/`, and module files to
+`orblib_fortran/build/mod/`.
 
 ## Things To Know Before Working On It
 
-- The repo is large because it vendors old Fortran optimization code and test
-  data, not because the Python package is huge.
+- The repo is large partly because it retains archived old Fortran optimization
+  code and test data, not because the Python package is huge.
 - Many important runtime behaviours depend on files written to disk, not only
   in-memory Python objects.
 - The output directory is part of the modelling state; reruns may reuse or
@@ -203,6 +205,5 @@ a compiled numerical backend.
   large.
 - The codebase mixes modern Python orchestration with legacy compiled numerical
   executables.
-- Tests and examples in `dev_tests/` are likely the fastest way to understand
+- Archived tests and examples in `archive/dev_tests/` are useful references for
   working configurations.
-

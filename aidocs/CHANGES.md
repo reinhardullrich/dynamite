@@ -61,16 +61,32 @@ This file is append-only. Add new entries at the bottom.
 ## 2026-06-02
 
 - Added `aidocs/fortran_orbit_library_engine.md`, a detailed analysis of
-  `legacy_fortran/orblib_f_new_mirror.f90`, covering runtime wiring,
+  `orblib_fortran/source/orblib_f_new_mirror.f90`, covering runtime wiring,
   Fortran module responsibilities, orbit integration and projection flow,
   computational hotspots, multiprocessing boundaries, output contracts, and
   replacement strategy.
 - Updated `aidocs/README.md` and `aidocs/KNOWLEDGE.md` to reference the new
   Fortran orbit-library engine analysis.
-- Added `tests/test_fortran_orblib_output.py`, an opt-in slow legacy Fortran
+- Added `tests/test_fortran_orblib_output.py`, an opt-in slow orblib Fortran
   regression test that regenerates the NGC6278 orbit-library LOSVD workflow
   from self-contained fixtures under `tests/fixtures/orblib_losvd/` and
   compares the produced velocity grid and LOSVD output statistics against the
   local reference fixture.
 - Updated `aidocs/KNOWLEDGE.md` to document the new Fortran orbit-library
   output comparison and fixture location.
+- Cleaned the active `orblib_fortran/` structure: object files now build under
+  `orblib_fortran/build/obj/`, module files under `orblib_fortran/build/mod/`,
+  final executables under `orblib_fortran/bin/`, human-written Fortran source
+  under `orblib_fortran/source/`, active numerical routine sources under
+  `orblib_fortran/source/numerics/`, and untested `orbgen`/`partgen` utilities
+  are archived under `archive/legacy_orbgen_partgen/`.
+- Removed stale `orblib` and `partgen` package-data entries from `setup.py`
+  and expanded the Fortran inventory tests to cover active numerics sources and
+  the archived `orbgen`/`partgen` files.
+- Renamed the active Fortran backend directory from `legacy_fortran/` to
+  `orblib_fortran/`, updated Python's default executable lookup path to
+  `orblib_fortran/bin/`, and renamed the opt-in executable test gate to
+  `DYNAMITE_RUN_ORBLIB_FORTRAN_EXEC_TESTS`.
+- Moved inactive retained Fortran files `pij.f90` and `dopri5.f` into
+  `orblib_fortran/source/unused/`; `dopri5.f` remains an explicitly inactive
+  alternate integrator reference while active builds continue to use DOP853.

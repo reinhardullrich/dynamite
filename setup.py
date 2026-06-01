@@ -13,17 +13,15 @@ with open("README.md", "r") as fh:
 with open("requirements.txt", "r") as fp:
     required = fp.read().splitlines()
 
-legacy_fortran = [
-    "../legacy_fortran/orbitstart",
-    "../legacy_fortran/orbitstart_bar",
-    "../legacy_fortran/orblib",
-    "../legacy_fortran/orblib_new_mirror",
-    "../legacy_fortran/orblib_bar",
-    "../legacy_fortran/partgen",
-    "../legacy_fortran/triaxmass",
-    "../legacy_fortran/triaxmass_bar",
-    "../legacy_fortran/triaxmassbin",
-    "../legacy_fortran/triaxmassbin_bar"
+orblib_fortran = [
+    "../orblib_fortran/bin/orbitstart",
+    "../orblib_fortran/bin/orbitstart_bar",
+    "../orblib_fortran/bin/orblib_new_mirror",
+    "../orblib_fortran/bin/orblib_bar",
+    "../orblib_fortran/bin/triaxmass",
+    "../orblib_fortran/bin/triaxmass_bar",
+    "../orblib_fortran/bin/triaxmassbin",
+    "../orblib_fortran/bin/triaxmassbin_bar"
 ]
 
 setuptools.setup(
@@ -48,7 +46,7 @@ setuptools.setup(
     # use the already parsed requirements from requirements.txt
     install_requires=required,
     package_data={
-        "dynamite": legacy_fortran
+        "dynamite": orblib_fortran
     },
     # extra requirements for testing
     extras_require={

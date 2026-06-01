@@ -658,7 +658,7 @@ class TriaxialVisibleComponent(VisibleComponent):
         We should possibly revisit the expressions later
 
         """
-        # avoid legacy_fortran's u=1 (rather, phi=psi=90deg) problem
+        # avoid orblib_fortran's u=1 (rather, phi=psi=90deg) problem
         if u == 1:
             u *= (1-np.finfo(float).epsneg)  # same value as for np.double
         p2 = np.double(p) ** 2
@@ -1039,7 +1039,7 @@ class DarkComponent(Component):
 
     def get_dh_legacy_strings(self, parset):
         """
-        Generates and returns two strings needed for the legacy Fortran files.
+        Generates and returns two strings needed for the orblib Fortran files.
 
         This method only applies to dark halo components.
 
@@ -1054,7 +1054,7 @@ class DarkComponent(Component):
             A string with the legacy code and the number of parameters, space
             separated.
         par_vals : str
-            The parameter values in the sequence legacy Fortran expects them,
+            The parameter values in the sequence orblib Fortran expects them,
             space separated.
 
         """
@@ -1197,7 +1197,7 @@ class NFW_m200_c(DarkComponent):
 
     def get_dh_legacy_strings(self, parset, system):
         """
-        Generates and returns two strings needed for the legacy Fortran files.
+        Generates and returns two strings needed for the orblib Fortran files.
 
         This method overrides the parent class' method because for legacy
         Fortran purposes, NFW_m200_c has two parameters. Note that NFW_m200_c
@@ -1214,7 +1214,7 @@ class NFW_m200_c(DarkComponent):
             A string with the legacy code and the number of parameters, space
             separated.
         par_vals : str
-            The parameter values in the sequence legacy Fortran expects them,
+            The parameter values in the sequence orblib Fortran expects them,
             space separated.
 
         """

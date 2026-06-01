@@ -199,7 +199,7 @@ class LegacyOrbitLibrary(OrbitLibrary):
             dh = dh[0]  # extract the one and only dm component
 
             if isinstance(dh, physys.NFW_m200_c):
-                #fix c via m200_c relation, for legacy Fortran it is still NFW
+                # fix c via m200_c relation; for orblib Fortran it is still NFW
                 dm_specs, dm_par_vals = dh.get_dh_legacy_strings(self.parset,
                                                                 self.system)
             else:
@@ -467,7 +467,7 @@ class LegacyOrbitLibrary(OrbitLibrary):
             text = f'...failed! orbitstart{bar} exit code {p.returncode}. ' \
                    f'Message: {p.stdout.decode("UTF-8")}. {log_file}'
             if p.returncode == 127: # command not found
-                text += 'Check DYNAMITE legacy_fortran executables.'
+                text += 'Check DYNAMITE orblib_fortran executables.'
                 self.logger.error(text)
                 raise FileNotFoundError(text)
             else:
@@ -505,7 +505,7 @@ class LegacyOrbitLibrary(OrbitLibrary):
             text=f'...failed! {cmdstr} exit code {p.returncode}. ' \
                  f'Message: {p.stdout.decode("UTF-8")}'
             if p.returncode == 127: # command not found
-                text += 'Check DYNAMITE legacy_fortran executables.'
+                text += 'Check DYNAMITE orblib_fortran executables.'
                 self.logger.error(text)
                 raise FileNotFoundError(text)
             else:
@@ -543,7 +543,7 @@ class LegacyOrbitLibrary(OrbitLibrary):
             text=f'...failed! {cmdstr_tube} exit code {p.returncode}. ' \
                  f'Message: {p.stdout.decode("UTF-8")}'
             if p.returncode == 127: # command not found
-                text += 'Check DYNAMITE legacy_fortran executables.'
+                text += 'Check DYNAMITE orblib_fortran executables.'
                 self.logger.error(text)
                 raise FileNotFoundError(text)
             else:
@@ -568,7 +568,7 @@ class LegacyOrbitLibrary(OrbitLibrary):
             text = f'...failed! {cmdstr_box} exit code {p.returncode}. ' \
                    f'Message: {p.stdout.decode("UTF-8")}'
             if p.returncode == 127: # command not found
-                text += 'Check DYNAMITE legacy_fortran executables.'
+                text += 'Check DYNAMITE orblib_fortran executables.'
                 self.logger.error(text)
                 raise FileNotFoundError(text)
             else:

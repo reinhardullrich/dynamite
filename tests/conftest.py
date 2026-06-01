@@ -7,9 +7,13 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-LEGACY_FORTRAN_DIR = REPO_ROOT / "legacy_fortran"
+ORBLIB_FORTRAN_DIR = REPO_ROOT / "orblib_fortran"
+ORBLIB_FORTRAN_BIN_DIR = ORBLIB_FORTRAN_DIR / "bin"
 ARCHIVED_NNLS_FORTRAN_DIR = (
     REPO_ROOT / "archive" / "legacy_nnls_fortran" / "legacy_fortran"
+)
+ARCHIVED_ORBGEN_PARTGEN_DIR = (
+    REPO_ROOT / "archive" / "legacy_orbgen_partgen" / "legacy_fortran"
 )
 
 
@@ -17,20 +21,20 @@ def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(
         reason="set DYNAMITE_RUN_SLOW_TESTS=1 to run slow integration tests"
     )
-    skip_legacy_exec = pytest.mark.skip(
+    skip_orblib_exec = pytest.mark.skip(
         reason=(
-            "set DYNAMITE_RUN_LEGACY_EXEC_TESTS=1 to run tests requiring "
-            "built legacy Fortran executables"
+            "set DYNAMITE_RUN_ORBLIB_FORTRAN_EXEC_TESTS=1 to run tests "
+            "requiring built orblib Fortran executables"
         )
     )
     for item in items:
         if "slow" in item.keywords and os.environ.get("DYNAMITE_RUN_SLOW_TESTS") != "1":
             item.add_marker(skip_slow)
         if (
-            "legacy_fortran" in item.keywords
-            and os.environ.get("DYNAMITE_RUN_LEGACY_EXEC_TESTS") != "1"
+            "orblib_fortran" in item.keywords
+            and os.environ.get("DYNAMITE_RUN_ORBLIB_FORTRAN_EXEC_TESTS") != "1"
         ):
-            item.add_marker(skip_legacy_exec)
+            item.add_marker(skip_orblib_exec)
 
 
 def require_gfortran():

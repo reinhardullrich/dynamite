@@ -6,7 +6,7 @@ from scipy import optimize
 
 from conftest import (
     ARCHIVED_NNLS_FORTRAN_DIR,
-    LEGACY_FORTRAN_DIR,
+    ORBLIB_FORTRAN_DIR,
     compile_fortran_driver,
 )
 from dynamite.myrand import MyRand
@@ -36,7 +36,7 @@ end program ran1_driver
     executable = compile_fortran_driver(
         tmp_path,
         driver,
-        [LEGACY_FORTRAN_DIR / "ran1_nr.f"],
+        [ORBLIB_FORTRAN_DIR / "source" / "ran1_nr.f"],
         "ran1_driver",
     )
     seed = -4242

@@ -43,17 +43,24 @@ numerical backend.
 Important language split:
 
 - `dynamite/`: main Python package.
-- `legacy_fortran/`: Fortran 77/90 programs used for orbit generation,
-  orbit libraries, mass calculations, and legacy optimization.
+- `orblib_fortran/`: active Fortran 77/90 programs used for orbit initial
+  conditions, orbit libraries, and mass calculations. Human-written source is
+  under `orblib_fortran/source/`; compiled artifacts go to ignored `build/`
+  and `bin/` folders.
+- `archive/legacy_nnls_fortran/`: archived legacy NNLS/GALAHAD solver sources.
+- `archive/legacy_orbgen_partgen/`: archived untested particle/orbit export
+  utilities.
 - `docs/`: Sphinx documentation and tutorial notebooks.
-- `dev_tests/`: development tests, example configs, sample data, and notebooks.
+- `archive/dev_tests/`: archived development tests, example configs, sample
+  data, and notebooks.
 
 The Python package requires **Python 3.10 or newer** according to `setup.py`.
 The current version in this checkout is **5.0.0**.
 
-The Fortran side is not optional for full traditional usage. The README describes
-an installation flow where the user installs the GALAHAD optimization library,
-compiles the Fortran programs, and then installs the Python package.
+The active Fortran orbit-library side is not optional for full traditional
+orbit-library generation. The current local no-GALAHAD build compiles the active
+orblib programs in `orblib_fortran/`; archived solver sources are retained for
+reference and compatibility work.
 
 ## Major Python Dependencies
 
@@ -164,19 +171,20 @@ The most important Python modules are:
 
 ## Fortran Backend
 
-The `legacy_fortran/` directory is a large part of the repository. It includes
-Fortran source and bundled optimization libraries. These are used for:
+The active `orblib_fortran/` directory contains the compiled orbit-library
+backend. It includes source for:
 
 - Orbit initial condition generation.
 - Orbit integration.
 - Orbit library construction.
 - Triaxial mass calculations.
-- Legacy non-negative least-squares solving.
-- GALAHAD optimization support.
 
 The Python code often acts as an orchestration layer around these compiled
 programs: it writes input files, runs the executables, reads their outputs, and
 stores the results in a structured project output tree.
+
+Legacy NNLS/GALAHAD solver code now lives under `archive/legacy_nnls_fortran/`
+instead of the active build tree.
 
 ## Documentation And Examples
 
@@ -189,8 +197,9 @@ The repo includes substantial documentation in `docs/`, including:
 - Tutorial notebooks.
 - Example input files for real or test galaxies.
 
-The `dev_tests/` directory contains practical examples and tests. It is useful
-for seeing realistic configuration files and expected input formats.
+The archived `archive/dev_tests/` directory contains practical examples and
+tests. It is useful for seeing realistic configuration files and expected input
+formats.
 
 ## Practical Impression
 
@@ -204,4 +213,3 @@ The package is probably most useful to astronomers or researchers who already
 have galaxy photometry/kinematics data and want to fit dynamical models. Running
 it properly requires compiled Fortran tools, careful configuration, and enough
 disk space for large orbit libraries.
-

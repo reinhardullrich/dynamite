@@ -202,9 +202,8 @@ class Configuration(object):
                           f'{const.RHO_CRIT = }.')
 
         legacy_dir = \
-            os.path.realpath(os.path.dirname(__file__)+'/../legacy_fortran')
-            # os.path.dirname(os.path.realpath(__file__))+'/../'legacy_fortran'
-        self.logger.debug(f'Default legacy Fortran directory: {legacy_dir}.')
+            os.path.realpath(os.path.dirname(__file__)+'/../orblib_fortran/bin')
+        self.logger.debug(f'Default orblib Fortran directory: {legacy_dir}.')
 
         self.config_file_name = filename
         try:
