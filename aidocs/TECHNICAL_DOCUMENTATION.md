@@ -1,0 +1,1020 @@
+# How DYNAMITE Works
+
+Last updated: 2026-06-01
+
+This is an internal AI/agent guide for the local DYNAMITE fork. It is written
+to make future work easier without modifying upstream source, upstream docs,
+legacy Fortran, or development tests.
+
+## Scope And Boundaries
+
+This document explains the current repository and runtime flow as observed in
+the checkout at `/home/reinhard/projects/thomas/dynamite`.
+
+Important boundaries:
+
+- `aidocs/` is local AI/agent documentation.
+- `docs/` is upstream DYNAMITE Sphinx documentation and should not receive
+  local AI notes.
+- `dynamite/` is the upstream Python package.
+- `legacy_fortran/` is the upstream legacy numerical backend.
+- `dev_tests/` contains upstream development tests, sample configs, input data,
+  and notebooks.
+
+For the current documentation pass, only `aidocs/` was changed.
+
+## Repository Identity
+
+This local checkout is a personal fork of upstream DYNAMITE.
+
+- Local path: `/home/reinhard/projects/thomas/dynamite`
+- Personal fork remote: `origin -> https://github.com/reinhardullrich/dynamite.git`
+- Upstream remote: `upstream -> https://github.com/dynamics-of-stellar-systems/dynamite.git`
+- Default branch observed locally: `master`
+
+Use `origin` for personal work. Use `upstream` to fetch or merge changes from
+the original project.
+
+The sibling CiFoS work is intentionally outside this repo:
+
+- `/home/reinhard/projects/thomas/cifos`
+
+This fork should stay DYNAMITE-focused.
+
+## Mental Model
+
+DYNAMITE is a scientific modelling package. It does not behave like a small
+library where most work happens in one function. A run is an orchestrated,
+disk-backed workflow:
+
+1. A YAML config describes a galaxy/system, input files, parameters, solver
+   choices, orbit-library settings, and output paths.
+2. Python reads the config and builds runtime objects.
+3. The code generates model parameter combinations.
+4. For each model, it builds or reuses an orbit library.
+5. It solves for non-negative orbit weights that reproduce observed data.
+6. It writes model status, chi-square values, and output artifacts to disk.
+7. It iterates until configured stopping criteria are met.
+8. It can produce plots and analysis products from the model outputs.
+
+The short user-facing entry point hides most of this:
+
+```python
+import dynamite as dyn
+
+c = dyn.config_reader.Configuration("my_config.yaml")
+_ = dyn.model_iterator.ModelIterator(c)
+```
+
+The main control path is:
+
+```text
+YAML config
+  -> Configuration
+  -> System + Components + Data + Settings
+  -> ParameterSpace
+  -> AllModels table
+  -> ParameterGenerator
+  -> ModelIterator / ModelInnerIterator
+  -> Model
+  -> LegacyOrbitLibrary
+  -> WeightSolver
+  -> all_models.ecsv + model directories + plots
+```
+
+## Top-Level Layout
+
+```text
+dynamite/
+  AGENTS.md             Local agent instructions for this fork
+  aidocs/               Local AI/agent docs and audit notes
+  README.md             Upstream project README
+  setup.py              Python packaging metadata
+  requirements.txt      Python runtime dependencies
+  .github/workflows/    Upstream CI
+  dynamite/             Python package
+  legacy_fortran/       Legacy Fortran backend and bundled numerical code
+  docs/                 Upstream Sphinx docs and tutorial notebooks
+  dev_tests/            Upstream development tests, configs, sample data
+```
+
+The nested `dynamite/dynamite` shape is normal Python packaging layout:
+
+- outer `dynamite/`: repository root
+- inner `dynamite/`: importable Python package
+
+Do not flatten this. Flattening would break imports and packaging.
+
+## Packaging And Installation Shape
+
+`setup.py` declares the package name as `dynamite`, requires Python `>=3.10`,
+uses `setuptools.find_packages()`, reads dependencies from `requirements.txt`,
+and includes compiled legacy Fortran executable paths as package data.
+
+The upstream README describes the full traditional installation sequence:
+
+1. Install GALAHAD in `legacy_fortran/galahad-2.3/`.
+2. Compile Fortran programs in `legacy_fortran/`.
+3. Install the Python package from the repository root:
+
+```bash
+python -m pip install .
+```
+
+Important runtime dependencies include:
+
+- `numpy`
+- `scipy`
+- `astropy`
+- `matplotlib`
+- `h5py`
+- `PyYAML`
+- `lmfit`
+- `pymc`
+- `numba`
+- `sparse`
+- `pathos`
+- `vorbin`, `plotbin`, `powerbin`, `pafit`
+
+`cvxopt` is optional and only needed when using the `cvxopt` NNLS backend.
+
+The requirements file intentionally avoids SciPy 1.12 through 1.15 because the
+NNLS implementation in those releases is documented in the file as slower or
+more failure-prone for this project.
+
+## Configuration Is The Real Entry Point
+
+The central object is `dynamite.config_reader.Configuration`.
+
+`Configuration(filename)` does much more than parse YAML. It:
+
+1. Sets up logging if requested.
+2. Reads YAML with `UniqueKeyLoader`, which rejects duplicate YAML keys.
+3. Creates an empty `physical_system.System`.
+4. Creates a `Settings` container.
+5. Normalizes input/output path strings.
+6. Creates output, model, and plot directories if needed.
+7. Instantiates components from `system_components`.
+8. Instantiates kinematic data, population data, and MGE data objects.
+9. Reads system-level parameters and attributes.
+10. Reads orbit-library, parameter-space, legacy, weight-solver, IO, and
+    multiprocessing settings.
+11. Validates the system and settings.
+12. Builds `ParameterSpace`.
+13. Builds `AllModels`.
+14. Updates status for existing model outputs.
+15. Precomputes projected mass constraints for non-legacy weight solving.
+
+The config file is therefore not just input. It is a complete recipe for a
+disk-backed modelling campaign.
+
+## Config Sections
+
+Typical config sections are:
+
+- `system_attributes`
+- `system_components`
+- `system_parameters`
+- `orblib_settings`
+- `weight_solver_settings`
+- `parameter_space_settings`
+- `legacy_settings`
+- `io_settings`
+- `multiprocessing_settings`
+
+### system_attributes
+
+Allowed attributes are currently:
+
+- `distMPc`: distance in megaparsecs.
+- `name`: system name.
+
+The code rejects unknown keys in this section.
+
+### system_components
+
+This section declares physical components such as:
+
+- `Plummer`: normally used for the central black hole / compact component.
+- `TriaxialVisibleComponent`: stellar component with MGE and kinematics.
+- `BarDiskComponent`: barred/disk visible component variant.
+- `NFW`, `NFW_m200_c`, `Hernquist`, `TriaxialCoredLogPotential`,
+  `GeneralisedNFW`: dark components.
+- `Chi2Ext`: optional external chi-square contribution.
+
+For ordinary components, the config value `type` is used as a class name under
+`dynamite.physical_system`.
+
+Visible components may include:
+
+- `mge_pot`
+- `mge_lum`
+- `disk_pot`
+- `disk_lum`
+- `kinematics`
+- `populations`
+
+Every included component must declare `parameters`.
+
+Component parameters become namespaced internally by appending the component
+name. For example, the `q` parameter on component `stars` becomes `q-stars`.
+
+### system_parameters
+
+System-level parameters include:
+
+- `ml`: mass-to-light ratio. This must be the first system parameter.
+- `omega`: optional, used for barred/rotating systems. If present, this must be
+  the second system parameter.
+
+The system currently rejects additional system parameters beyond `ml` and
+optional `omega`.
+
+### orblib_settings
+
+This section controls orbit library construction.
+
+Common settings seen in sample configs:
+
+- `nE`: number of energy shells.
+- `logrmin`, `logrmax`: radial range.
+- `nI2`, `nI3`: integral grid dimensions.
+- `dithering`: orbit dithering.
+- `orbital_periods`: integration length.
+- `sampling`: orbit sampling count.
+- `starting_orbit`: first orbit index.
+- `number_orbits`: number to integrate; `-1` means all orbits.
+- `accuracy`: Fortran-style accuracy string in examples.
+- `random_seed`: `<= 0` means stochastic seed in the example comments.
+
+Validation enforces `nI2 >= 4`. Missing quadrature settings are defaulted:
+
+- `quad_nr`: default `10`
+- `quad_nth`: default `6`
+- `quad_nph`: default `6`
+
+### weight_solver_settings
+
+This section chooses how orbital weights are solved.
+
+Observed solver types:
+
+- `LegacyWeightSolver`: Fortran-backed legacy NNLS path.
+- `NNLS`: Python NNLS path.
+
+Common settings:
+
+- `type`
+- `nnls_solver`
+- `regularisation`
+- `number_GH`
+- `GH_sys_err`
+- `lum_intr_rel_err`
+- `sb_proj_rel_err`
+- `reattempt_failures`
+- `CRcut`
+- `maxiter_factor` for SciPy NNLS
+
+If `reattempt_failures` is omitted, `Configuration` defaults it to `True`.
+
+If `nnls_solver` is `cvxopt` and the module is not installed, settings
+validation raises `ModuleNotFoundError`.
+
+### parameter_space_settings
+
+This section chooses the parameter generator and stopping criteria.
+
+Observed generator types:
+
+- `LegacyGridSearch`
+- `GridWalk`
+- `FullGrid`
+- `SpecificModels`
+
+Common keys:
+
+- `generator_type`
+- `which_chi2`
+- `generator_settings`
+- `stopping_criteria`
+
+Stopping criteria commonly include:
+
+- `min_delta_chi2_abs`
+- `min_delta_chi2_rel`
+- `n_max_mods`
+- `n_max_iter`
+
+For `LegacyGridSearch`, `Configuration` can translate either an absolute
+threshold or a threshold expressed as a fraction of `sqrt(2*nobs)` into
+`threshold_del_chi2`.
+
+### legacy_settings
+
+`legacy_settings.directory` identifies the legacy Fortran executable directory.
+
+If the value is `default`, `Configuration` resolves it to the repository's
+`legacy_fortran` directory. A trailing slash is removed.
+
+### io_settings
+
+Required keys:
+
+- `input_directory`
+- `output_directory`
+- `all_models_file`
+
+`Settings.add("io_settings", values)` also derives:
+
+- `model_directory = output_directory + "models/"`
+- `plot_directory = output_directory + "plots/"`
+
+`Configuration` creates these directories if they do not exist. If
+`reset_existing_output=True` is passed to `Configuration`, the existing output
+directory tree is deleted before creation.
+
+### multiprocessing_settings
+
+Controls parallelism and iterator type.
+
+Observed/defaulted keys:
+
+- `ncpus`: integer or `all_available`
+- `ncpus_weights`: defaults to `ncpus`
+- `ncpus_ext`: defaults to `ncpus`
+- `modeliterator`: defaults to `ModelInnerIterator`
+- `orblibs_in_parallel`: defaults to `False`
+
+If running under Slurm, the code checks `SLURM_JOB_CPUS_PER_NODE` and may add
+the current working directory to `sys.path`.
+
+## Runtime Object Model
+
+### Settings
+
+`config_reader.Settings` is a plain container for the major config settings:
+
+- `orblib_settings`
+- `parameter_space_settings`
+- `legacy_settings`
+- `io_settings`
+- `weight_solver_settings`
+- `multiprocessing_settings`
+
+It also validates expected sections and some solver/orbit-library details.
+
+### System
+
+`physical_system.System` represents the galaxy or stellar system. It owns:
+
+- component list
+- system-level parameters
+- distance
+- name
+- counts of kinematic and population data sets
+
+Validation checks:
+
+- system has `distMPc` and `name`
+- system has components
+- first system parameter is `ml`
+- optional second system parameter is `omega`
+- no extra system parameters beyond those
+- component structure is consistent
+
+### Components
+
+`physical_system.Component` is the base class. Subclasses specialize it:
+
+- visible components carry MGE data and kinematics
+- dark components provide potential/density/mass functions
+- Plummer is used as a compact central component
+- `Chi2Ext` delegates external chi-square calculation to a user-provided class
+
+Components own their own parameter list. A component can validate both its
+declared parameter names and a proposed parameter set.
+
+### Parameters
+
+`parameter_space.Parameter` represents one model parameter.
+
+Important ideas:
+
+- A parameter has a stored value.
+- A parameter may be fixed or free.
+- A parameter can be logarithmic.
+- A parameter may carry generator settings such as `lo`, `hi`, `step`, and
+  `minstep`.
+- Raw values and physical parameter values can differ. The current explicit
+  transformation is logarithmic conversion.
+
+### ParameterSpace
+
+`parameter_space.ParameterSpace` is a list of all parameters from:
+
+1. every component
+2. the system itself
+
+It records:
+
+- `par_names`
+- total parameter count
+- fixed/free parameter counts
+
+It can:
+
+- convert raw values to parameter values
+- convert parameter values back to raw values
+- find parameters by name
+- produce a one-row Astropy table representing the current parameter set
+- validate a candidate parameter set through the system and components
+
+## Input Data Objects
+
+### MGE
+
+`mges.MGE` reads Multi Gaussian Expansion data. Visible components use:
+
+- `mge_pot` for potential/mass density
+- `mge_lum` for luminosity density
+
+MGE methods support:
+
+- validating observed axis ratios
+- converting old formats
+- calculating projected masses
+- calculating intrinsic masses
+- adding MGE objects for barred/disk combined luminosity cases
+
+### Kinematics
+
+`kinematics.Kinematics` is the base. Important subclasses:
+
+- `GaussHermite`
+- `BayesLOSVD`
+
+Kinematics data can:
+
+- read observed data
+- validate and update data for solver settings
+- convert to old Fortran-compatible formats
+- transform orbit-library outputs into observables
+- provide observed values and uncertainties for fitting
+
+`GaussHermite` handles velocity, dispersion, and higher-order GH coefficients.
+`BayesLOSVD` handles histogrammed LOSVD data and HDF5/ECSV conversion support.
+
+### Populations
+
+`populations.Populations` stores integrated population data. Population data is
+used by orbit-coloring workflows and may be attached to visible components or
+derived from kinematic data with population columns.
+
+## Model Tracking: all_models.ecsv
+
+`model.AllModels` manages the global model table.
+
+The filename comes from:
+
+```text
+output_directory + all_models_file
+```
+
+The table includes:
+
+- one column per parameter
+- `chi2`
+- `kinchi2`
+- `kinmapchi2`
+- optional `chi2_ext_added`
+- `time_modified`
+- `orblib_done`
+- `weights_done`
+- `all_done`
+- `which_iter`
+- `directory`
+
+This table is the central checkpoint and resume mechanism.
+
+`AllModels` can:
+
+- create an empty table
+- read a previous table from disk
+- update stale/incomplete status by inspecting model directories
+- detect existing orbit libraries
+- detect existing weights
+- add external chi-square where needed
+- delete unusable incomplete model rows when configured not to retry failures
+- save the table
+- retrieve best models
+- map rows to `Model` objects
+- compute velocity-scaling factors when reusing orbit libraries across `ml`
+
+The table is saved repeatedly during iteration so a failed run can often be
+resumed or repaired.
+
+## Model Directory Structure
+
+Individual models live under:
+
+```text
+<output_directory>/models/
+```
+
+Directory names are assigned by `ModelInnerIterator.assign_model_directories`.
+
+New orbit-library models use:
+
+```text
+orblib_<iteration>_<index>/ml<ml_value>/
+```
+
+Example shape:
+
+```text
+NGC6278_output/
+  all_models.ecsv
+  plots/
+  models/
+    orblib_000_000/
+      infil/
+      datfil/
+      ml05.00/
+```
+
+The `orblib_...` directory contains orbit-library files shared by all models
+with the same orbit-library-defining parameters. The nested `ml...` directory
+contains mass-to-light specific weight-solver output.
+
+This distinction matters. Changing only `ml` can reuse the same orbit library
+with velocity scaling, while other parameter changes require a new orbit
+library.
+
+## Model Object Lifecycle
+
+`model.Model` represents one row of `all_models.ecsv`.
+
+Initialization:
+
+1. Receives `config` and `parset`.
+2. Validates the parameter set against the parameter space.
+3. Determines the model directory from `all_models.ecsv` unless explicitly
+   provided.
+4. Derives `directory_noml`, the shared orbit-library directory.
+5. Warns if the current config file differs from a config backup in the model
+   directory.
+
+Main methods:
+
+- `setup_directories()`: creates model, `infil/`, and `datfil/` directories.
+- `get_orblib()`: instantiates `LegacyOrbitLibrary` and runs it.
+- `get_weights(orblib)`: chooses and runs the configured weight solver.
+
+`get_weights()` writes results back to the model object:
+
+- `weights`
+- `chi2`
+- `kinchi2`
+- `kinmapchi2`
+
+## Parameter Generation
+
+`ModelIterator` chooses a generator class from
+`parameter_space_settings.generator_type`.
+
+`ParameterGenerator.generate()` wraps every concrete generator:
+
+1. Check stopping criteria.
+2. Generate proposed parameter models through the subclass method.
+3. Filter out already-run or invalid models.
+4. Convert raw values to parameter values.
+5. Add valid models to `AllModels.table`.
+6. Update status.
+
+Special behavior:
+
+- If this is the first generation step, the generator may combine iterations
+  0 and 1 by calling the specific generation method twice.
+- A generated "model" in this layer is a list of `Parameter` objects, not a
+  `model.Model` instance.
+
+Generator classes:
+
+- `LegacyGridSearch`: legacy-style parameter stepping around best models.
+- `GridWalk`: walks a grid from a center point.
+- `FullGrid`: enumerates a full grid.
+- `SpecificModels`: runs explicitly listed parameter combinations.
+
+## Model Iteration
+
+`model_iterator.ModelIterator` is the high-level "run everything" object.
+
+On construction it:
+
+1. Reads parameter-space settings.
+2. Instantiates the configured parameter generator.
+3. Optionally creates a `Plotter`.
+4. Instantiates the configured inner iterator, usually `ModelInnerIterator`.
+5. Determines the previous iteration from `all_models.ecsv`.
+6. Optionally reattempts failed weight solving.
+7. Loops until `n_max_iter`, `n_max_mods`, no-new-models, or another stopping
+   criterion stops the run.
+8. After successful iterations, attempts plots.
+
+`ModelInnerIterator.run_iteration()` is the core work loop:
+
+1. Ask the parameter generator to add new rows to `AllModels`.
+2. Save `AllModels` immediately after adding parameter rows.
+3. Find new rows with empty `directory`.
+4. Split rows into:
+   - rows needing new orbit libraries
+   - rows that can reuse an existing orbit library and only need weights
+5. Assign model directory names.
+6. Save `AllModels` again so directories survive failures.
+7. Run model work in multiprocessing pools.
+8. Write model results back into the table.
+9. Optionally add external chi-square values.
+10. Save `AllModels` again.
+
+The iterator takes care to avoid computing the same orbit library twice when
+multiple rows share orbit-library-defining parameters.
+
+## Parallelism
+
+DYNAMITE uses `pathos.multiprocessing.Pool` in the model iterator.
+
+Relevant CPU settings:
+
+- `ncpus`: orbit-library/model pool.
+- `ncpus_weights`: weight-solving pool for split execution.
+- `ncpus_ext`: external chi-square pool.
+- `orblibs_in_parallel`: controls whether tube and box orbit-library work can
+  be launched in parallel inside `LegacyOrbitLibrary`.
+
+There are two execution modes in `run_iteration()`:
+
+- default: run new orbit libraries and their weights together, then run
+  remaining `ml`-only weights.
+- split mode: run all orbit libraries first, then all weights, then external
+  chi-square.
+
+The default entry path uses the configured inner iterator. `SplitModelIterator`
+exists as a specialized subclass.
+
+## Orbit Library Generation
+
+`orblib.LegacyOrbitLibrary` is the main orbit-library implementation.
+
+Despite the abstract `OrbitLibrary` base class, the runtime path uses legacy
+Fortran programs. Python prepares files, calls executables, and reads results.
+
+Important initialization inputs:
+
+- `config`
+- `mod_dir`: orbit-library directory without the `ml` subdirectory
+- `parset`: model parameters
+
+Important state:
+
+- `system`
+- `settings.orblib_settings`
+- `legacy_directory`
+- `input_directory`
+- whether the configured solver is `LegacyWeightSolver`
+- whether orbit libraries should run in parallel
+- velocity scaling factor for models reusing an orbit library
+
+`get_orblib()` does nothing if:
+
+```text
+datfil/tube_box_done
+```
+
+already exists in the orbit-library directory.
+
+If the orbit library is missing, it:
+
+1. Writes Fortran orbit-library input files into `infil/`.
+2. Copies aperture and bin files for kinematic and population data.
+3. Generates orbit initial conditions if `begin.dat` and `beginbox.dat` are
+   missing.
+4. Runs tube and box orbit-library programs.
+5. For non-legacy weight solving, calculates intrinsic masses through the MGE
+   code.
+6. Touches `datfil/tube_box_done` if both `tube_done` and `box_done` exist.
+
+Generated files mentioned in docstrings include:
+
+- `begin.dat`
+- `beginbox.dat`
+- `orblib.dat.bz2`
+- `orblib.dat_orbclass.out`
+- `orblibbox.dat.bz2`
+- `orblibbox.dat_orbclass.out`
+- `mass_aper.dat` for legacy solver mode
+- `mass_qgrid.dat` or `mass_qgrid.ecsv`
+- `mass_radmass.dat` or `mass_radmass.ecsv`
+- status and log files
+
+The orbit-library code translates Python/domain parameters into legacy input
+files such as:
+
+- `parameters_pot.in`
+- `parameters_lum.in`
+- `orblib.in`
+- `orblibbox.in`
+- `triaxmass.in`
+- `triaxmassbin.in`
+
+The dark halo path supports zero or one non-Plummer dark component. More than
+one non-Plummer dark component raises an error in the legacy input path.
+
+## Fortran Backend Relationship
+
+The Python package treats `legacy_fortran/` as an executable numerical backend.
+
+Typical roles:
+
+- generate orbit initial conditions
+- integrate tube and box orbits
+- build orbit libraries
+- compute mass grids
+- run legacy non-negative least-squares solving
+
+Important executable names from packaging or code context include:
+
+- `orbitstart`
+- `orbitstart_bar`
+- `orblib`
+- `orblib_new_mirror`
+- `orblib_bar`
+- `partgen`
+- `triaxmass`
+- `triaxmass_bar`
+- `triaxmassbin`
+- `triaxmassbin_bar`
+- `triaxnnls_CRcut`
+- `triaxnnls_noCRcut`
+- `triaxnnls_bar`
+
+The Fortran layer is not just optional historical code for full traditional
+runs. It is part of the model execution path unless a workflow is specifically
+configured to avoid the legacy weight solver where possible.
+
+## Weight Solving
+
+`weight_solvers.WeightSolver` is the base class. Implementations include:
+
+- `LegacyWeightSolver`
+- `NNLS`
+
+The solver stage finds non-negative orbital weights that best reproduce the
+observations and mass constraints.
+
+Returned values are:
+
+- `weights`
+- `chi2_tot`
+- `chi2_kin`
+- `chi2_kinmap`
+
+These become:
+
+- `Model.weights`
+- `Model.chi2`
+- `Model.kinchi2`
+- `Model.kinmapchi2`
+
+### LegacyWeightSolver
+
+The legacy solver calls Fortran NNLS-style programs:
+
+- `triaxnnls_CRcut`
+- `triaxnnls_noCRcut`
+- barred variants where applicable
+
+It prepares old-format kinematic input files, writes `nn.in`, runs the solver,
+and reads the solver outputs.
+
+It supports the `CRcut` setting for the counter-rotating orbit problem.
+
+### NNLS
+
+The Python `NNLS` class constructs an NNLS matrix and right-hand side using:
+
+- observed mass constraints
+- orbit-library projections
+- kinematic constraints
+- regularization settings
+
+It can use SciPy's NNLS implementation or optional `cvxopt`, depending on
+configuration.
+
+### chi2_kinmap
+
+The base class provides `chi2_kinmap(weights)`, which directly compares model
+kinematic maps to observed maps for `GaussHermite` kinematics. If any
+kinematic data are not `GaussHermite`, it returns `nan` and logs why.
+
+## External Chi-Square
+
+`physical_system.Chi2Ext` allows a config to plug in an external module/class
+for additional chi-square contributions.
+
+When present:
+
+- `AllModels` adds a `chi2_ext_added` column.
+- `ModelInnerIterator` can run external chi-square after weights.
+- The external chi-square is added to `chi2`, `kinchi2`, and `kinmapchi2`.
+
+Rows that differ only in external chi-square parameters can avoid redundant
+orbit-library or weight work.
+
+## Plotting And Analysis
+
+`plotter.Plotter` is optionally created by `ModelIterator`.
+
+After successful iterations, plotting attempts include:
+
+- chi-square versus model id
+- chi-square parameter plots
+- kinematic maps for the best model so far
+
+Plotting failures are logged as warnings and do not necessarily stop modelling.
+
+`analysis.Analysis` and `analysis.Decomposition` support post-processing such
+as:
+
+- extracting projected/intrinsic model quantities
+- building kinematic maps
+- orbit decomposition
+- orbit-distribution and anisotropy analysis
+
+`coloring.Coloring` supports stellar-population or orbit-coloring workflows.
+
+## Output Files Are State
+
+DYNAMITE uses disk output as durable state. This matters when debugging.
+
+Key state files and directories:
+
+- `<output_directory>/<all_models_file>`
+- `<output_directory>/models/`
+- `<output_directory>/plots/`
+- model-specific YAML config backups
+- `infil/` input files for legacy programs
+- `datfil/` orbit-library data and status files
+- weight files under the `ml.../` directory
+
+Do not treat outputs as disposable unless the task explicitly says to reset or
+delete them. `Configuration(reset_existing_output=True)` can delete the output
+tree, but normal construction preserves existing data.
+
+## Failure And Resume Behavior
+
+DYNAMITE has explicit support for partially completed runs.
+
+During `Configuration`:
+
+- existing `all_models.ecsv` is loaded if present
+- orbit-library flags are updated by inspecting directories
+- model-table status is repaired where possible
+
+During `ModelIterator`:
+
+- `reattempt_failures=True` causes failed weights to be retried if orbit
+  libraries exist
+- rows with no usable orbit library and no weights may be removed
+- existing orbit libraries can be reused
+
+This means a failed run is often recoverable without recomputing everything.
+It also means table state and directory state must be kept consistent.
+
+## Important Scientific Assumptions
+
+This section summarizes the local audit perspective.
+
+The core non-rotating triaxial Schwarzschild/MGE modelling chain appears
+scientifically grounded. The main caveats from the local audits are:
+
+- convergence and stopping criteria require careful interpretation
+- barred-model support needs benchmarking caution
+- cored-log halo density domains need attention
+- modelling priors influence results
+- failure handling in legacy Fortran paths may be weak
+- solver status should be checked carefully
+- build and dependency environments matter
+
+For detailed audit notes, see:
+
+- `aidocs/audits/dynamite_python_audit.md`
+- `aidocs/audits/dynamite_fortran_audit.md`
+- `aidocs/audits/dynamite_scientific_correctness_audit.md`
+
+## Development And Modification Guidance
+
+When modifying this fork:
+
+1. Read `AGENTS.md`.
+2. Read `aidocs/KNOWLEDGE.md`.
+3. Keep local AI notes in `aidocs/`.
+4. Avoid editing upstream `docs/` unless explicitly asked.
+5. Avoid editing `legacy_fortran/` unless the task is specifically about the
+   Fortran backend.
+6. Avoid editing `dev_tests/` unless the task is specifically about tests or
+   examples.
+7. Check `git status --short` before and after edits.
+8. Prefer small, focused changes.
+9. Treat existing uncommitted user changes as intentional.
+10. Run the narrowest useful verification for any code change.
+
+For documentation-only changes inside `aidocs/`, code tests are usually not
+necessary.
+
+## Useful Read-Only Inspection Commands
+
+These commands are useful when orienting future work:
+
+```bash
+git remote -v
+git status --short
+rg -n "class ModelIterator|class Configuration|class Model|class AllModels" dynamite
+rg -n "generator_type|weight_solver_settings|orblib_settings" dev_tests docs
+find aidocs -maxdepth 3 -type f -print
+```
+
+## Common Places To Inspect
+
+For config parsing:
+
+- `dynamite/config_reader.py`
+
+For system and components:
+
+- `dynamite/physical_system.py`
+
+For parameter generation:
+
+- `dynamite/parameter_space.py`
+
+For model tracking and directories:
+
+- `dynamite/model.py`
+
+For the high-level run loop:
+
+- `dynamite/model_iterator.py`
+
+For orbit libraries:
+
+- `dynamite/orblib.py`
+
+For weight solving:
+
+- `dynamite/weight_solvers.py`
+
+For observed data:
+
+- `dynamite/data.py`
+- `dynamite/mges.py`
+- `dynamite/kinematics.py`
+- `dynamite/populations.py`
+
+For plotting and post-processing:
+
+- `dynamite/plotter.py`
+- `dynamite/analysis.py`
+- `dynamite/coloring.py`
+
+## Practical Workflow For Future Agents
+
+For a normal code task:
+
+1. Confirm the task scope and allowed write areas.
+2. Inspect `git status --short`.
+3. Read `aidocs/KNOWLEDGE.md`.
+4. Read the relevant source module.
+5. Make the smallest scoped edit.
+6. Update `aidocs/KNOWLEDGE.md` and `aidocs/CHANGES.md` if behavior,
+   workflow, architecture, dependencies, or operational knowledge changed.
+7. Run focused tests or static checks if code changed.
+8. Report exactly what changed and what was not tested.
+
+For a documentation-only task like this one:
+
+1. Keep edits in `aidocs/`.
+2. Do not touch upstream `docs/`, package code, legacy Fortran, or dev tests.
+3. Update the local index and current-state files.
+4. Verify no forbidden paths changed with `git status --short`.
+
+## Current Local State After This Documentation Pass
+
+Expected local untracked documentation additions:
+
+```text
+AGENTS.md
+aidocs/
+```
+
+No upstream source, upstream docs, legacy Fortran, or dev-test files should be
+modified by this documentation pass.
