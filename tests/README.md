@@ -17,6 +17,7 @@ Opt-in checks:
 
 ```bash
 DYNAMITE_RUN_LEGACY_EXEC_TESTS=1 .venv/bin/python -m pytest tests/test_fortran_inventory.py
+DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_LEGACY_EXEC_TESTS=1 .venv/bin/python -m pytest tests/test_fortran_orblib_output.py
 DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_LEGACY_EXEC_TESTS=1 .venv/bin/python -m pytest tests
 ```
 
@@ -26,15 +27,19 @@ Current coverage:
   historical example fixtures;
 - Python `MyRand` against the saved legacy random sequence;
 - compiled Fortran `ran1_nr.f` against Python `MyRand`;
-- compiled Fortran `nnls95.f` against `scipy.optimize.nnls` for several
-  reference NNLS cases;
+- compiled archived Fortran `nnls95.f` against `scipy.optimize.nnls` for
+  several reference NNLS cases;
 - inventory of legacy Fortran executables used by the Python runtime;
+- an inventory check that NNLS/GALAHAD Fortran is archived, not active;
 - static coverage for the historical Python examples, shell examples, and
   YAML/notebook workflow intent by embedding the relevant code/config facts
   directly in pytest;
 - validation of current tutorial configs and notebooks that still live under
   `docs/`;
-- no dependency on external historical test folders.
+- no dependency on external historical test folders for the default suite;
+- an opt-in slow legacy Fortran orbit-library output comparison that
+  regenerates the historical NGC6278 LOSVD workflow and compares the produced
+  velocity grid and LOSVD array statistics against `comparison_losvd.npz`.
 
-The slow marker remains available for future integration tests that generate
-orbit libraries and model outputs.
+The slow marker is used for integration tests that generate orbit libraries and
+model outputs.

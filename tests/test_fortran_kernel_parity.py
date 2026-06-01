@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 from scipy import optimize
 
-from conftest import LEGACY_FORTRAN_DIR, compile_fortran_driver
+from conftest import (
+    ARCHIVED_NNLS_FORTRAN_DIR,
+    LEGACY_FORTRAN_DIR,
+    compile_fortran_driver,
+)
 from dynamite.myrand import MyRand
 
 
@@ -71,7 +75,7 @@ end program nnls_driver
     executable = compile_fortran_driver(
         tmp_path,
         driver,
-        [LEGACY_FORTRAN_DIR / "sub" / "nnls95.f"],
+        [ARCHIVED_NNLS_FORTRAN_DIR / "sub" / "nnls95.f"],
         "nnls_driver",
     )
     completed = subprocess.run(
@@ -176,7 +180,7 @@ end program nnls_stdin_driver
     executable = compile_fortran_driver(
         tmp_path,
         driver,
-        [LEGACY_FORTRAN_DIR / "sub" / "nnls95.f"],
+        [ARCHIVED_NNLS_FORTRAN_DIR / "sub" / "nnls95.f"],
         "nnls_stdin_driver",
     )
     lines = [f"{a.shape[0]} {a.shape[1]}"]

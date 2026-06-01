@@ -8,6 +8,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEGACY_FORTRAN_DIR = REPO_ROOT / "legacy_fortran"
+ARCHIVED_NNLS_FORTRAN_DIR = (
+    REPO_ROOT / "archive" / "legacy_nnls_fortran" / "legacy_fortran"
+)
 
 
 def pytest_collection_modifyitems(config, items):

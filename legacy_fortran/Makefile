@@ -85,21 +85,10 @@ ifeq ($(compiler),gfortran)
   link = gfortran $(flags) -o
 endif
 
-# define local Galahad directory --> might need to be changed for your system
-GALAHADDIR =$(CURDIR)/galahad-2.3
-
-# Define galahad compiled libary choice (platform dependant)
-
-# MAC, gfortran
-GALAHADTYPE= mac.osx.gfo/double/
-
-# linux, ifort
-# GALAHADTYPE= pc.lnx.ifc/double
-#GALAHADTYPE= pc.lnx.gfo/double
 ##########################################################
 
-all : orbitstart orbitstart_bar orblib_new_mirror orblib_bar triaxmass triaxmass_bar triaxmassbin triaxmassbin_bar triaxnnls_CRcut triaxnnls_noCRcut triaxnnls_bar
-nogal : orbitstart orbitstart_bar orblib_new_mirror orblib_bar
+all : orbitstart orbitstart_bar orblib_new_mirror orblib_bar triaxmass triaxmass_bar triaxmassbin triaxmassbin_bar
+nogal : all
 
 #########################################################
 #
@@ -107,8 +96,8 @@ nogal : orbitstart orbitstart_bar orblib_new_mirror orblib_bar
 #
 #########################################################
 
-RCS : Makefile iniparam_f.f90 orblib_f_new_mirror.f90 triaxpotent.f90 interpolpotent.f90 orblibprogram.f90 triaxmassbin.f90 triaxmass.f90 orbitstart.f90 triaxnnls_CRcut.f90 triaxnnls_noCRcut.f90 dmpotent.f90
-	ci -q -l -mcompile Makefile iniparam_f.f90 orblib_f_new_mirror.f90 triaxpotent.f90 interpolpotent.f90 orblibprogram.f90 triaxmassbin.f90 triaxmass.f90 orbitstart.f90 triaxnnls_CRcut.f90 triaxnnls_noCRcut.f90 dmpotent.f90
+RCS : Makefile iniparam_f.f90 orblib_f_new_mirror.f90 triaxpotent.f90 interpolpotent.f90 orblibprogram.f90 triaxmassbin.f90 triaxmass.f90 orbitstart.f90 dmpotent.f90
+	ci -q -l -mcompile Makefile iniparam_f.f90 orblib_f_new_mirror.f90 triaxpotent.f90 interpolpotent.f90 orblibprogram.f90 triaxmassbin.f90 triaxmass.f90 orbitstart.f90 dmpotent.f90
 
 ##########################################################
 #
@@ -183,12 +172,6 @@ dop853.o: ./sub/dop853.f
 dopri5.o: ./sub/dopri5.f
 	$(fortran77) ./sub/dopri5.f
 
-nnls95.o : ./sub/nnls95.f
-	$(fortran77) ./sub/nnls95.f
-
-gausherm.o : ./sub/gausherm.f
-	$(fortran77) ./sub/gausherm.f
-
 dqxgs.o : ./sub/dqxgs.f
 	$(fortran77)  ./sub/dqxgs.f
 
@@ -250,47 +233,6 @@ orbitstart : $(ORBLIBNMOBJ) orbitstart_f.o orbitstart.f90
 orbitstart_bar : $(ORBLIBNMOBJ) orbitstart_f.o orbitstart_bar.f90
 	$(link) orbitstart_bar  $(ORBLIBNMOBJ) orbitstart_f.o orbitstart_bar.f90
 
-##############################################################
-#
-# triaxnnls_CRcut
-# triaxnnls_noCRcut
-##############################################################
-
-OBJECTS5_out = nnls95.o iniparam_f.o numeric_kinds_f.o gausherm.o triaxnnls_CRcut.o
-
-
-triaxnnls_CRcut : $(OBJECTS5_out)
-	$(link) triaxnnls_CRcut $(OBJECTS5_out)   -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)  -lgalahad  -lgalahad_hsl -lgalahad_metis -lgalahad_lapack -lgalahad_blas
-
-triaxnnls_CRcut.o : triaxnnls_CRcut.f90 numeric_kinds_f.o iniparam_f.o
-	$(fortran90) triaxnnls_CRcut.f90  -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)
-
-##############################################################
-#
-##############################################################
-
-OBJECTS5_out_nl = nnls95.o iniparam_f.o numeric_kinds_f.o gausherm.o triaxnnls_bar.o
-
-triaxnnls_bar : $(OBJECTS5_out_nl)
-	$(link) triaxnnls_bar $(OBJECTS5_out_nl)   -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)  -lgalahad  -lgalahad_hsl -lgalahad_metis -lgalahad_lapack -lgalahad_blas
-
-triaxnnls_bar.o : triaxnnls_bar.f90 numeric_kinds_f.o iniparam_f.o
-	$(fortran90) triaxnnls_bar.f90  -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)
-
-
-##############################################################
-#
-##############################################################
-
-OBJECTS7 = nnls95.o iniparam_f.o numeric_kinds_f.o gausherm.o triaxnnls_noCRcut.o
-
-triaxnnls_noCRcut : $(OBJECTS7)
-	$(link) triaxnnls_noCRcut $(OBJECTS7)   -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)  -lgalahad  -lgalahad_hsl -lgalahad_metis -lgalahad_lapack -lgalahad_blas
-
-triaxnnls_noCRcut.o : triaxnnls_noCRcut.f90 numeric_kinds_f.o iniparam_f.o
-	$(fortran90) triaxnnls_noCRcut.f90  -I$(GALAHADDIR)/modules/$(GALAHADTYPE)  -L$(GALAHADDIR)/objects/$(GALAHADTYPE)
-
-
 ##########################################
 #
 #  Utilities
@@ -298,7 +240,7 @@ triaxnnls_noCRcut.o : triaxnnls_noCRcut.f90 numeric_kinds_f.o iniparam_f.o
 ##########################################
 
 distclean:
-	rm -f *.o *.il *.mod *.dyn work.* *.d *.exe ifc* *.dpi *.spi gmon.out orbitstart orbitstart_bar orblib_new_mirror orblib_bar triaxmass triaxmass_bar triaxmassbin triaxmassbin_bar triaxnnls_CRcut triaxnnls_noCRcut triaxnnls_bar
+	rm -f *.o *.il *.mod *.dyn work.* *.d *.exe ifc* *.dpi *.spi gmon.out orbitstart orbitstart_bar orblib_new_mirror orblib_bar triaxmass triaxmass_bar triaxmassbin triaxmassbin_bar
 
 clean:
 	rm -f *.o *.il *.mod work.* *.d ifc*

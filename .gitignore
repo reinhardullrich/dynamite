@@ -51,6 +51,17 @@ archive/dev_tests/bayes_losvd/IC0719_output/
 archive/dev_tests/Data_prep/Dyn_input/ATLAS3D/*
 archive/dev_tests/Data_prep/Dyn_input/CALIFA/*
 
+# Archived legacy NNLS/GALAHAD build products #
+archive/legacy_nnls_fortran/legacy_fortran/*.o
+archive/legacy_nnls_fortran/legacy_fortran/*.mod
+archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_CRcut
+archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut
+archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_bar
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/versions/pc.lnx.gfo
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/makefiles/pc.lnx.gfo
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/modules/
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/
+
 # Documentation build files #
 docs/_build/
 !docs/tutorial_notebooks/NGC6278_input/dynamite_input/mge.ecsv
