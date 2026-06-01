@@ -34,4 +34,7 @@ remains local AI/agent documentation for the personal fork.
   checks after the initial audit gap was closed.
 - `14_improvement_opportunities.md`: non-bug-fix performance, smoothness,
   maintainability, and simplification roadmap.
+- `15_nnls_galahad_scipy_benchmark.md`: solver-path clarification, GALAHAD vs
+  legacy Fortran NNLS vs Python SciPy/CVXOPT usage, benchmark results, and
+  removal options.
 - `SUMMARY.md`: final prioritized findings and recommended next actions.

@@ -198,6 +198,31 @@ Highest-payoff improvement themes:
    - evaluate `scipy.lsq_linear` and sparse/iterative approaches only after
      matrix density and memory use are measured.
 
+## Solver Benchmark Follow-Up
+
+The solver-specific continuation is recorded in
+`15_nnls_galahad_scipy_benchmark.md`.
+
+Key result:
+
+- SciPy `optimize.nnls` matched the old Fortran Lawson-Hanson NNLS solution to
+  roundoff on the five tested NGC6278 models.
+- SciPy `optimize.nnls` was the fastest valid backend once the matrix existed:
+  about `0.039 s` mean solver time.
+- CVXOPT installed locally and worked as an optional cross-check, but required
+  stricter tolerances and was slower.
+- GALAHAD/QPB mode `5` failed on all five tested models with
+  `QPB_solve exit status = -5`.
+
+Recommendation:
+
+- remove GALAHAD from the required/recommended workflow for normal plain-NNLS
+  DYNAMITE work;
+- keep legacy Fortran/GALAHAD only as compatibility/reproduction mode until
+  parity tests cover the scientific cases Thomas still needs;
+- convert the existing `dev_tests/test_reimplement_nnls.py` comparison into a
+  real pass/fail pytest parity test before deleting legacy solver code.
+
 ## Local Worktree Status
 
 Expected new local documentation:
