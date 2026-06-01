@@ -50,7 +50,9 @@ changes from the original project.
   repository/build, configuration, physical model, data ingestion, model
   iteration, orbit-library boundary, weight solving, Fortran backend,
   analysis/plotting/coloring, tests/docs, scientific correctness, and
-  operational risk. Start with `SUMMARY.md` for the prioritized results.
+  operational risk. It also includes an improvement-focused continuation in
+  `14_improvement_opportunities.md`. Start with `SUMMARY.md` for the
+  prioritized results.
 
 ## Main Project Layout
 
@@ -89,6 +91,11 @@ source files.
   `QPB_solve exit status = -5` while the shell process exited `0` and output
   files were written. Treat solver-status propagation as a confirmed high-risk
   issue.
+- Improvement continuation: `14_improvement_opportunities.md` focuses on
+  non-bug-fix changes: lazy imports, binary sidecar caches, prepared NNLS matrix
+  caching, stable model/orbit-library keys, explicit timing manifests,
+  structured command specs, typed settings wrappers, and smaller stage-specific
+  helper functions.
 
 ## Separated Workspaces
 

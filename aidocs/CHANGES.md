@@ -44,3 +44,16 @@ This file is append-only. Add new entries at the bottom.
   `triaxnnls_noCRcut` and `triaxnnls_CRcut`, but both logged
   `QPB_solve exit status = -5` while the shell process exited `0` and wrote
   output files.
+- Added `aidocs/audits/full-audit-2026-06-01/14_improvement_opportunities.md`
+  as a non-bug-fix improvement roadmap covering import speed, runtime storage,
+  NNLS matrix caching, table lookup keys, runtime manifests, command execution,
+  typed settings, method extraction, and build-profile improvements.
+- Clarified the improvement roadmap after local timing checks: `import dynamite`
+  is about 3.6 seconds in this environment, which matters for short tools and
+  tests, but full legacy model runs are dominated by Fortran orbit-library
+  generation and surrounding disk I/O rather than startup time.
+- Expanded `IM-015` in `14_improvement_opportunities.md` with a staged modern
+  solver roadmap: common `SolverProblem` / `SolverResult`, SciPy NNLS baseline,
+  optional `scipy.lsq_linear`, CVXOPT cross-checks, sparse-path prerequisites,
+  legacy Fortran/GALAHAD compatibility mode, and required parity tests before
+  changing defaults.

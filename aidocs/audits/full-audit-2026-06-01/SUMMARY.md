@@ -149,6 +149,55 @@ Priority: high/medium depending on workflow.
    - prefer `uv` for future fresh setup if desired;
    - record/lock package versions for repeatable audits.
 
+## Improvement Roadmap
+
+The improvement-focused continuation is recorded in
+`14_improvement_opportunities.md`. It intentionally avoids bug-fix work and
+focuses on making the existing system faster, smoother, shorter, and easier to
+develop.
+
+Highest-payoff improvement themes:
+
+0. Keep runtime expectations realistic:
+   - local `import dynamite` takes about 3.6 seconds, so startup matters for
+     short tools and test collection;
+   - full legacy model runs are dominated by Fortran orbit-library generation
+     and surrounding disk I/O, not import time.
+
+1. Reduce hot-path text I/O:
+   - keep ECSV for inspection/export;
+   - use binary sidecars for large runtime arrays, weights, mass grids, and
+     cacheable solver inputs.
+
+2. Cache prepared solver inputs:
+   - cache NNLS matrix blocks by orbit-library/settings/input hash;
+   - avoid rebuilding identical matrix components for repeated solves.
+
+3. Speed table lookups:
+   - create stable `model_key` and `orblib_key` values;
+   - replace repeated full-table scans with dictionary lookups.
+
+4. Make runtime stages explicit:
+   - separate config parsing from output mutation;
+   - add per-stage timing manifests;
+   - move shell command generation toward structured command specs.
+
+5. Make imports lighter for developer ergonomics:
+   - reduce eager imports from `dynamite/__init__.py`;
+   - avoid pulling plotting/coloring/PyMC dependencies into every basic import.
+
+6. Make the code shorter and easier to modify:
+   - extract large methods into stage-specific helpers;
+   - introduce typed settings wrappers incrementally;
+   - add a small public workflow API for validate/plan/run/resume/summarize.
+
+7. Treat Python `NNLS` as the modern solver path:
+   - keep legacy Fortran/GALAHAD as compatibility and parity-reference backend;
+   - introduce a common `SolverProblem` / `SolverResult` interface;
+   - add parity checks before changing defaults;
+   - evaluate `scipy.lsq_linear` and sparse/iterative approaches only after
+     matrix density and memory use are measured.
+
 ## Local Worktree Status
 
 Expected new local documentation:

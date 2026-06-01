@@ -32,4 +32,6 @@ remains local AI/agent documentation for the personal fork.
   concurrency, and local/global install risk findings.
 - `13_galahad_runtime_check.md`: local GALAHAD build, link, and runtime solver
   checks after the initial audit gap was closed.
+- `14_improvement_opportunities.md`: non-bug-fix performance, smoothness,
+  maintainability, and simplification roadmap.
 - `SUMMARY.md`: final prioritized findings and recommended next actions.
