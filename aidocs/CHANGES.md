@@ -57,3 +57,20 @@ This file is append-only. Add new entries at the bottom.
   optional `scipy.lsq_linear`, CVXOPT cross-checks, sparse-path prerequisites,
   legacy Fortran/GALAHAD compatibility mode, and required parity tests before
   changing defaults.
+
+## 2026-06-02
+
+- Added `aidocs/fortran_orbit_library_engine.md`, a detailed analysis of
+  `legacy_fortran/orblib_f_new_mirror.f90`, covering runtime wiring,
+  Fortran module responsibilities, orbit integration and projection flow,
+  computational hotspots, multiprocessing boundaries, output contracts, and
+  replacement strategy.
+- Updated `aidocs/README.md` and `aidocs/KNOWLEDGE.md` to reference the new
+  Fortran orbit-library engine analysis.
+- Added `tests/test_fortran_orblib_output.py`, an opt-in slow legacy Fortran
+  regression test that regenerates the NGC6278 orbit-library LOSVD workflow
+  from self-contained fixtures under `tests/fixtures/orblib_losvd/` and
+  compares the produced velocity grid and LOSVD output statistics against the
+  local reference fixture.
+- Updated `aidocs/KNOWLEDGE.md` to document the new Fortran orbit-library
+  output comparison and fixture location.

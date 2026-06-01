@@ -1,6 +1,6 @@
 # Project Knowledge
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 This file is the canonical current-state overview for the local DYNAMITE fork
 at `/home/reinhard/projects/thomas/dynamite`.
@@ -42,6 +42,10 @@ changes from the original project.
   repository.
 - `aidocs/dynamite_code_map.md`: map of major DYNAMITE modules and
   responsibilities.
+- `aidocs/fortran_orbit_library_engine.md`: detailed analysis of the active
+  Fortran orbit-library backend in `legacy_fortran/orblib_f_new_mirror.f90`,
+  including module responsibilities, runtime connections, compute hotspots,
+  multiprocessing boundaries, and replacement risks.
 - `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
 - `aidocs/audits/dynamite_fortran_audit.md`: Fortran-side audit findings.
 - `aidocs/audits/dynamite_scientific_correctness_audit.md`: scientific
@@ -61,9 +65,14 @@ changes from the original project.
 - `legacy_fortran/`: legacy Fortran backend for orbit starts, orbit
   integration, orbit-library construction, mass calculations, and legacy
   non-negative least-squares/GALAHAD workflows.
+- `tests/`: local pytest baseline for Fortran replacement work. The default
+  suite covers fixture contracts, extracted historical workflow facts, and
+  small Fortran kernel parity checks; opt-in slow/legacy tests include a
+  generated orbit-library LOSVD output comparison against the self-contained
+  NGC6278 fixture in `tests/fixtures/orblib_losvd/`.
 - `docs/`: upstream Sphinx documentation.
-- `dev_tests/`: upstream development tests, notebooks, and sample
-  configurations.
+- `archive/dev_tests/`: archived upstream development tests, notebooks, sample
+  configurations, and historical fixtures kept for human reference.
 - `.github/workflows/ci.yml`: upstream CI workflow.
 - `requirements.txt` and `setup.py`: upstream Python packaging inputs.
 
