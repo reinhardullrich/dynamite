@@ -1,14 +1,12 @@
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEV_TESTS_DIR = REPO_ROOT / "archive" / "dev_tests"
 LEGACY_FORTRAN_DIR = REPO_ROOT / "legacy_fortran"
 
 
@@ -48,37 +46,3 @@ def compile_fortran_driver(tmp_path, driver_source, sources, output_name):
     cmd.extend(str(source) for source in sources)
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
     return executable
-
-
-def run_python_script(script_path, cwd, timeout=900):
-    env = os.environ.copy()
-    pythonpath = str(REPO_ROOT)
-    if env.get("PYTHONPATH"):
-        pythonpath = pythonpath + os.pathsep + env["PYTHONPATH"]
-    env["PYTHONPATH"] = pythonpath
-    return subprocess.run(
-        [sys.executable, str(script_path)],
-        cwd=cwd,
-        env=env,
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-    )
-
-
-def copy_dev_tests_workspace(tmp_path):
-    target = tmp_path / "dev_tests"
-    shutil.copytree(
-        DEV_TESTS_DIR,
-        target,
-        ignore=shutil.ignore_patterns(
-            "__pycache__",
-            "*.pyc",
-            "*_output",
-            "output_*.txt",
-            "*.log",
-        ),
-    )
-    return target
