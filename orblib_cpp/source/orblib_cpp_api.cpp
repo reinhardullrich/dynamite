@@ -1546,6 +1546,45 @@ extern "C" void orblib_cpp_api_write_qgrid_file(
     }
 }
 
+extern "C" void orblib_cpp_api_write_losvd_histogram_file(
+    const char* output_path,
+    int orbit_count,
+    int aperture_count,
+    int velocity_bin_count,
+    double velocity_bin_width,
+    const int* begin_offsets,
+    const int* end_offsets,
+    const double* histograms,
+    int* status
+) noexcept {
+    if (output_path == nullptr || orbit_count <= 0 || aperture_count <= 0 ||
+        velocity_bin_count <= 0 || velocity_bin_width <= 0.0 ||
+        begin_offsets == nullptr || end_offsets == nullptr || histograms == nullptr ||
+        !std::isfinite(velocity_bin_width)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::write_losvd_histogram_file(
+                output_path,
+                orbit_count,
+                aperture_count,
+                velocity_bin_count,
+                velocity_bin_width,
+                begin_offsets,
+                end_offsets,
+                histograms
+            )) {
+            set_status(status, kStatusIoError);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_run_orbitstart_memory(
     int,
     int,

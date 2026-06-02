@@ -90,6 +90,7 @@ orblib_cpp_api_qgrid_boundaries
 orblib_cpp_api_accumulate_qgrid
 orblib_cpp_api_normalize_qgrid
 orblib_cpp_api_write_qgrid_file
+orblib_cpp_api_write_losvd_histogram_file
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -175,9 +176,11 @@ Current branch status:
   `dynamite::orblib_cpp::normalize_losvd_histogram`, and
   `dynamite::orblib_cpp::compute_sparse_losvd_ranges`, and tested against
   Python mirrors of the Fortran `binning_add_it_up()`, `histogram_write()`,
-  and `histogram_write_compat_sparse()` preparation formulas. Actual binary
-  LOSVD file serialization and full orbit-engine wiring are not part of this
-  helper.
+  and `histogram_write_compat_sparse()` preparation formulas. Sparse LOSVD
+  Fortran-record binary serialization is ported in
+  `orblib_cpp/source/orbit_output.cpp` as `write_losvd_histogram_file()` and
+  tested by reading the generated file through SciPy `FortranFile`. Full
+  orbit-engine wiring is not part of this helper.
 - Intrinsic qgrid boundary setup, moment accumulation, orbit-type channel
   accumulation, and normalization are ported in `orblib_cpp/source/orbit_qgrid.cpp`
   and tested against Python mirrors of the Fortran `qgrid_setup()`,
@@ -186,11 +189,11 @@ Current branch status:
 - Qgrid Fortran-record binary serialization is ported in
   `orblib_cpp/source/orbit_output.cpp` as `write_qgrid_file()` and tested by
   writing a C++ `*_qgrid.dat` file that SciPy `FortranFile` reads back with
-  the existing Python reader's record order. LOSVD/pops/orbclass binary/text
-  output serialization is not ported yet.
+  the existing Python reader's record order. Pops/orbclass binary/text output
+  serialization is not ported yet.
 - The orbit-specific C++ engine is still not implemented yet:
   interpolation-grid disk caching, orbit-start generation, full orbit-engine
-  wiring, and LOSVD/pops/orbclass output writing still remain.
+  wiring, and pops/orbclass output writing still remain.
 
 ## DOP853 Policy
 
@@ -332,10 +335,10 @@ mixed with the first C++ parity port.
    boxed aperture mapping, plus LOSVD velocity-bin mapping and per-aperture
    histogram accumulation, bin-order collapse, normalization, and sparse
    row-range preparation, plus intrinsic qgrid boundary setup, accumulation,
-   and normalization, plus qgrid Fortran-record file serialization. Still
-   required: legacy interpolation-grid disk caching if C++ parity requires it,
-   LOSVD/pops/orbclass output wiring, and Fortran-value parity tests for full
-   orbit integration.
+   and normalization, plus qgrid and LOSVD sparse Fortran-record file
+   serialization. Still required: legacy interpolation-grid disk caching if
+   C++ parity requires it, pops/orbclass output wiring, and Fortran-value
+   parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
@@ -345,8 +348,8 @@ mixed with the first C++ parity port.
    Per-symmetry projection, LOS velocity, PSF convolution, and boxed aperture
    mapping are done, and the LOSVD velocity-bin plus per-aperture histogram
    accumulation core plus memory-side sparse row preparation are done; qgrid
-   memory-side accumulation is done; qgrid file serialization is done;
-   LOSVD/pops/orbclass output writing still remains.
+   memory-side accumulation is done; qgrid and LOSVD sparse file serialization
+   are done; pops/orbclass output writing still remains.
 9. Run full generated LOSVD parity against
    `comparison_losvd_shared_library.npz`.
 10. Only after correctness, benchmark and optimize memory layout, branching,

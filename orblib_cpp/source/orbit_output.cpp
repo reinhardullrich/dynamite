@@ -1,5 +1,6 @@
 #include "orbit_output.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -49,6 +50,21 @@ public:
         if (bytes > 0) {
             stream_.write(reinterpret_cast<const char*>(values), static_cast<std::streamsize>(bytes));
         }
+        stream_.write(reinterpret_cast<const char*>(&record_size), sizeof(record_size));
+        return stream_.good();
+    }
+
+    bool write_losvd_setup_header(
+        std::int32_t aperture_count,
+        std::int32_t half_bin_count,
+        double velocity_bin_width
+    ) noexcept {
+        constexpr std::int32_t record_size =
+            static_cast<std::int32_t>(2 * sizeof(std::int32_t) + sizeof(double));
+        stream_.write(reinterpret_cast<const char*>(&record_size), sizeof(record_size));
+        stream_.write(reinterpret_cast<const char*>(&aperture_count), sizeof(aperture_count));
+        stream_.write(reinterpret_cast<const char*>(&half_bin_count), sizeof(half_bin_count));
+        stream_.write(reinterpret_cast<const char*>(&velocity_bin_width), sizeof(velocity_bin_width));
         stream_.write(reinterpret_cast<const char*>(&record_size), sizeof(record_size));
         return stream_.good();
     }
@@ -153,6 +169,70 @@ bool write_qgrid_file(
             !writer.write_array(orbit_types + orbit_type_offset, static_cast<std::size_t>(dither_count)) ||
             !writer.write_array(qgrids + qgrid_offset, qgrid_stride)) {
             return false;
+        }
+    }
+    return true;
+}
+
+bool write_losvd_histogram_file(
+    const char* path,
+    int orbit_count,
+    int aperture_count,
+    int velocity_bin_count,
+    double velocity_bin_width,
+    const int* begin_offsets,
+    const int* end_offsets,
+    const double* histograms
+) noexcept {
+    if (path == nullptr || orbit_count <= 0 || aperture_count <= 0 ||
+        velocity_bin_count <= 0 || velocity_bin_width <= 0.0 ||
+        begin_offsets == nullptr || end_offsets == nullptr || histograms == nullptr ||
+        !std::isfinite(velocity_bin_width)) {
+        return false;
+    }
+
+    int row_count = 0;
+    if (!checked_mul_int(orbit_count, aperture_count, row_count)) {
+        return false;
+    }
+
+    FortranRecordWriter writer(path);
+    if (!writer.ok()) {
+        return false;
+    }
+
+    const std::int32_t half_bin_count =
+        static_cast<std::int32_t>(static_cast<double>(velocity_bin_count) / 2.0);
+    if (!writer.write_losvd_setup_header(
+            static_cast<std::int32_t>(aperture_count),
+            half_bin_count,
+            velocity_bin_width
+        )) {
+        return false;
+    }
+
+    for (int row = 0; row < row_count; ++row) {
+        const int begin = begin_offsets[row];
+        const int end = end_offsets[row];
+        const std::int32_t sparse_range[2] = {
+            static_cast<std::int32_t>(begin),
+            static_cast<std::int32_t>(end),
+        };
+        if (!writer.write_array(sparse_range, 2)) {
+            return false;
+        }
+        if (begin <= end) {
+            const int begin_bin = begin + static_cast<int>(half_bin_count);
+            const int end_bin = end + static_cast<int>(half_bin_count);
+            if (begin_bin < 0 || end_bin < begin_bin || end_bin >= velocity_bin_count) {
+                return false;
+            }
+            const std::size_t row_offset =
+                static_cast<std::size_t>(row) * static_cast<std::size_t>(velocity_bin_count);
+            const std::size_t count = static_cast<std::size_t>(end_bin - begin_bin + 1);
+            if (!writer.write_array(histograms + row_offset + static_cast<std::size_t>(begin_bin), count)) {
+                return false;
+            }
         }
     }
     return true;

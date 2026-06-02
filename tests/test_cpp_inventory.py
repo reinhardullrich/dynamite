@@ -2961,6 +2961,84 @@ def test_orblib_cpp_prepares_sparse_losvd_rows_like_fortran():
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_writes_losvd_histogram_file_readable_by_scipy_fortranfile(tmp_path):
+    orbit_count = 2
+    aperture_count = 3
+    velocity_bin_count = 5
+    velocity_bin_width = 4.5
+    histograms = np.ascontiguousarray(
+        [
+            [0.0, 0.2, 0.0, 0.0, 0.1],
+            [0.3, 0.0, 0.0, 0.4, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 0.5, 0.0, 0.0],
+            [0.6, 0.0, 0.7, 0.0, 0.8],
+            [0.0, 0.9, 0.0, 1.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
+    begin_offsets, end_offsets = _expected_sparse_losvd_ranges(histograms)
+    output_path = tmp_path / "orblib_losvd_hist.dat"
+
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function = library.orblib_cpp_api_write_losvd_histogram_file
+    function.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        int_p,
+        int_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        str(output_path).encode(),
+        ctypes.c_int(orbit_count),
+        ctypes.c_int(aperture_count),
+        ctypes.c_int(velocity_bin_count),
+        ctypes.c_double(velocity_bin_width),
+        begin_offsets.ctypes.data_as(int_p),
+        end_offsets.ctypes.data_as(int_p),
+        histograms.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    reader = scipy.io.FortranFile(output_path, "r")
+    try:
+        header_apertures, header_half_bins, header_bin_width = reader.read_record(
+            np.int32,
+            np.int32,
+            float,
+        )
+        np.testing.assert_array_equal(header_apertures, np.array([aperture_count], dtype=np.int32))
+        np.testing.assert_array_equal(
+            header_half_bins,
+            np.array([velocity_bin_count // 2], dtype=np.int32),
+        )
+        np.testing.assert_array_equal(header_bin_width, np.array([velocity_bin_width], dtype=np.float64))
+        for row_index, row in enumerate(histograms):
+            row_begin, row_end = reader.read_ints(np.int32)
+            assert row_begin == begin_offsets[row_index]
+            assert row_end == end_offsets[row_index]
+            if row_begin <= row_end:
+                first_bin = row_begin + velocity_bin_count // 2
+                last_bin = row_end + velocity_bin_count // 2
+                np.testing.assert_array_equal(
+                    reader.read_reals(float),
+                    row[first_bin:last_bin + 1],
+                )
+    finally:
+        reader.close()
+
+
+@pytest.mark.orblib_cpp
 @pytest.mark.parametrize("omega", [0.0, 1.5e-16])
 def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
     surf_pc = np.array([0.0], dtype=np.float64)

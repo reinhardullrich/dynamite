@@ -375,3 +375,14 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, orbit-start
   generation, full orbit-engine wiring, and LOSVD/pops/orbclass output
   writing.
+- Ported sparse LOSVD Fortran-record binary serialization into C++ as
+  `dynamite::orblib_cpp::write_losvd_histogram_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_write_losvd_histogram_file` and opt-in pytest coverage that
+  writes a split `*_losvd_hist.dat`-style file and reads it back with SciPy
+  `FortranFile`, validating the mixed histogram setup record, per-row sparse
+  begin/end records, skipped empty rows, and optional velocity-bin value
+  records. Remaining C++ gaps now include interpolation-grid disk caching if
+  required for parity, orbit-start generation, full orbit-engine wiring, and
+  pops/orbclass output writing.

@@ -20,4 +20,15 @@ bool write_qgrid_file(
     const double* qgrids
 ) noexcept;
 
+bool write_losvd_histogram_file(
+    const char* path,
+    int orbit_count,
+    int aperture_count,
+    int velocity_bin_count,
+    double velocity_bin_width,
+    const int* begin_offsets,
+    const int* end_offsets,
+    const double* histograms
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

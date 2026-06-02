@@ -71,6 +71,8 @@ Current coverage:
   mirrors of the Fortran `histogram_velbin()` and `histogram_store()` formulas;
 - C++ LOSVD bin-order collapse, normalization, and sparse row-range validation
   against Python mirrors of the Fortran writer-preparation formulas;
+- C++ sparse LOSVD Fortran-record file serialization validation by reading the
+  generated file through SciPy `FortranFile`;
 - C++ intrinsic qgrid boundary, accumulation, and normalization validation
   against a Python mirror of the Fortran `qgrid_*` formulas;
 - C++ qgrid Fortran-record file serialization validation by reading the
