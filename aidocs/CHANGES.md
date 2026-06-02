@@ -183,3 +183,8 @@ This file is append-only. Add new entries at the bottom.
   renamed it to `13_active_runtime_verification.md`, and updated the audit
   README, SUMMARY, environment reference, and canonical knowledge summary to
   point at the active shared-library/orblib/NNLS verification contract.
+- Added `aidocs/cpp_orblib_port_plan.md` for the `fortran-to-cpp` branch,
+  recording the C++ orbit-library port policy: correctness before speed,
+  aggressive optimization only after parity, no avoidable hot-path allocations,
+  DOP853 dense-output preservation, RHS/acceleration optimization, existing
+  Fortran fixtures as acceptance tests, and stage-split benchmark requirements.

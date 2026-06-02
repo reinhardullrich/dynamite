@@ -19,6 +19,9 @@ project's Sphinx documentation tree.
 - `fortran_orbit_library_engine.md`: detailed analysis of
   `orblib_fortran/source/orblib_f_new_mirror.f90`, its runtime connections,
   computational hotspots, multiprocessing boundaries, and replacement risks.
+- `cpp_orblib_port_plan.md`: C++ orbit-library backend port rules, including
+  correctness-first/performance-second constraints, DOP853 policy, allocation
+  rules, fixture-based acceptance criteria, and benchmark policy.
 - `audits/dynamite_python_audit.md`: Python-side audit notes.
 - `audits/dynamite_fortran_audit.md`: Fortran-side audit notes.
 - `audits/dynamite_scientific_correctness_audit.md`: scientific-correctness

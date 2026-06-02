@@ -47,6 +47,11 @@ changes from the original project.
   `orblib_fortran/source/orblib_f_new_mirror.f90`,
   including module responsibilities, runtime connections, compute hotspots,
   multiprocessing boundaries, and replacement risks.
+- `aidocs/cpp_orblib_port_plan.md`: branch-specific plan for the
+  `fortran-to-cpp` experiment. It records the required priority order
+  of correctness first and speed second, the DOP853 policy, allocation and
+  hot-path rules, fixture-based acceptance criteria, C++ shared-library shape,
+  and benchmark policy.
 - `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
 - `aidocs/audits/dynamite_fortran_audit.md`: Fortran-side audit findings.
 - `aidocs/audits/dynamite_scientific_correctness_audit.md`: scientific
@@ -140,6 +145,12 @@ source files.
   active build profiles. `15_active_nnls_solver_benchmark.md` now documents the
   active Python `NNLS` solver policy, validation, fixture, caching, and benchmark
   plan only.
+- C++ orbit-library port experiment: branch `fortran-to-cpp` exists for a
+  future C++ replacement of the active Fortran orbit-library backend. The port
+  must use the current Fortran shared-library backend and fixtures as the
+  numerical oracle. Correctness is the first rule; among correct versions,
+  optimize aggressively for speed, allocation behavior, RHS/acceleration
+  throughput, cache locality, and reproducible parallel execution.
 
 ## Separated Workspaces
 

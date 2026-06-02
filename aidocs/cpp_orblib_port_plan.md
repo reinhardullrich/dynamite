@@ -1,0 +1,229 @@
+# C++ Orblib Port Plan
+
+Date: 2026-06-02
+
+Branch: `fortran-to-cpp`
+
+Scope: port the active orbit-library Fortran backend to C++ while preserving
+the active Python-facing orbit-library API semantics. This plan covers active
+code under `orblib_fortran/source/`, especially orbit-start generation,
+potential/interpolation evaluation, DOP853 orbit integration, orbit
+classification, projection, PSF convolution, aperture mapping, LOSVD binning,
+intrinsic moment grids, and binary orbit-library output.
+
+Archived solver code, archived development tests, and archived particle export
+utilities are not part of this port.
+
+## Non-Negotiable Rules
+
+1. Correctness comes first.
+2. Among implementations that are correct, make the code as fast as practical.
+3. The current Fortran shared-library backend is the numerical oracle until the
+   C++ backend proves parity.
+4. Do not silently change numerical methods, precision contracts, random
+   sampling, dense-output sampling, binary output layout, or cache behavior.
+5. Any deliberate numerical deviation must be isolated, benchmarked, documented,
+   and approved before it becomes the default.
+
+The goal is not "nice C++" at the cost of performance. The goal is a correct,
+maintainable, high-throughput compiled backend.
+
+## Acceptance Fixtures
+
+The C++ backend must be tested against existing Fortran-derived fixtures:
+
+- `tests/fixtures/orblib_losvd/data/comparison_losvd_shared_library.npz`
+  is the current direct shared-library fixture and should be the tight parity
+  target where deterministic behavior is expected.
+- `tests/fixtures/orblib_losvd/data/comparison_losvd.npz` is the historical
+  executable-generated fixture and remains a compatibility reference with its
+  separate tolerance policy.
+- `tests/test_fortran_orblib_output.py` defines the slow generated LOSVD
+  workflow that the C++ backend should eventually mirror.
+- `tests/test_orblib_api.py` defines the Python API facade behavior that the
+  C++ backend should match.
+
+Initial C++ tests should add small, deterministic unit fixtures before running
+the full LOSVD workflow:
+
+- DOP853 integration on simple known ODEs;
+- DOP853 dense-output interpolation at prescribed sample times;
+- potential/acceleration parity for selected MGE and dark-halo inputs;
+- orbit-start array parity;
+- one-orbit classification/projection/histogram parity;
+- full small NGC6278 LOSVD parity.
+
+## Proposed Backend Shape
+
+Add a new backend without removing the Fortran backend:
+
+```text
+orblib_cpp/
+  include/
+  source/
+  build/lib/liborblib_cpp.so
+```
+
+Expose a C ABI from C++ so Python can call it through `ctypes` in the same
+style as the current Fortran shared library:
+
+```text
+orblib_cpp_api_abi_version
+orblib_cpp_api_run_orbitstart_memory
+orblib_cpp_api_run_orblib_direct
+```
+
+Python should gain a separate backend name, for example
+`cpp_shared_library`. The current `fortran_shared_library` backend should stay
+the default until C++ parity and performance are proven.
+
+## DOP853 Policy
+
+The active Fortran backend uses DOP853, an explicit Runge-Kutta method of order
+`8(5,3)` with stepsize control and dense output. DYNAMITE depends on dense
+output through the current `SOLOUT`/`CONTD8` path to sample positions and
+velocities at controlled output times.
+
+Do not replace this with Boost `runge_kutta_dopri5`; that is a different
+method.
+
+Allowed starting points:
+
+- use Hairer's C DOP853 as a reference or source after checking redistribution
+  terms;
+- conservatively port the current DOP853 implementation to C++;
+- implement DOP853 from coefficients and formulas only if tests first lock down
+  the exact behavior expected by this backend.
+
+The C++ DOP853 implementation must preserve:
+
+- scalar tolerance mode used by the current code;
+- initial step-size reuse behavior equivalent to current `WORK(7)`;
+- maximum-step/error-failure behavior;
+- dense output for all 6 orbit state components;
+- sample-time offset behavior currently driven by `ran1`;
+- energy-conservation retry policy;
+- diagnostic counters needed for debugging and benchmarks.
+
+## Hot-Path Performance Rules
+
+Avoid allocation in hot loops. In particular, do not allocate heap memory inside:
+
+- the DOP853 step loop;
+- derivative/RHS evaluation;
+- dense-output sample extraction;
+- per-sample projection;
+- PSF convolution inner loops;
+- aperture lookup;
+- LOSVD histogram binning;
+- per-orbit qgrid/moment accumulation.
+
+Use reusable workspace objects allocated at setup time or per worker:
+
+- DOP853 work arrays;
+- state and derivative arrays;
+- dense-output coefficients;
+- sampled positions and velocities;
+- projected coordinates and line-of-sight velocities;
+- histogram scratch;
+- qgrid/moment scratch;
+- orbit-classification scratch.
+
+Prefer:
+
+- `std::array<double, 6>` for fixed orbit state vectors;
+- contiguous `std::vector<double>` buffers with explicit `resize` during setup;
+- `std::span` or raw pointer plus size in hot functions;
+- precomputed dimensions and strides;
+- `reserve()` before filling variable-length vectors;
+- explicit status codes at ABI boundaries.
+
+Avoid in hot paths unless a benchmark proves no cost:
+
+- `std::function`;
+- virtual dispatch;
+- repeated `new`/`delete`;
+- repeated `std::vector` growth;
+- exceptions crossing ABI boundaries;
+- string formatting or logging per orbit sample;
+- bounds-checked containers in inner loops.
+
+## RHS And Potential Evaluation
+
+The derivative function is one of the most important hot paths. Each DOP853
+orbit integration calls it many times. The C++ RHS implementation should be
+optimized deliberately:
+
+- keep model/potential data in a compact context object;
+- pass the context by pointer/reference, not by copying;
+- make the acceleration evaluator inlineable where possible;
+- precompute constants and interpolation tables before orbit loops;
+- avoid callback chains that bounce between C++ and Fortran;
+- separate non-rotating and rotating-frame cases so the common case does not
+  pay unnecessary branch cost inside every evaluation if avoidable;
+- measure acceleration evaluation time separately from the DOP853 controller.
+
+If a generic callback interface is needed for tests, keep it outside the main
+production hot loop or provide a templated/static-polymorphism path for the
+real backend.
+
+## Parallelism
+
+The natural parallel unit is an orbit-library task or a batch of orbit bundles,
+not an individual DOP853 stage. Keep the first C++ backend compatible with the
+current Python process-level orchestration, then benchmark whether C++ internal
+threading helps.
+
+Rules:
+
+- no global mutable numerical state in the C++ backend;
+- each worker owns its scratch buffers;
+- random-state behavior must be reproducible;
+- binary output writing must remain deterministic and serialized or otherwise
+  explicitly ordered;
+- avoid oversubscription between Python process pools and C++ thread pools.
+
+## Binary Output Contract
+
+The first C++ backend should write the same binary `datfil/` output contract
+that Python already reads:
+
+- qgrid files;
+- LOSVD histogram files;
+- orbit-classification output;
+- `tube_done`, `box_done`, and `orblib_done` markers.
+
+Changing output to a memory-only API is a separate refactor. It should not be
+mixed with the first C++ parity port.
+
+## Implementation Order
+
+1. Add the C++ backend skeleton, build target, and ABI version function.
+2. Add Python backend selection for `cpp_shared_library` without changing the
+   default backend.
+3. Port or wrap DOP853 and test dense output on small ODE fixtures.
+4. Port potential and acceleration evaluation; test against Fortran values.
+5. Port orbit-start generation; test against current begin/beginbox fixtures.
+6. Port one-orbit integration and classification; test against Fortran.
+7. Port projection, PSF, aperture, histogram, qgrid, and output writing.
+8. Run full generated LOSVD parity against
+   `comparison_losvd_shared_library.npz`.
+9. Only after correctness, benchmark and optimize memory layout, branching,
+   allocation, parallelism, and compiler flags.
+
+## Benchmark Policy
+
+Every performance claim must include:
+
+- compiler and flags;
+- CPU/thread count;
+- backend name and ABI version;
+- orbit grid size and fixture name;
+- wall time split by stage;
+- number of derivative evaluations;
+- accepted/rejected DOP853 step counts;
+- output byte counts;
+- max absolute and relative output differences versus Fortran.
+
+Correctness failures invalidate speed comparisons. The fastest wrong backend is
+not useful.
