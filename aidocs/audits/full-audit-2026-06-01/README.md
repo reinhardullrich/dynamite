@@ -5,6 +5,25 @@ This folder contains the full local DYNAMITE audit run.
 The audit is intentionally stored under `aidocs/`, not upstream `docs/`, so it
 remains local AI/agent documentation for the personal fork.
 
+## Current Status After Fortran Cleanup
+
+The reports in this folder have been adapted for the current
+`fortran-cleanup` branch state as of 2026-06-02:
+
+- The active Fortran backend is `orblib_fortran/` and builds only
+  `orblib_fortran/build/lib/liborblib_fortran.so`.
+- Normal orbit-library generation uses the direct shared-library API in
+  `dynamite/orblib_api.py`; it no longer launches orbit executables or creates
+  Fortran `infil/` input files.
+- Legacy NNLS/GALAHAD solver code and `triaxmass*` helpers are archived under
+  `archive/legacy_nnls_fortran/`; `LegacyWeightSolver` is rejected by current
+  configuration/model execution.
+- Old development-test content is archived under `archive/dev_tests/`, and current
+  pytest coverage lives under `tests/`.
+- The old audit findings about executable packaging, archived test collection,
+  and active legacy solver execution should be read as resolved or superseded
+  where the individual report now says so.
+
 ## Audit Outputs
 
 - `AUDIT_PLAN.md`: scope, boundaries, module split, and execution order.

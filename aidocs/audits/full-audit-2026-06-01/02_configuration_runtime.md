@@ -2,6 +2,11 @@
 
 Date started: 2026-06-01
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. Current configuration rejects `LegacyWeightSolver`;
+the active orbit backend no longer writes Fortran `infil/` inputs; and old
+development configs/tests are archived under `archive/dev_tests/`.
+
 ## Scope
 
 This audit section covers:
@@ -21,7 +26,8 @@ This audit section covers:
 - `dynamite/model_iterator.py`
 - `dynamite/physical_system.py`
 - `dynamite/parameter_space.py`
-- sample configs under `dev_tests/` and upstream `docs/tutorial_notebooks/`
+- active fixture configs under `tests/fixtures/`, archived sample configs under
+  `archive/dev_tests/`, and upstream `docs/tutorial_notebooks/`
 
 ## Findings
 
@@ -235,11 +241,16 @@ Files:
 
 Summary:
 
-`Settings.validate()` unconditionally indexes
+Original finding: `Settings.validate()` unconditionally indexed
 `weight_solver_settings['nnls_solver']`. The documentation and sample legacy
-configs include `nnls_solver: 1` even for `LegacyWeightSolver`, but if a legacy
-config omits this otherwise irrelevant setting, validation will raise a raw
+configs included `nnls_solver: 1` even for `LegacyWeightSolver`, but if a legacy
+config omitted this otherwise irrelevant setting, validation raised a raw
 `KeyError`.
+
+Current status: superseded for the active runtime. `LegacyWeightSolver` is now
+rejected by configuration/model execution because its Fortran solver programs
+are archived. Validation for active configs should focus on Python `NNLS`
+settings.
 
 Evidence:
 
@@ -267,15 +278,15 @@ Validate `nnls_solver` conditionally by `weight_solver_settings['type']`.
 For example:
 
 - require `nnls_solver in {'scipy', 'cvxopt'}` for `type: NNLS`
-- accept or default legacy `nnls_solver` only for `LegacyWeightSolver`
+- reject `LegacyWeightSolver` unless a controlled archived backend is explicitly
+  restored
 - raise clear `ValueError` for unknown solver types/settings
 
 Verification:
 
 Add config validation tests for:
 
-- `LegacyWeightSolver` without `nnls_solver`
-- `LegacyWeightSolver` with `nnls_solver: 1`
+- `LegacyWeightSolver` is rejected with a clear error
 - `NNLS` with `scipy`
 - `NNLS` with `cvxopt` missing
 - unknown solver type

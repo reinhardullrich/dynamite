@@ -2,12 +2,18 @@
 
 Date started: 2026-06-01
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. `LegacyWeightSolver` is now rejected by configuration
+validation and `Model.get_weights()` because its Fortran solver programs are
+archived under `archive/legacy_nnls_fortran/`. The active solver path is
+Python `NNLS`.
+
 ## Scope
 
 This audit section covers:
 
 - `dynamite/weight_solvers.py`
-- `LegacyWeightSolver`
+- archived `LegacyWeightSolver` behavior where relevant
 - Python `NNLS`
 - SciPy and CVXOPT solver paths
 - mass/kinematic constraint matrix construction
@@ -16,8 +22,8 @@ This audit section covers:
 ## Evidence Reviewed
 
 - `dynamite/weight_solvers.py`
-- `dev_tests/test_nnls.py`
-- `dev_tests/test_reimplement_nnls.py`
+- archived `archive/dev_tests/test_nnls.py`
+- archived `archive/dev_tests/test_reimplement_nnls.py`
 - orbit-library boundary findings in `06_orbit_library_boundary.md`
 
 ## Findings
@@ -427,7 +433,9 @@ Add sample `nn_orb.out` fixtures for CRcut and noCRcut outputs.
 - SciPy solver max iterations are configurable through `maxiter_factor`.
 - Existing weight files are cached and can be reused, which is important for
   expensive model grids.
-- Legacy/Python NNLS comparison tests exist in `dev_tests/test_reimplement_nnls.py`.
+- Archived Legacy/Python NNLS comparison scripts exist in
+  `archive/dev_tests/test_reimplement_nnls.py`; active regression tests now
+  live under `tests/`.
 
 ## Open Questions
 

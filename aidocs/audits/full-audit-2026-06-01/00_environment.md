@@ -2,6 +2,13 @@
 
 Date: 2026-06-01
 
+Current-status update, 2026-06-02: this environment chapter has been adapted
+for the `fortran-cleanup` branch. The active Fortran build now produces only
+`orblib_fortran/build/lib/liborblib_fortran.so`; old GALAHAD/NNLS solver build
+artifacts are archived under `archive/legacy_nnls_fortran/`; old development-test
+workflows are archived under `archive/dev_tests/`; and active pytest coverage
+lives under `tests/`.
+
 ## Local Install Policy
 
 The audit uses only repository-local installation state.
@@ -134,29 +141,30 @@ GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
 
 No global Fortran dependency installation has been performed.
 
-## Initial Fortran Build Preflight
+## Fortran Build Preflight
 
-Existing compiled executables before the audit build check:
+Original pre-cleanup executable state:
 
 ```text
-none found at legacy_fortran/ top level
+none found at the old removed Fortran top level
 ```
 
-Dry-run target:
+Original dry-run target:
 
 ```bash
 make -n nogal
 ```
 
-The dry run shows `nogal` would compile the no-GALAHAD executables:
+The original dry run showed `nogal` would compile the old no-GALAHAD
+executables:
 
 - `orbitstart`
 - `orbitstart_bar`
 - `orblib_new_mirror`
 - `orblib_bar`
 
-The dry-run uses the repository `legacy_fortran/Makefile` with `gfortran` and
-flags including:
+The original dry-run used the old removed Fortran-tree Makefile with
+`gfortran` and flags including:
 
 ```text
 -ffast-math -O3 -march=native -fomit-frame-pointer -m64 -funroll-loops
@@ -167,36 +175,44 @@ flags including:
 need monitoring on other compilers/platforms. It did not block the local
 no-GALAHAD build with GNU Fortran 13.3.0.
 
-## No-GALAHAD Fortran Build Result
+Current active build target:
 
-Command:
+```bash
+make -C orblib_fortran shared
+```
+
+This builds `orblib_fortran/build/lib/liborblib_fortran.so`.
+
+## Original No-GALAHAD Fortran Build Result
+
+Original command:
 
 ```bash
 make nogal
 ```
 
-Result: succeeded with GNU Fortran 13.3.0.
+Original result: succeeded with GNU Fortran 13.3.0.
 
-Executables produced locally under `legacy_fortran/`:
+Executables produced locally under the old removed Fortran tree:
 
 - `orbitstart`
 - `orbitstart_bar`
 - `orblib_new_mirror`
 - `orblib_bar`
 
-The build also produced `.o` and `.mod` files in `legacy_fortran/`. Git status
-shows these artifacts are ignored by the repository's `.gitignore`.
+Current status: superseded. The active build is shared-library-only under
+`orblib_fortran/`; old executable drivers are inactive retained sources.
 
-## GALAHAD Fortran Build Result
+## Archived GALAHAD Fortran Build Result
 
 The initial audit pass did not run the full GALAHAD build. This gap was later
 closed locally without global/system installation.
 
-Local dependency trees used:
+Original local dependency trees used:
 
-- `legacy_fortran/galahad-2.3/`
-- `legacy_fortran/cuter/`
-- `legacy_fortran/hsl/`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/`
+- `archive/legacy_nnls_fortran/legacy_fortran/cuter/`
+- `archive/legacy_nnls_fortran/legacy_fortran/hsl/`
 
 The GALAHAD installer completed for PC/Linux/GNU gfortran, QP packages, local
 CUTEr, and double precision. The first DYNAMITE `make all` attempt then failed
@@ -210,14 +226,14 @@ Those objects were compiled into `/tmp/dynamite-galahad-probe` and re-added to
 the generated local archives with `ar`/`ranlib`. No source files or Makefiles
 were changed.
 
-Full build command:
+Original full build command:
 
 ```bash
-cd legacy_fortran
-make GALAHADDIR=/home/reinhard/projects/thomas/dynamite/legacy_fortran/galahad-2.3 GALAHADTYPE=pc.lnx.gfo/double all
+cd archive/legacy_nnls_fortran/legacy_fortran
+make GALAHADDIR=/home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3 GALAHADTYPE=pc.lnx.gfo/double all
 ```
 
-Result: succeeded after the generated-archive repair.
+Original result: succeeded after the generated-archive repair.
 
 Additional checks:
 
@@ -235,6 +251,9 @@ Runtime GALAHAD/QPB check:
 - Both direct GALAHAD runs logged `QPB_solve exit status = -5`, but the shell
   process still exited `0` and wrote output files.
 
+Current status: archived. `LegacyWeightSolver` is rejected by active runtime
+configuration/model execution.
+
 Detailed evidence is recorded in `13_galahad_runtime_check.md`.
 
 ## Python Baseline Checks
@@ -247,23 +266,27 @@ MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m compileall -q dynamite
 
 Result: succeeded.
 
-Pytest collection:
+Original pytest collection of archived development tests:
 
 ```bash
-MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m pytest --collect-only -q dev_tests
+MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m pytest --collect-only -q archive/dev_tests
 ```
 
-Result: failed during collection before tests ran.
+Original result: failed during collection before tests ran.
+
+Current status: superseded. Active local pytest coverage lives under `tests/`;
+focused fast tests and opt-in slow orblib shared-library tests passed during
+the cleanup.
 
 Collection errors:
 
-1. `dev_tests/test_dataprep.py` imports
+1. `archive/dev_tests/test_dataprep.py` imports
    `from dynamite.data_prep import data_prep_test`, but
    `dynamite/data_prep/__init__.py` does not export that name and no obvious
    `data_prep_test` module exists in `dynamite/data_prep/`.
-2. `dev_tests/test_decomp.py` constructs a configuration with
+2. `archive/dev_tests/test_decomp.py` constructs a configuration with
    `user_test_config_ml.yaml` as a bare relative path. Collection from the
-   repository root fails because that file is under `dev_tests/`.
+   repository root fails because that file is under `archive/dev_tests/`.
 
 Warning during collection:
 

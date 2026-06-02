@@ -1,7 +1,8 @@
-# DYNAMITE Fortran Replacement Tests
+# DYNAMITE Orblib Fortran And API Tests
 
-This test tree is for building a correctness baseline before replacing orblib
-Fortran code with Python implementations.
+This test tree is the local correctness baseline for the active orblib Fortran
+shared-library backend, the Python direct-input API facade, and any future
+replacement work.
 
 Default run:
 
@@ -47,9 +48,10 @@ Current coverage:
   `docs/`;
 - no dependency on external historical test folders for the default suite;
 - an opt-in slow orblib Fortran orbit-library output comparison that
-  regenerates the historical NGC6278 LOSVD workflow and compares the produced
-  velocity grid and LOSVD array statistics against `comparison_losvd.npz`,
-  allowing a small aggregate difference from the historical executable output.
+  regenerates the NGC6278 LOSVD workflow once, compares it against the
+  historical executable-generated `comparison_losvd.npz` with legacy
+  compatibility tolerances, and compares it against
+  `comparison_losvd_shared_library.npz` with full-array `1e-12` tolerance.
 
 The slow marker is used for integration tests that generate orbit libraries and
 model outputs.

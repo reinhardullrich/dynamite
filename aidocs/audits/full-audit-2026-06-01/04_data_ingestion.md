@@ -2,6 +2,11 @@
 
 Date started: 2026-06-01
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. Old sample/test workflows now live under
+`archive/dev_tests/`; active local tests for fixture and
+configuration behavior live under `tests/`.
+
 ## Scope
 
 This audit section covers:
@@ -21,7 +26,8 @@ This audit section covers:
 - `dynamite/kinematics.py`
 - `dynamite/populations.py`
 - `dynamite/data_prep/generate_kin_input.py`
-- sample input/config files under `dev_tests/`
+- active fixture inputs under `tests/fixtures/` and archived sample inputs under
+  `archive/dev_tests/`
 - upstream user documentation references under `docs/getting_started/`
 
 ## Findings
@@ -388,26 +394,30 @@ Files:
 
 - `dynamite/data_prep/__init__.py`
 - `dynamite/data_prep/generate_kin_input.py`
-- `dev_tests/test_dataprep.py`
+- `archive/dev_tests/test_dataprep.py`
 
 Summary:
 
 The installed `data_prep` package contains only `generate_kin_input.py`, but
-`dev_tests/test_dataprep.py` imports `dynamite.data_prep.data_prep_test`. That
-module is not present, so pytest collection fails before any data-prep tests can
-run.
+Original finding: `archive/dev_tests/test_dataprep.py` imported
+`dynamite.data_prep.data_prep_test`. That module was not present, so pytest
+collection failed before any data-prep tests could run.
+
+Current status: superseded for the active local baseline. Old `dev_tests`
+content is archived under `archive/dev_tests/`; active tests live under
+`tests/`.
 
 Evidence:
 
 `dynamite/data_prep/__init__.py` is empty.
 
 ```text
-dev_tests/test_dataprep.py:7
+archive/dev_tests/test_dataprep.py:7
 from dynamite.data_prep import data_prep_test
 ```
 
 ```text
-dev_tests/test_dataprep.py:21
+archive/dev_tests/test_dataprep.py:21
 from dynamite.data_prep.data_prep_test import data_prep_function_test
 ```
 
@@ -421,14 +431,14 @@ writing are unlikely to be caught by CI or local collection.
 
 Recommendation:
 
-Either restore the missing `data_prep_test` module or replace
-`dev_tests/test_dataprep.py` with executable tests for the current
+Either restore the missing `data_prep_test` module in a dedicated archived-test
+revival task or add active tests under `tests/` for the current
 `generate_kin_input.py` API.
 
 Verification:
 
-`python -m pytest --collect-only dev_tests/test_dataprep.py` should collect
-without import errors.
+Any active data-prep test added under `tests/` should collect without import
+errors.
 
 ### DI-008
 

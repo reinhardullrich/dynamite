@@ -58,9 +58,9 @@ The Python package requires **Python 3.10 or newer** according to `setup.py`.
 The current version in this checkout is **5.0.0**.
 
 The active Fortran orbit-library side is not optional for full traditional
-orbit-library generation. The current local no-GALAHAD build compiles the active
-orblib programs in `orblib_fortran/`; archived solver sources are retained for
-reference and compatibility work.
+orbit-library generation. The current local build compiles the active shared
+library in `orblib_fortran/`; archived solver sources are retained for
+reference and compatibility work, but are not active runtime backends.
 
 ## Major Python Dependencies
 
@@ -160,8 +160,9 @@ The most important Python modules are:
 - `model_iterator.py`: drives iterative model creation and execution.
 - `orblib.py`: keeps the orbit-library reader/container interface and delegates
   active generation to the direct shared-library API.
-- `weight_solvers.py`: solves for non-negative orbit weights using either
-  legacy Fortran solvers or Python NNLS-based solvers.
+- `weight_solvers.py`: solves for non-negative orbit weights using the active
+  Python `NNLS` path. The old `LegacyWeightSolver` is rejected by current
+  configuration validation because its Fortran solver programs are archived.
 - `kinematics.py`: handles kinematic data formats such as Gauss-Hermite and
   BayesLOSVD data.
 - `mges.py`: handles Multi Gaussian Expansion data.
@@ -210,5 +211,5 @@ actual dynamical modelling.
 
 The package is probably most useful to astronomers or researchers who already
 have galaxy photometry/kinematics data and want to fit dynamical models. Running
-it properly requires compiled Fortran tools, careful configuration, and enough
-disk space for large orbit libraries.
+it properly requires the compiled orblib Fortran shared library, careful
+configuration, and enough disk space for large orbit libraries.

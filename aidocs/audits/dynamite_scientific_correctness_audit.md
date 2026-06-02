@@ -7,6 +7,15 @@ assumptions in DYNAMITE are scientifically defensible. It does not judge code
 style, packaging, maintainability, or ordinary programming bugs unless they
 directly affect the scientific meaning of a model equation.
 
+Current-status update, 2026-06-02: this audit has been adapted for the
+`fortran-cleanup` branch. The active orbit backend is now the direct
+shared-library path in `orblib_fortran/` through `dynamite/orblib_api.py`.
+Legacy NNLS/GALAHAD solver programs are archived and rejected by current
+configuration, so solver-status caveats below apply to archived solver code
+unless a legacy solver backend is explicitly restored. The direct shared-library
+orblib path now preserves the legacy `parameters_pot` and `begin` precision
+contract and has both historical-fixture and current-backend LOSVD parity tests.
+
 ## Short Conclusion
 
 The core DYNAMITE modelling chain is scientifically grounded: it implements a
@@ -61,20 +70,20 @@ The main scientific caveats are:
 - Projected and intrinsic MGE mass constraints:
   `dynamite/dynamite/mges.py:101-345`, `dynamite/dynamite/mges.py:660-920`
 - MGE potential and acceleration:
-  `dynamite/legacy_fortran/triaxpotent.f90:90-620`
+  `orblib_fortran/source/triaxpotent.f90:90-620`
 - Dark halo and black-hole potentials:
-  `dynamite/legacy_fortran/dmpotent.f90:30-264`,
+  `orblib_fortran/source/dmpotent.f90:30-264`,
   `dynamite/dynamite/physical_system.py:1120-1445`
 - Orbit initial-condition sampling and rotating-frame equations:
-  `dynamite/legacy_fortran/orbitstart_f.f90:1-304`,
-  `dynamite/legacy_fortran/orblib_f_new_mirror.f90:667-710`
+  `orblib_fortran/source/orbitstart_f.f90:1-304`,
+  `orblib_fortran/source/orblib_f_new_mirror.f90:667-710`
 - Projection/mirroring:
-  `dynamite/legacy_fortran/orblib_f_new_mirror.f90:825-1040`,
+  `orblib_fortran/source/orblib_f_new_mirror.f90:825-1040`,
   `dynamite/docs/index.rst:28-36`
 - Gauss-Hermite observables and NNLS constraints:
   `dynamite/dynamite/kinematics.py:460-650`,
   `dynamite/dynamite/weight_solvers.py:650-820`,
-  `dynamite/legacy_fortran/triaxnnls_noCRcut.f90:470-575`
+  `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:470-575`
 
 ## Detailed Findings
 
@@ -404,15 +413,17 @@ DYNAMITE is scientifically appropriate when these assumptions are acceptable:
 
 ## Reference-Output Comparison Status
 
-The repository contains a development test with a saved comparison LOSVD:
+The repository now contains active pytest LOSVD comparison fixtures:
 
-- `dynamite/dev_tests/test_orbit_losvds.py`
-- `dynamite/dev_tests/data/comparison_losvd.npz`
+- `tests/test_fortran_orblib_output.py`
+- `tests/fixtures/orblib_losvd/data/comparison_losvd.npz`
+- `tests/fixtures/orblib_losvd/data/comparison_losvd_shared_library.npz`
 
 That is useful evidence that the project has a regression-style orbit-library
-comparison path. I did not execute a fresh full orbit-library generation in
-this audit because the active Python environment lacks the scientific Python
-stack (`numpy` is not importable in the current shell), and compiling/running
+comparison path. The cleanup added a current shared-library fixture with tight
+`1e-12` comparison tolerance. The original standalone audit did not execute a
+fresh full orbit-library generation because the active Python environment lacked
+the scientific Python stack (`numpy` was not importable in that shell), and compiling/running
 the full Fortran orbit tests would require setting up that environment first.
 
 Therefore, this report is a static scientific-equation audit plus literature
@@ -429,4 +440,3 @@ The highest-priority scientific risk is not the core stellar dynamics. It is
 parameter-domain and validation risk: especially the cored logarithmic halo
 density positivity, bar-model benchmarking, orbit-library convergence, and
 regularisation/CRcut sensitivity.
-

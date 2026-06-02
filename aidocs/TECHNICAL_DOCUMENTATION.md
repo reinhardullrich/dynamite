@@ -18,17 +18,18 @@ Important boundaries:
   local AI notes.
 - `dynamite/` is the upstream Python package.
 - `orblib_fortran/` is the active orbit-library Fortran backend.
-- `dev_tests/` contains upstream development tests, sample configs, input data,
-  and notebooks.
+- `archive/dev_tests/` contains archived upstream development tests, sample
+  configs, input data, and notebooks.
 
-For the current documentation pass, only `aidocs/` was changed.
+Local AI notes still belong in `aidocs/`; user-facing Markdown such as the root
+README and `tests/README.md` may be updated when their instructions are stale.
 
 ## Repository Identity
 
 This local checkout is a personal fork of upstream DYNAMITE.
 
 - Local path: `/home/reinhard/projects/thomas/dynamite`
-- Personal fork remote: `origin -> https://github.com/reinhardullrich/dynamite.git`
+- Personal fork remote: `origin -> git@github.com:reinhardullrich/dynamite.git`
 - Upstream remote: `upstream -> https://github.com/dynamics-of-stellar-systems/dynamite.git`
 - Default branch observed locally: `master`
 
@@ -99,7 +100,7 @@ dynamite/
       unused/           Inactive retained Fortran sources
     build/lib/          Ignored generated shared library
   docs/                 Upstream Sphinx docs and tutorial notebooks
-  dev_tests/            Upstream development tests, configs, sample data
+  archive/dev_tests/    Archived upstream development tests, configs, sample data
 ```
 
 The nested `dynamite/dynamite` shape is normal Python packaging layout:
@@ -113,11 +114,11 @@ Do not flatten this. Flattening would break imports and packaging.
 
 `setup.py` declares the package name as `dynamite`, requires Python `>=3.10`,
 uses `setuptools.find_packages()`, reads dependencies from `requirements.txt`,
-and includes compiled orblib Fortran executable paths as package data.
+and includes the compiled orblib Fortran shared library path as package data.
 
 The current local README describes the active installation sequence:
 
-1. Compile Fortran programs in `orblib_fortran/`.
+1. Compile the Fortran shared library in `orblib_fortran/`.
 2. Install the Python package from the repository root:
 
 ```bash
@@ -948,8 +949,8 @@ When modifying this fork:
 4. Avoid editing upstream `docs/` unless explicitly asked.
 5. Avoid editing `orblib_fortran/` unless the task is specifically about the
    Fortran backend.
-6. Avoid editing `dev_tests/` unless the task is specifically about tests or
-   examples.
+6. Avoid editing `archive/dev_tests/` unless the task is specifically about
+   archived tests or examples.
 7. Check `git status --short` before and after edits.
 8. Prefer small, focused changes.
 9. Treat existing uncommitted user changes as intentional.

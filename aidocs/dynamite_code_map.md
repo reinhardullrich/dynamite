@@ -189,7 +189,7 @@ These modules produce diagnostic plots and derived science products, including:
 
 The current local README describes a two-stage active installation:
 
-1. Compile the active Fortran programs in `orblib_fortran/`.
+1. Compile the active Fortran shared library in `orblib_fortran/`.
 2. Install the Python package with `python -m pip install .`.
 
 The active Fortran build writes only the shared library to

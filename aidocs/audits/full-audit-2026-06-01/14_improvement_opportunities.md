@@ -5,6 +5,12 @@ Date: 2026-06-01
 Scope: non-bug-fix improvements that could make DYNAMITE faster, smoother,
 cleaner, easier to develop, and easier to run repeatedly.
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. The active Fortran build is now shared-library-only,
+`LegacyWeightSolver` is rejected by current runtime configuration, and old
+GALAHAD/NNLS sources are archived. Recommendations that originally proposed a
+future transition now describe the current local state where applicable.
+
 This chapter is intentionally separate from the bug/risk audit. It does not
 recommend changing scientific behavior first. It recommends improving the
 execution model, data flow, APIs, and developer ergonomics around the existing
@@ -39,7 +45,7 @@ Local import timing in this audit environment:
 So eager imports are real overhead for command-line tools, test collection,
 notebooks, metadata checks, and repeated short-lived helper processes.
 
-For full legacy model runs, that startup cost is small. In the temporary
+For full model runs, that startup cost is small. In the temporary original
 GALAHAD/legacy test run, 5 models took about 386 seconds total. New orbit
 libraries spent roughly a minute in initial conditions and about 50 seconds in
 tube/box orbit integration. The classic legacy weight solves took only a few
@@ -485,9 +491,9 @@ performance testing.
 
 Evidence:
 
-- `legacy_fortran/Makefile` uses one fast profile with `-ffast-math`,
+- `orblib_fortran/Makefile` uses a speed-oriented profile with `-ffast-math`,
   `-march=native`, and other optimization flags.
-- The GALAHAD build required manual knowledge of `GALAHADDIR` and
+- The archived GALAHAD build required manual knowledge of `GALAHADDIR` and
   `GALAHADTYPE`.
 
 Improvement:
@@ -497,8 +503,8 @@ Add documented build profiles:
 - `fast-local`: current speed-oriented build;
 - `portable`: no `-march=native`;
 - `debug`: bounds checks, backtraces, no fast math;
-- `galahad`: full solver build with archive preflight;
-- `clean-generated`: remove local objects/executables safely.
+- `shared`: current active shared-library build;
+- `clean-generated`: remove local objects and shared-library artifacts safely.
 
 Implementation size: medium.
 
@@ -514,8 +520,9 @@ weight-solving workflows once orbit libraries already exist.
 
 Evidence:
 
-- `dynamite/weight_solvers.py:151-181` defines `LegacyWeightSolver` around the
-  legacy Fortran `triaxnnls_*` programs and writes Fortran input files.
+- `dynamite/weight_solvers.py` still contains `LegacyWeightSolver` source for
+  historical reference, but current configuration/model execution rejects it
+  because its Fortran solver binaries are archived.
 - `dynamite/weight_solvers.py:595-613` defines the Python `NNLS` solver with
   `nnls_solver in ['scipy', 'cvxopt']`.
 - `dynamite/weight_solvers.py:656-729` already constructs the explicit Python
@@ -531,14 +538,16 @@ Evidence:
 Improvement:
 
 Treat the Python `NNLS` path as the modern default for new development, and
-make legacy GALAHAD/Fortran a compatibility and parity-reference backend.
+keep legacy GALAHAD/Fortran archived unless a controlled reproduction task
+explicitly restores it.
 
 This should not mean "delete GALAHAD". It should mean:
 
 - new features target the Python `NNLS` interface first;
-- legacy Fortran remains available for reproducing older results;
-- GALAHAD remains useful as an independent reference for selected regression
-  fixtures while the modern path matures;
+- archived legacy Fortran remains available as source material for reproducing
+  older results;
+- GALAHAD remains useful only as an archived independent reference unless
+  restored behind an explicit backend;
 - the codebase stops assuming that every serious run must have GALAHAD/HSL
   compiled locally.
 
@@ -610,8 +619,9 @@ Candidate backend tiers:
    - still worth designing the interface so sparse matrices or `LinearOperator`
      backends remain possible.
 
-5. legacy Fortran/GALAHAD compatibility backend
-   - keep for parity checks and old-result reproduction;
+5. archived legacy Fortran/GALAHAD reference path
+   - keep as archived source material for parity checks and old-result
+     reproduction;
    - wrap it behind the same `SolverResult` concept;
    - parse Fortran/GALAHAD status explicitly instead of treating output files as
      success.
@@ -629,8 +639,9 @@ Once `A`, `b`, row metadata, and scaling metadata are stable, the project can:
 
 Required parity checks before changing defaults:
 
-1. Legacy classic NNLS parity
-   - Run `LegacyWeightSolver` with `nnls_solver: 1`.
+1. Archived classic NNLS parity
+   - Restore/run `LegacyWeightSolver` with `nnls_solver: 1` only in a controlled
+     archived-backend parity harness.
    - Run Python `NNLS` with `nnls_solver: "scipy"` on the same generated orbit
      library.
    - Compare weights, total chi-square, kinematic chi-square, map chi-square,
@@ -655,8 +666,8 @@ Required parity checks before changing defaults:
 
 5. Solver status parity
    - Backends need a shared success/failure contract.
-   - Legacy Fortran/GALAHAD should be allowed only if non-zero solver statuses
-     are exposed and recorded.
+   - Archived legacy Fortran/GALAHAD should be restored only if non-zero solver
+     statuses are exposed and recorded.
 
 Suggested staged plan:
 
@@ -672,15 +683,15 @@ Suggested staged plan:
 5. Add `scipy.lsq_linear` as an experimental backend behind an explicit config
    value such as `nnls_solver: "scipy_lsq_linear"`.
 6. Measure matrix density and memory footprint before adding a sparse path.
-7. Once parity is stable across fixtures, make `type: "NNLS"` the documented
-   default for new configs and describe `LegacyWeightSolver` as reproduction
-   mode.
+7. Keep `type: "NNLS"` as the active path for new configs and keep
+   `LegacyWeightSolver` rejected unless a controlled reproduction backend is
+   explicitly restored.
 
 What this does not solve:
 
 - It does not speed up fresh Fortran orbit integration.
-- It does not remove the need for the legacy backend when reproducing historical
-  published outputs.
+- It does not remove the possible need for archived legacy source when
+  reproducing historical published outputs.
 - It does not prove scientific equivalence automatically; the parity harness is
   mandatory.
 - It does not make sparse methods valuable unless the actual matrices are
@@ -699,7 +710,8 @@ for CRcut, bar workflows, and repeated-M/L orbit-library reuse.
 2. Add O(1) model/orbit-library lookup keys next to the existing table.
 3. Preallocate NNLS matrix arrays instead of repeated concatenate/vstack.
 4. Make `dynamite/__init__.py` lazy or minimal for short tools and tests.
-5. Add named local build commands/docs for no-GALAHAD and GALAHAD.
+5. Add named local build commands/docs for the active shared library and any
+   explicitly restored archived solver build.
 
 ### Second pass: runtime throughput
 
@@ -718,7 +730,7 @@ for CRcut, bar workflows, and repeated-M/L orbit-library reuse.
 ## What Not To Do First
 
 - Do not rewrite the Fortran numerical core before there is a benchmark suite.
-- Do not replace GALAHAD/HSL blindly without parity tests.
+- Do not restore or replace GALAHAD/HSL blindly without parity tests.
 - Do not change file formats without schema versioning and migration/export
   support.
 - Do not optimize individual formulas before measuring full workflow time.

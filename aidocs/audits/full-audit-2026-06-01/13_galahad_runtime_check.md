@@ -2,8 +2,14 @@
 
 Date: 2026-06-01
 
-Scope: local GALAHAD 2.3 installation, full legacy Fortran build, linked
-solver executable checks, and direct GALAHAD/QPB runtime probes.
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. GALAHAD/NNLS solver code is now archived under
+`archive/legacy_nnls_fortran/`, and `LegacyWeightSolver` is rejected by current
+configuration/model execution. Treat this chapter as archived-path evidence and
+parity/reference context, not an active runtime requirement.
+
+Scope: local GALAHAD 2.3 installation, full archived legacy Fortran build,
+linked solver executable checks, and direct GALAHAD/QPB runtime probes.
 
 This section corrects the earlier audit gap: the first full-audit pass covered
 static Fortran review and `make nogal`, but it had not proven the GALAHAD-linked
@@ -16,14 +22,14 @@ used.
 
 The repository already contains local legacy dependency trees:
 
-- `legacy_fortran/galahad-2.3/`
-- `legacy_fortran/cuter/`
-- `legacy_fortran/hsl/`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/`
+- `archive/legacy_nnls_fortran/legacy_fortran/cuter/`
+- `archive/legacy_nnls_fortran/legacy_fortran/hsl/`
 
 GALAHAD was installed locally by running:
 
 ```bash
-cd legacy_fortran/galahad-2.3
+cd archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3
 ./install_galahad
 ```
 
@@ -34,7 +40,7 @@ Installer choices used:
 - GNU gfortran
 - QP packages and interfaces to CUTEr
 - local CUTEr path:
-  `/home/reinhard/projects/thomas/dynamite/legacy_fortran/cuter`
+  `/home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/cuter`
 - double precision only
 
 The installer completed with:
@@ -48,8 +54,8 @@ GALAHAD: QP routines (double precision version) for CUTEr compiled successfully
 Initial full DYNAMITE build command:
 
 ```bash
-cd legacy_fortran
-make GALAHADDIR=/home/reinhard/projects/thomas/dynamite/legacy_fortran/galahad-2.3 GALAHADTYPE=pc.lnx.gfo/double all
+cd archive/legacy_nnls_fortran/legacy_fortran
+make GALAHADDIR=/home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3 GALAHADTYPE=pc.lnx.gfo/double all
 ```
 
 The first attempt failed because the generated GALAHAD static archives were
@@ -68,43 +74,40 @@ as:
 Local generated-artifact repair:
 
 ```bash
-sed -f legacy_fortran/galahad-2.3/seds/double.sed \
-  legacy_fortran/galahad-2.3/src/gltr/gltr.f90 \
+sed -f archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/seds/double.sed \
+  archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/src/gltr/gltr.f90 \
   > /tmp/dynamite-galahad-probe/gltr.f90
 
 gfortran -o /tmp/dynamite-galahad-probe/gltr.o \
   -c -fno-second-underscore -O \
-  -I/home/reinhard/projects/thomas/dynamite/legacy_fortran/galahad-2.3/modules/pc.lnx.gfo/double \
+  -I/home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/modules/pc.lnx.gfo/double \
   /tmp/dynamite-galahad-probe/gltr.f90
 
 gfortran -o /tmp/dynamite-galahad-probe/hsl_ma57d.o \
   -c -fno-second-underscore -O \
-  -I/home/reinhard/projects/thomas/dynamite/legacy_fortran/galahad-2.3/modules/pc.lnx.gfo/double \
-  /home/reinhard/projects/thomas/dynamite/legacy_fortran/hsl/ma57v4/hsl_ma57d.f90
+  -I/home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/modules/pc.lnx.gfo/double \
+  /home/reinhard/projects/thomas/dynamite/archive/legacy_nnls_fortran/legacy_fortran/hsl/ma57v4/hsl_ma57d.f90
 
-ar -rc legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad.a \
+ar -rc archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad.a \
   /tmp/dynamite-galahad-probe/gltr.o
-ar -rc legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad_hsl.a \
+ar -rc archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad_hsl.a \
   /tmp/dynamite-galahad-probe/hsl_ma57d.o
-ranlib legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad.a
-ranlib legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad_hsl.a
+ranlib archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad.a
+ranlib archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/pc.lnx.gfo/double/libgalahad_hsl.a
 ```
 
 After this local archive repair, the full build succeeded.
 
-Generated executables:
+Original generated executables before cleanup. These are no longer active
+runtime artifacts:
 
-- `legacy_fortran/orbitstart`
-- `legacy_fortran/orbitstart_bar`
-- `legacy_fortran/orblib_new_mirror`
-- `legacy_fortran/orblib_bar`
-- `legacy_fortran/triaxmass`
-- `legacy_fortran/triaxmass_bar`
-- `legacy_fortran/triaxmassbin`
-- `legacy_fortran/triaxmassbin_bar`
-- `legacy_fortran/triaxnnls_CRcut`
-- `legacy_fortran/triaxnnls_noCRcut`
-- `legacy_fortran/triaxnnls_bar`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxmass`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxmass_bar`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxmassbin`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxmassbin_bar`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_CRcut`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_bar`
 
 Link/load checks:
 
@@ -119,8 +122,8 @@ Link/load checks:
 ## Runtime Checks
 
 A real DYNAMITE legacy model run was executed in `/tmp/dynamite-galahad-run`
-using copied `dev_tests/reimplement_nnls_config1.yaml` and
-`dev_tests/NGC6278_input/`, with local edits in `/tmp` only:
+using copied `archive/dev_tests/reimplement_nnls_config1.yaml` and
+`archive/dev_tests/NGC6278_input/`, with local edits in `/tmp` only:
 
 - `ncpus: 1`
 - `n_max_mods : 1`

@@ -167,3 +167,9 @@ This file is append-only. Add new entries at the bottom.
   `parameters_pot`/`begin` text precision is intentionally preserved and the
   generated `interpolgrid` cache is shared by orbit-start, tube, and box
   workers.
+- Audited and updated Markdown documentation for the current `fortran-cleanup`
+  branch state. Active docs and audit reports now describe the shared-library
+  orblib backend, SSH origin remote, archived `archive/dev_tests/` workflows,
+  archived legacy NNLS/GALAHAD and mass-helper code, rejected
+  `LegacyWeightSolver`, current pytest baseline under `tests/`, and the
+  direct shared-library LOSVD parity fixtures.

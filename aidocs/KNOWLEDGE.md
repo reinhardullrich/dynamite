@@ -16,7 +16,7 @@ stellar-population modelling of stellar systems.
 
 ## GitHub Remotes
 
-- `origin`: `https://github.com/reinhardullrich/dynamite.git`
+- `origin`: `git@github.com:reinhardullrich/dynamite.git`
 - `upstream`: `https://github.com/dynamics-of-stellar-systems/dynamite.git`
 
 Use `origin` for personal fork changes. Use `upstream` only to fetch or merge
@@ -85,8 +85,9 @@ changes from the original project.
   orbit-start, tube, and box workers. Binary `datfil/` orbit-library outputs
   remain the active output contract for the existing Python readers and weight
   solvers.
-- `tests/`: local pytest baseline for Fortran replacement work. The default
-  suite covers fixture contracts, extracted historical workflow facts, small
+- `tests/`: local pytest baseline for the active orblib Fortran shared-library
+  backend, the direct-input Python API facade, and future replacement work. The
+  default suite covers fixture contracts, extracted historical workflow facts, small
   Fortran kernel parity checks, and fast coverage for the direct-input
   orbit-library API facade; opt-in slow tests include a generated
   orbit-library LOSVD output comparison against the self-contained NGC6278
@@ -120,12 +121,13 @@ source files.
   Schwarzschild/MGE modelling chain scientifically grounded, with caveats
   around convergence, barred-model benchmarking, cored-log halo density
   domains, and modelling priors.
-- Full 2026-06-01 audit: local install succeeded in `.venv/`, no-GALAHAD
-  Fortran build succeeded, full GALAHAD-backed Fortran build succeeded after
-  repairing generated static archives, pytest collection currently fails, and
-  the highest risks are CI coverage gaps, unsafe output-state mutation, weak
+- Full 2026-06-01 audit: this is now an adapted historical audit baseline. The
+  original run found CI coverage gaps, unsafe output-state mutation, weak
   Python-to-Fortran failure detection, solver-result validation gaps, physical
-  parameter domain gaps, and non-atomic model/cache writes.
+  parameter domain gaps, and non-atomic model/cache writes. After the local
+  Fortran cleanup, active orbit generation uses the direct shared-library API,
+  archived development-test workflows have pytest replacements under `tests/`, and
+  the old `LegacyWeightSolver`/GALAHAD path is rejected rather than active.
 - GALAHAD follow-up: direct solver-mode `5` probes reached QPB in
   `triaxnnls_noCRcut` and `triaxnnls_CRcut`, but both logged
   `QPB_solve exit status = -5` while the shell process exited `0` and output
@@ -162,7 +164,7 @@ git fetch upstream
 Push fork changes:
 
 ```bash
-git push origin master
+git push origin <branch>
 ```
 
 ## Current Documentation Boundary

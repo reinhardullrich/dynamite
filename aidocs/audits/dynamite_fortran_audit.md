@@ -4,10 +4,16 @@ Date: 2026-06-01
 
 Repository audited: `/home/reinhard/projects/thomas/dynamite`
 
-Historical note, updated 2026-06-01: this earlier standalone audit predates
-the later full-audit GALAHAD build/runtime follow-up. For current GALAHAD
-status, see
-`aidocs/audits/full-audit-2026-06-01/13_galahad_runtime_check.md`.
+Current-status update, 2026-06-02: this earlier standalone audit has been
+adapted for the `fortran-cleanup` branch. The active Fortran backend is now
+`orblib_fortran/`, normal builds produce only
+`orblib_fortran/build/lib/liborblib_fortran.so`, and Python calls it through
+`dynamite/orblib_api.py`. Legacy NNLS/GALAHAD solver sources and `triaxmass*`
+helpers are archived under `archive/legacy_nnls_fortran/`; `orbgen`/`partgen`
+are archived under `archive/legacy_orbgen_partgen/`. Findings about active
+legacy solver executables, mass-helper executables, or executable packaging are
+therefore resolved or obsolete unless explicitly marked as applying to the
+archived tree.
 
 This is a separate audit of the Fortran side of DYNAMITE. I focused on DYNAMITE-maintained Fortran entry points, the build system, the Python/Fortran file contract, and the integration with bundled numerical solvers. I did not line-by-line re-audit the entire vendored GALAHAD/CUTEr/HSL trees; those are treated as third-party dependencies and noted separately.
 
@@ -15,11 +21,19 @@ This is a separate audit of the Fortran side of DYNAMITE. I focused on DYNAMITE-
 
 The Fortran code is legacy scientific Fortran with a lot of domain knowledge in it, but it has several reliability hazards that matter for production runs:
 
-- Many error paths use plain `stop "message"`. With local `gfortran 13.3.0`, I verified that `stop "bad"` exits with status code `0`, so Python or shell callers may treat failed Fortran runs as successful unless they parse logs.
-- Solver failure handling is too weak. GALAHAD/QPB and NNLS failures are printed but not made fatal before orbit weights and prediction files are written.
-- Some orbit-start logic can consume uninitialized arrays if the integrator stores fewer crossing samples than expected.
-- The Linux Makefile is broken unless `FORTRAN` is explicitly passed, and the default Makefile points GALAHAD at a macOS library directory even on Linux.
-- The packaged numerical dependencies are very old or pinned to old branches. Bundled GALAHAD is from 2008, while current upstream GALAHAD is `v5.4.0`; the helper script pins older Optrove components too.
+- Active shared-library calls are isolated in worker processes, but many legacy
+  Fortran error paths still use plain `stop "message"` and can terminate the
+  worker process. Python must continue treating a worker failure as fatal.
+- Solver failure handling in the old GALAHAD/QPB and Fortran NNLS executables
+  is now an archived-path concern because `LegacyWeightSolver` is rejected by
+  current runtime configuration.
+- Some orbit-start logic can consume uninitialized arrays if the integrator
+  stores fewer crossing samples than expected.
+- The active Makefiles now build only the shared library; previous findings
+  about active mass/NNLS executable builds and executable packaging are
+  obsolete.
+- The archived GALAHAD/CUTEr/HSL numerical dependencies are still old and
+  should remain outside the active runtime unless explicitly restored.
 
 I would not treat the Fortran pipeline as robust until the high-severity findings below are fixed and covered by at least one end-to-end regression case.
 
@@ -27,41 +41,49 @@ I would not treat the Fortran pipeline as robust until the high-severity finding
 
 First-party or DYNAMITE-specific files reviewed:
 
-- `legacy_fortran/Makefile`
-- `legacy_fortran/Makefile.linux`
-- `legacy_fortran/compile_deps.sh`
-- `legacy_fortran/iniparam_f.f90`
-- `legacy_fortran/dmpotent.f90`
-- `legacy_fortran/triaxpotent.f90`
-- `legacy_fortran/interpolpotent.f90`
-- `legacy_fortran/orbitstart.f90`
-- `legacy_fortran/orbitstart_bar.f90`
-- `legacy_fortran/orbitstart_f.f90`
-- `legacy_fortran/orblibprogram.f90`
-- `legacy_fortran/orblibprogram_bar.f90`
-- `legacy_fortran/orblib_f_new_mirror.f90`
-- `legacy_fortran/triaxmass_f.f90`
-- `legacy_fortran/triaxmassbin_f.f90`
-- `legacy_fortran/triaxnnls_CRcut.f90`
-- `legacy_fortran/triaxnnls_noCRcut.f90`
-- `legacy_fortran/triaxnnls_bar.f90`
-- `legacy_fortran/orbgen_partgen/orbgen.f90`
-- `legacy_fortran/orbgen_partgen/partgen.f90`
-- `legacy_fortran/ran1_nr.f`
+- `orblib_fortran/Makefile`
+- `orblib_fortran/Makefile.linux`
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh`
+- `orblib_fortran/source/iniparam_f.f90`
+- `orblib_fortran/source/dmpotent.f90`
+- `orblib_fortran/source/triaxpotent.f90`
+- `orblib_fortran/source/interpolpotent.f90`
+- `orblib_fortran/source/unused/orbitstart.f90`
+- `orblib_fortran/source/unused/orbitstart_bar.f90`
+- `orblib_fortran/source/orbitstart_f.f90`
+- `orblib_fortran/source/unused/orblibprogram.f90`
+- `orblib_fortran/source/unused/orblibprogram_bar.f90`
+- `orblib_fortran/source/orblib_f_new_mirror.f90`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmass_f.f90`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmassbin_f.f90`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_CRcut.f90`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_bar.f90`
+- `archive/legacy_orbgen_partgen/legacy_fortran/orbgen_partgen/orbgen.f90`
+- `archive/legacy_orbgen_partgen/legacy_fortran/orbgen_partgen/partgen.f90`
+- `orblib_fortran/source/ran1_nr.f`
 
 Vendored or mostly third-party code noted but not fully re-reviewed:
 
-- `legacy_fortran/galahad-2.3/`
-- `legacy_fortran/cuter/`
-- `legacy_fortran/hsl/`
-- numerical helper routines under `legacy_fortran/sub/`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/`
+- `archive/legacy_nnls_fortran/legacy_fortran/cuter/`
+- `archive/legacy_nnls_fortran/legacy_fortran/hsl/`
+- numerical helper routines under `archive/legacy_nnls_fortran/legacy_fortran/sub/`
 
 ## Build And Verification Checks Performed
 
 - Confirmed local compiler: `gfortran 13.3.0`.
-- Ran `make -n nogal` in `legacy_fortran`; this dry-run emits plausible commands for `orbitstart`, `orbitstart_bar`, `orblib_new_mirror`, and `orblib_bar`.
-- Ran `make -n all` in `legacy_fortran`; this dry-run shows the NNLS/GALAHAD targets still use `galahad-2.3/modules/mac.osx.gfo/double/` and `objects/mac.osx.gfo/double/` from the default Makefile.
-- Ran `make -n -f Makefile.linux nogal`; because `FORTRAN` is unset, commands expand to a leading compiler flag instead of a compiler, e.g. `Wuninitialized ...`. This confirms the Linux Makefile is not self-contained.
+- Original pre-cleanup check: ran `make -n nogal` in `legacy_fortran`; this
+  dry-run emitted plausible commands for `orbitstart`, `orbitstart_bar`,
+  `orblib_new_mirror`, and `orblib_bar`. Current `make nogal` in
+  `orblib_fortran/` builds the shared library.
+- Original archived-solver check: ran `make -n all` in `legacy_fortran`; this
+  dry-run showed the NNLS/GALAHAD targets still used
+  `galahad-2.3/modules/mac.osx.gfo/double/` and
+  `objects/mac.osx.gfo/double/` from the default Makefile.
+- Original Linux-Makefile check: ran `make -n -f Makefile.linux nogal`; because
+  `FORTRAN` was unset, commands expanded to a leading compiler flag instead of
+  a compiler, e.g. `Wuninitialized ...`.
 - Compiled a tiny `/tmp` program with the same optimization flags to confirm the current gfortran accepts the flags.
 - Tested `stop "bad"` with local gfortran; it printed `STOP bad` and exited with status code `0`.
 - Did not run full `make all`, because that would write objects/binaries into the clone and depends on GALAHAD/HSL setup that is not currently configured.
@@ -76,12 +98,12 @@ Severity: High
 
 Examples:
 
-- `legacy_fortran/dmpotent.f90:41`
-- `legacy_fortran/triaxpotent.f90:130`
-- `legacy_fortran/triaxpotent.f90:714`
-- `legacy_fortran/orblib_f_new_mirror.f90:2459`
-- `legacy_fortran/triaxnnls_noCRcut.f90:141`
-- `legacy_fortran/triaxmass_f.f90:197`
+- `orblib_fortran/source/dmpotent.f90:41`
+- `orblib_fortran/source/triaxpotent.f90:130`
+- `orblib_fortran/source/triaxpotent.f90:714`
+- `orblib_fortran/source/orblib_f_new_mirror.f90:2459`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:141`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmass_f.f90:197`
 
 The code uses many `stop "message"` statements for real error conditions: invalid models, failed integrators, inconsistent orbit libraries, malformed input, and disk-write errors.
 
@@ -107,8 +129,8 @@ Severity: High
 
 Primary example:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:1144-1150`
-- `legacy_fortran/triaxnnls_noCRcut.f90:1166-1169`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:1144-1150`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:1166-1169`
 
 The code calls `QPB_solve`, prints `info%status` when nonzero, but then continues and assigns:
 
@@ -131,8 +153,8 @@ Severity: High
 
 Examples:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:779-785`
-- `legacy_fortran/triaxnnls_noCRcut.f90:1242-1254`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:779-785`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:1242-1254`
 
 The Lawson-Hanson `nnls` call returns `mode`, but the program only prints it. Standard NNLS semantics are that `mode = 1` is success; other modes indicate invalid dimensions or iteration failure. The code continues regardless.
 
@@ -148,10 +170,10 @@ Severity: High
 
 Relevant code:
 
-- `legacy_fortran/orbitstart_f.f90:657`
-- `legacy_fortran/orbitstart_f.f90:704-717`
-- `legacy_fortran/orbitstart_f.f90:720-731`
-- `legacy_fortran/orbitstart_f.f90:783-818`
+- `orblib_fortran/source/orbitstart_f.f90:657`
+- `orblib_fortran/source/orbitstart_f.f90:704-717`
+- `orblib_fortran/source/orbitstart_f.f90:720-731`
+- `orblib_fortran/source/orbitstart_f.f90:783-818`
 
 `findtubeorbitwidth` allocates `pos_t(intsteps, 3)`, the DOP853 callback stores plane crossings, and then the caller computes `rad(:)` over the entire `pos_t` array.
 
@@ -171,8 +193,8 @@ Severity: High
 
 Relevant code:
 
-- `legacy_fortran/Makefile.linux:13-14`
-- `legacy_fortran/Makefile.linux:90-92`
+- `orblib_fortran/Makefile.linux:13-14`
+- `orblib_fortran/Makefile.linux:90-92`
 
 `Makefile.linux` sets `compilername=gfortran`, but the actual compile commands use `$(FORTRAN)`. The default `FORTRAN=path/to/gfortran` line is commented out.
 
@@ -197,8 +219,8 @@ Severity: High for Linux users building NNLS/GALAHAD targets
 
 Relevant code:
 
-- `legacy_fortran/Makefile:89-98`
-- `legacy_fortran/Makefile:262-288`
+- `archive/legacy_nnls_fortran/legacy_fortran/Makefile:89-98`
+- `archive/legacy_nnls_fortran/legacy_fortran/Makefile:262-288`
 
 The default Makefile sets:
 
@@ -209,8 +231,8 @@ GALAHADTYPE= mac.osx.gfo/double/
 On Linux, `make all` still emits compile/link commands using:
 
 ```text
-legacy_fortran/galahad-2.3/modules/mac.osx.gfo/double/
-legacy_fortran/galahad-2.3/objects/mac.osx.gfo/double/
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/modules/mac.osx.gfo/double/
+archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/objects/mac.osx.gfo/double/
 ```
 
 CI only runs `make nogal`, so this breakage is not covered.
@@ -227,10 +249,10 @@ Severity: Medium to High, depending on whether NNLS/GALAHAD targets are required
 
 Local state:
 
-- `legacy_fortran/galahad-2.3/version` says `GALAHAD version 2.2.0003 (12/June/2008 16:45 GMT)`.
-- `legacy_fortran/cuter/README` references CUTEr documentation from 2003 and 2005.
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/version` says `GALAHAD version 2.2.0003 (12/June/2008 16:45 GMT)`.
+- `archive/legacy_nnls_fortran/legacy_fortran/cuter/README` references CUTEr documentation from 2003 and 2005.
 - HSL files show versions and dates around 2004-2008.
-- `legacy_fortran/compile_deps.sh` pins:
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh` pins:
   - ARCHDefs `v2.0.4`
   - CUTEst `v2.0.3`
   - SIFDecode `v2.0.3`
@@ -263,9 +285,9 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/compile_deps.sh:6-12`
-- `legacy_fortran/compile_deps.sh:22-36`
-- `legacy_fortran/compile_deps.sh:38-65`
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh:6-12`
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh:22-36`
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh:38-65`
 
 The script has some checks, but it does not use `set -euo pipefail`, and most path variables are unquoted:
 
@@ -289,13 +311,16 @@ Recommended fix:
 
 Severity: Medium to High
 
+Current status: resolved locally. The old mass/NNLS executables are archived,
+and the active Fortran build is shared-library-only.
+
 Relevant code:
 
-- `legacy_fortran/dmpotent.f90:172-176`
-- `legacy_fortran/dmpotent.f90:237-247`
-- `legacy_fortran/dmpotent.f90:255-258`
-- `legacy_fortran/dmpotent.f90:203-208`
-- `legacy_fortran/dmpotent.f90:288-295`
+- `orblib_fortran/source/dmpotent.f90:172-176`
+- `orblib_fortran/source/dmpotent.f90:237-247`
+- `orblib_fortran/source/dmpotent.f90:255-258`
+- `orblib_fortran/source/dmpotent.f90:203-208`
+- `orblib_fortran/source/dmpotent.f90:288-295`
 
 Several dark-matter profiles divide by `sqrt(d2)`, `d2`, or `dnorm`, where `d2 = x*x + y*y + z*z`. At exactly the origin, this can produce NaN/Inf even where the analytic limit is finite or well-defined.
 
@@ -318,7 +343,7 @@ Severity: Medium to High
 
 Relevant code:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:172-180`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:172-180`
 - Similar blocks exist in `triaxnnls_CRcut.f90` and `triaxnnls_bar.f90`.
 
 The code reads the second orbit library's intrinsic-grid metadata but comments out the consistency check:
@@ -342,9 +367,9 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/triaxmass_f.f90:189-197`
-- `legacy_fortran/triaxmassbin_f.f90:17-19`
-- `legacy_fortran/triaxmassbin_f.f90:263-267`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmass_f.f90:189-197`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmassbin_f.f90:17-19`
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmassbin_f.f90:263-267`
 
 `triaxmass_f.f90` uses:
 
@@ -372,11 +397,11 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/iniparam_f.f90:101-151`
-- `legacy_fortran/iniparam_f.f90:209-283`
-- `legacy_fortran/orblib_f_new_mirror.f90:640-660`
-- `legacy_fortran/triaxnnls_noCRcut.f90:409-416`
-- `legacy_fortran/triaxnnls_noCRcut.f90:481-499`
+- `orblib_fortran/source/iniparam_f.f90:101-151`
+- `orblib_fortran/source/iniparam_f.f90:209-283`
+- `orblib_fortran/source/orblib_f_new_mirror.f90:640-660`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:409-416`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:481-499`
 
 Most input files are opened and read without `iostat`. Missing files, truncated files, invalid numeric fields, negative sizes, and inconsistent values generally become runtime aborts rather than controlled errors.
 
@@ -398,7 +423,7 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/triaxpotent.f90:708-719`
+- `orblib_fortran/source/triaxpotent.f90:708-719`
 
 The helper skips lines whose first nonblank character is `#`, but it returns blank lines as content. Callers then do `read(string,*)`, which can fail unexpectedly if a config file contains blank lines.
 
@@ -416,7 +441,7 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/interpolpotent.f90:292-320`
+- `orblib_fortran/source/interpolpotent.f90:292-320`
 
 The `interpolgrid` cache stores dimensions and grid data, and then validates by testing acceleration accuracy against the current model. That is useful, but the file itself does not record model parameters, compiler, code version, floating format, or profile type.
 
@@ -434,9 +459,9 @@ Severity: Medium
 
 Relevant code:
 
-- `legacy_fortran/orblib_f_new_mirror.f90:2461-2475`
-- `legacy_fortran/orblib_f_new_mirror.f90:2520-2539`
-- `legacy_fortran/triaxnnls_noCRcut.f90:126-150`
+- `orblib_fortran/source/orblib_f_new_mirror.f90:2461-2475`
+- `orblib_fortran/source/orblib_f_new_mirror.f90:2520-2539`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:126-150`
 - Python readers covered in the Python audit use Fortran-style binary records.
 
 The orbit-library files are compiler/runtime-specific unformatted sequential records. They are not self-describing and can vary by compiler record markers, endianness, and record-size conventions.
@@ -470,14 +495,15 @@ CI builds only `make nogal`, which excludes:
 - `triaxnnls_bar`
 - GALAHAD linking
 
-The artifact verification step only lists files and does not assert executable presence. The test step does not run `pytest`; it runs `dev_tests/test_nnls.py` as a shell command.
+The artifact verification step only lists files and does not assert executable presence. The test step does not run `pytest`; it runs `archive/dev_tests/test_nnls.py` as a shell command.
 
 Recommended fix:
 
-- Add executable checks after build.
-- Add at least one `make all` or `make -f Makefile.linux all` job when dependencies are available.
+- Add shared-library checks after build.
+- Add archived-solver checks only if the old solver backend is deliberately
+  restored.
 - Run `python -m pytest` or execute test files through Python intentionally.
-- Add one minimal end-to-end smoke model that runs the Fortran executables and validates expected output files.
+- Keep the active orblib shared-library LOSVD regression tests.
 
 ### 17. Optimization Flags Reduce Numerical Debbugability And Portability
 
@@ -485,8 +511,8 @@ Severity: Low to Medium
 
 Relevant code:
 
-- `legacy_fortran/Makefile:57-65`
-- `legacy_fortran/Makefile.linux:64-72`
+- `orblib_fortran/Makefile:57-65`
+- `orblib_fortran/Makefile.linux:64-72`
 
 The default build uses:
 
@@ -509,9 +535,9 @@ Severity: Low to Medium
 
 Relevant code:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:826`
-- `legacy_fortran/triaxnnls_noCRcut.f90:840`
-- `legacy_fortran/triaxnnls_noCRcut.f90:1828`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:826`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:840`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:1828`
 
 The solver path uses fixed filenames like `orbmat.gal`, `sol`, and `datfil/abel_orb.out`. Parallel runs in the same working directory can collide, and stale files can be mistaken for current solver outputs.
 
@@ -527,11 +553,11 @@ Severity: Low
 
 Found files:
 
-- `legacy_fortran/sub/nnls95.f~`
-- `legacy_fortran/galahad-2.3/sifdec/SifDec.medium.pc.lnx.g77/Makefile.bak`
-- `legacy_fortran/galahad-2.3/src/.DS_Store`
-- `legacy_fortran/galahad-2.3/src/icfs/.DS_Store`
-- `legacy_fortran/hsl/icfs/.DS_Store`
+- `archive/legacy_nnls_fortran/legacy_fortran/sub/nnls95.f~`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/sifdec/SifDec.medium.pc.lnx.g77/Makefile.bak`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/src/.DS_Store`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/src/icfs/.DS_Store`
+- `archive/legacy_nnls_fortran/legacy_fortran/hsl/icfs/.DS_Store`
 
 These are not necessarily runtime bugs, but they make source packaging noisier and can confuse audits.
 
@@ -554,8 +580,11 @@ After the overview, Python audit, and this Fortran audit, these areas are still 
 
 - Full third-party numerical libraries: GALAHAD, CUTEr/CUTEst, HSL, NAG-derived routines, DOP853/DOPRI5 internals, and Numerical Recipes helpers were not line-by-line reviewed.
 - Scientific correctness: I did not validate the astrophysical equations or compare generated orbit libraries against published/reference model outputs.
-- Full runtime behavior: I did not run a complete DYNAMITE model end to end through all Fortran executables.
-- Full `make all`: I did not compile the GALAHAD-dependent targets in this workspace.
+- Full runtime behavior: the original audit did not run a complete DYNAMITE
+  model end to end through all Fortran executables; current active tests now
+  include an opt-in slow shared-library LOSVD regression fixture.
+- Full `make all`: the original audit did not compile the GALAHAD-dependent
+  targets in this workspace; those targets are now archived.
 - Cross-platform binary compatibility: I did not test generated orbit-library files across compilers, endianness, or record-marker variants.
 - Performance and scaling: I did not profile large model runs or memory usage.
 - License/legal status: I did not perform a formal license audit of bundled HSL/GALAHAD/CUTEr/Numerical Recipes-derived code.
@@ -565,9 +594,10 @@ After the overview, Python audit, and this Fortran audit, these areas are still 
 ## Suggested Fix Order
 
 1. Replace fatal `stop "message"` with nonzero exits and update shell/Python launchers to fail hard.
-2. Enforce GALAHAD and NNLS solver status before writing final outputs.
+2. Keep archived GALAHAD and NNLS solver status handling out of the active
+   runtime unless that backend is explicitly restored.
 3. Fix `findtubeorbitwidth` uninitialized-array risk.
-4. Repair the Linux Makefile and add CI coverage for it.
-5. Decide on one supported GALAHAD dependency path and document/build it reproducibly.
-6. Add one small end-to-end Fortran/Python regression fixture.
+4. Keep active shared-library build coverage for `orblib_fortran/`.
+5. Keep GALAHAD dependency paths archived unless a controlled restore is needed.
+6. Maintain the small opt-in Fortran/Python LOSVD regression fixture.
 7. Convert fixed-size arrays and fragile parsing helpers after the failure semantics are reliable.

@@ -6,6 +6,13 @@ Scope: clarify which weight solvers exist in DYNAMITE, how GALAHAD and the
 old Fortran NNLS path are configured, how the Python SciPy/CVXOPT paths are
 configured, and what the local benchmark showed.
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. The recommended direction has been implemented
+locally for active runtime: `LegacyWeightSolver` is rejected by configuration
+validation and `Model.get_weights()`, and legacy NNLS/GALAHAD sources are
+archived under `archive/legacy_nnls_fortran/`. The active solver path is Python
+`NNLS`.
+
 This chapter follows up chapter 13, which verified that the local GALAHAD build
 can link and reach QPB at runtime, and chapter 14, which proposed treating the
 Python `NNLS` path as the future default.
@@ -33,10 +40,10 @@ weight_solver_settings:
     nnls_solver: "scipy"
 ```
 
-The legacy Fortran/GALAHAD stack should no longer be treated as required for
-new work. The remaining reason to keep it is compatibility and reproducibility:
-older published outputs, older configurations, or additional constrained
-GALAHAD modes that are not equivalent to plain NNLS.
+The legacy Fortran/GALAHAD stack is no longer active in this local branch. It
+is retained only as archived compatibility/reproducibility material for older
+published outputs, older configurations, or additional constrained GALAHAD modes
+that are not equivalent to plain NNLS.
 
 ## Terminology
 
@@ -45,7 +52,7 @@ programs.
 
 ### Legacy Fortran NNLS
 
-This is the old Fortran weight-solving route exposed by:
+This is the old Fortran weight-solving route that used to be exposed by:
 
 ```yaml
 weight_solver_settings:
@@ -57,16 +64,16 @@ Python class:
 
 - `dynamite/weight_solvers.py:151`, `LegacyWeightSolver`
 
-Fortran executables:
+Archived Fortran executables:
 
-- `legacy_fortran/triaxnnls_noCRcut`
-- `legacy_fortran/triaxnnls_CRcut`
-- `legacy_fortran/triaxnnls_bar`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_CRcut`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_bar`
 
 Algorithm:
 
 - Lawson-Hanson non-negative least squares from
-  `legacy_fortran/sub/nnls95.f`
+  `archive/legacy_nnls_fortran/legacy_fortran/sub/nnls95.f`
 
 Problem:
 
@@ -113,11 +120,13 @@ through GALAHAD's QPB quadratic-programming package.
 
 The relevant Fortran routine is:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:848`, `donnls_galahad`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:848`,
+  `donnls_galahad`
 
 The actual QPB call is:
 
-- `legacy_fortran/triaxnnls_noCRcut.f90:1144`, `CALL QPB_solve(...)`
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_noCRcut.f90:1144`,
+  `CALL QPB_solve(...)`
 
 The Fortran solver menu in `triaxnnls_noCRcut.f90` distinguishes the paths:
 
@@ -134,10 +143,10 @@ GALAHAD/QPB.
 
 ## Runtime Dispatch in Python
 
-The active solver is selected only by config. There is no silent automatic
-replacement.
+The active solver is selected by config. In the current cleanup branch, the
+legacy solver type is rejected rather than silently replaced.
 
-In `dynamite/model.py:1203-1211`:
+Old dispatch before cleanup:
 
 ```python
 ws_type = self.config.settings.weight_solver_settings['type']
@@ -149,9 +158,10 @@ else:
     raise ValueError(...)
 ```
 
-So:
+Current branch behavior:
 
-- `type: "LegacyWeightSolver"` launches the old Fortran route.
+- `type: "LegacyWeightSolver"` raises a clear error because the old Fortran
+  route is archived.
 - `type: "NNLS"` launches the Python route.
 - `nnls_solver: "scipy"` uses SciPy.
 - `nnls_solver: "cvxopt"` uses CVXOPT.
@@ -161,13 +171,15 @@ So:
 GALAHAD is needed only if the project builds or runs the full legacy Fortran
 solver binaries with GALAHAD/QPB support.
 
-Build files:
+Archived build files:
 
-- `legacy_fortran/Makefile.linux:104` has `all`, including the `triaxnnls_*`
-  binaries.
-- `legacy_fortran/Makefile.linux:105` has `nogal`, which builds only the
-  orbit-library programs and does not build the `triaxnnls_*` solver binaries.
-- `legacy_fortran/Makefile.linux:266`, `279`, and `291` link the
+- `archive/legacy_nnls_fortran/legacy_fortran/Makefile.linux:104` has `all`,
+  including the `triaxnnls_*` binaries.
+- `archive/legacy_nnls_fortran/legacy_fortran/Makefile.linux:105` had `nogal`,
+  which built only the old orbit-library programs and did not build the
+  `triaxnnls_*` solver binaries.
+- `archive/legacy_nnls_fortran/legacy_fortran/Makefile.linux:266`, `279`, and
+  `291` link the
   `triaxnnls_*` binaries against GALAHAD libraries.
 
 Documentation already describes two installation options:
@@ -180,14 +192,15 @@ Python `NNLS` path is sufficient.
 
 ## Is Legacy Fortran NNLS Still In Use?
 
-Yes, it is still in the code and still selectable by config.
+No. In the current cleanup branch it is retained only as archived source and is
+not selectable by active configuration/model execution.
 
-Examples that still use `LegacyWeightSolver`:
+Archived examples that used `LegacyWeightSolver`:
 
-- `dev_tests/user_test_config.yaml`
-- `dev_tests/test_slurm_config.yaml`
-- `dev_tests/dif_dm_halos_config.yaml`
-- `dev_tests/reimplement_nnls_config1.yaml`
+- `archive/dev_tests/user_test_config.yaml`
+- `archive/dev_tests/test_slurm_config.yaml`
+- `archive/dev_tests/dif_dm_halos_config.yaml`
+- `archive/dev_tests/reimplement_nnls_config1.yaml`
 
 Examples that use the modern Python path:
 
@@ -195,11 +208,11 @@ Examples that use the modern Python path:
 - `docs/tutorial_notebooks/NGC6278_config_single.yaml`
 - `docs/tutorial_notebooks/FCC167_config.yaml`
 - `docs/tutorial_notebooks/NGC4550_config.yaml`
-- `dev_tests/user_test_config_ml.yaml`
-- `dev_tests/user_test_config_ml_gas.yaml`
-- `dev_tests/user_test_config_specificmodels.yaml`
-- `dev_tests/reimplement_nnls_config2.yaml`
-- `dev_tests/bayes_losvd/IC0719_dynamite_config.yaml`
+- `archive/dev_tests/user_test_config_ml.yaml`
+- `archive/dev_tests/user_test_config_ml_gas.yaml`
+- `archive/dev_tests/user_test_config_specificmodels.yaml`
+- `archive/dev_tests/reimplement_nnls_config2.yaml`
+- `archive/dev_tests/bayes_losvd/IC0719_dynamite_config.yaml`
 
 The docs and runtime validation already push new workflows toward Python NNLS:
 
@@ -371,25 +384,25 @@ script-style checks rather than strict unit tests.
 
 Relevant existing files:
 
-- `dev_tests/test_reimplement_nnls.py`
+- `archive/dev_tests/test_reimplement_nnls.py`
   - runs `reimplement_nnls_config1.yaml` with `LegacyWeightSolver`;
   - runs `reimplement_nnls_config2.yaml` with Python `NNLS`;
   - compares one model's weights with `np.allclose`;
   - compares the `kinchi2` grid with `np.allclose`;
   - currently produces plots and text output, but does not fail the process if
     the comparison is bad.
-- `dev_tests/test_nnls.py`
+- `archive/dev_tests/test_nnls.py`
   - runs a Python `NNLS/scipy` workflow and compares against stored chi-square
     comparison data visually/textually;
   - useful as a regression-test base, but currently more integration-script
     than pytest.
-- `dev_tests/test_all.sh`
+- `archive/dev_tests/test_all.sh`
   - can sweep `LegacyWeightSolver` and `NNLS/scipy` across generator types;
   - currently checks only exit codes, not scientific parity.
-- `dev_tests/test_bar.py` and `dev_tests/bartest.yaml`
+- `archive/dev_tests/test_bar.py` and `archive/dev_tests/bartest.yaml`
   - useful seed for barred-model coverage;
   - current comparison logic is partly commented out.
-- `dev_tests/bayes_losvd/IC0719_dynamite_config.yaml`
+- `archive/dev_tests/bayes_losvd/IC0719_dynamite_config.yaml`
   - useful seed for the BayesLOSVD path, which already requires Python `NNLS`.
 
 These assets should be converted into deterministic pass/fail tests before
@@ -450,9 +463,9 @@ legacy route solved.
 
 Start from:
 
-- `dev_tests/reimplement_nnls_config1.yaml`
-- `dev_tests/reimplement_nnls_config2.yaml`
-- `dev_tests/test_reimplement_nnls.py`
+- `archive/dev_tests/reimplement_nnls_config1.yaml`
+- `archive/dev_tests/reimplement_nnls_config2.yaml`
+- `archive/dev_tests/test_reimplement_nnls.py`
 
 Convert the current script into a pytest-style test that:
 
@@ -623,7 +636,7 @@ This is the safest scientific path.
 Keep legacy Fortran/GALAHAD temporarily as a compatibility backend, but stop
 treating it as normal infrastructure. Add a parity harness first:
 
-- legacy `LegacyWeightSolver` vs Python `NNLS/scipy`;
+- archived `LegacyWeightSolver` behavior vs Python `NNLS/scipy`;
 - CRcut true/false;
 - multiple M/L values sharing one orbit library;
 - barred models;
@@ -643,7 +656,9 @@ Cons:
 - keeps old dependencies around longer;
 - does not immediately simplify the repository as much as option A.
 
-This is the recommended route if published-output reproducibility matters.
+This was the recommended transition route. The local branch has taken the
+stronger cleanup step: `LegacyWeightSolver` is rejected and the old sources are
+archived.
 
 ### Option C - Keep GALAHAD And Legacy Fortran Indefinitely
 
@@ -667,20 +682,20 @@ This option is not attractive for new development.
 
 ## Recommendation
 
-Remove GALAHAD from the required/recommended workflow now, but do not delete all
-legacy code blindly in the same step.
+Current local recommendation: keep GALAHAD removed from the
+required/recommended workflow and keep the old solver code archived unless a
+specific reproduction task requires a controlled restore.
 
 Recommended staged decision:
 
 1. Make Python `NNLS` with `nnls_solver: "scipy"` the only recommended path for
    new plain-NNLS work.
-2. Mark `LegacyWeightSolver` as compatibility/reproduction mode only.
+2. Reject `LegacyWeightSolver` in active configuration/model execution.
 3. Stop requiring GALAHAD in local setup and CI.
 4. Add a small parity harness that compares old Fortran NNLS and Python SciPy
    NNLS on representative fixtures.
-5. If parity passes for the required scientific cases, remove
-   `LegacyWeightSolver` and the GALAHAD-linked Fortran solver build from the
-   active code path.
+5. Keep `LegacyWeightSolver` and the GALAHAD-linked Fortran solver build out of
+   the active code path.
 6. Keep archived legacy source or a tagged branch if old result reproduction is
    still needed.
 

@@ -147,7 +147,9 @@ flowchart TD
 
 ## Main Execution Flow
 
-For each Fortran orbit-library executable invocation:
+For each active direct shared-library orbit-library call, the Fortran code still
+executes the same old setup/run/output pipeline internally. The legacy
+executable drivers used the same sequence:
 
 1. `setup()` or `setup_bar()` initializes modules.
 2. `integrator_setup()` reads the potential parameters and the orbit-start file.

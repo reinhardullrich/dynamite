@@ -2,13 +2,21 @@
 
 Date started: 2026-06-01
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. Active orbit-library generation now delegates to
+`dynamite/orblib_api.py` and calls
+`orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`. Python passes
+the non-bar inputs directly and no longer writes Fortran `infil/` inputs or
+launches orbit executables for normal generation. Binary `datfil/` outputs
+remain active because the existing readers and weight solvers consume them.
+
 ## Scope
 
 This audit section covers:
 
 - `dynamite/orblib.py`
-- Python-generated Fortran input files under `infil/`
-- Python-generated shell scripts for legacy Fortran executables
+- the direct shared-library API facade in `dynamite/orblib_api.py`
+- active direct-memory Fortran inputs
 - orbit-library status files under `datfil/`
 - compressed Fortran output files
 - orbit-library readback into Python histograms and intrinsic masses
@@ -455,8 +463,8 @@ not left partially written.
 
 ## Positive Observations
 
-- The Python layer separates generated input files under `infil/` from Fortran
-  outputs under `datfil/`.
+- The active Python layer now passes Fortran inputs through the direct
+  shared-library API and keeps binary outputs under `datfil/`.
 - New-format orbit-library files split qgrid, LOSVD histograms, and population
   outputs, which makes presence checks more specific than the legacy monolith.
 - `AllModels.update_orblib_flags()` checks for required compressed outputs and
@@ -466,8 +474,8 @@ not left partially written.
 
 ## Open Questions
 
-- Are the legacy Fortran executables expected to return reliable non-zero exit
-  codes on all failure modes?
+- Should shared-library worker failures expose more structured Fortran error
+  metadata than process failure alone?
 - Should `tube_box_done` be deprecated in favor of checking the actual required
   `.bz2` file set every time?
 - Are parallel orbit-library runs actively used, and do they need stronger

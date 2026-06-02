@@ -4,18 +4,30 @@ Date: 2026-06-01
 
 Repository audited: `/home/reinhard/projects/thomas/dynamite`
 
+Current-status update, 2026-06-02: this standalone audit has been adapted for
+the `fortran-cleanup` branch. Active orbit generation now goes through the
+direct shared-library API in `dynamite/orblib_api.py`, not generated shell
+scripts and orbit executables. The old development-test workflows are archived
+under `archive/dev_tests/`, and current pytest coverage lives under `tests/`.
+The old `LegacyWeightSolver` path is rejected by current configuration/model
+execution because its Fortran solver programs are archived.
+
 I did not modify the cloned repository. This report is a static code review plus packaging/dependency inspection. I could not run the project test suite locally because this environment does not have the scientific Python stack installed (`numpy`, `scipy`, `astropy`, `pytest`, and `setuptools` were missing). I did run syntax parsing for the package modules and validated the requirement strings with `packaging`.
 
 ## Executive Summary
 
 DYNAMITE is a mature scientific Python package around a legacy Fortran modelling pipeline. The Python side handles configuration, data ingestion, orbit-library orchestration, weight solving, analysis, and plotting. The most important risks I found are not style issues; they are correctness and reproducibility risks:
 
-- Orbit-library shell scripts can mark failed Fortran runs as complete.
+- Original finding, now superseded locally: orbit-library shell scripts could
+  mark failed Fortran executable runs as complete. Active orbit generation now
+  uses the direct shared-library API and no longer launches those scripts.
 - `pip install .` is likely broken because `setup.py` passes comment lines from `requirements.txt` directly to `install_requires`.
 - Several analytic dark-halo methods contain clear runtime errors or incorrect parameter unpacking.
 - Importing `dynamite` eagerly imports heavy optional plotting/Bayesian dependencies such as `pymc`, `vorbin`, and `powerbin`.
 - Runtime validation often uses `assert`, including at least one tautological assertion that never checks the intended condition.
-- The test and CI setup does not currently exercise installation via `setup.py`, and the local tests are integration scripts rather than discoverable unit tests.
+- Original finding, now partly superseded locally: the old archived development
+  tests were script-like. Current local pytest coverage lives under `tests/`;
+  upstream CI coverage still needs separate review.
 
 ## Validation Performed
 
@@ -435,7 +447,7 @@ Recommended fix:
 
 File:
 
-- `legacy_fortran/galahad-2.3/python/galahad.py`
+- `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3/python/galahad.py`
 
 The package modules parse, but this vendored legacy file contains Python 2 syntax such as `print "..."`.
 
@@ -522,8 +534,8 @@ Suggested packaging direction:
 Files:
 
 - `.github/workflows/ci.yml`
-- `dev_tests/test_nnls.py`
-- `dev_tests/test_orbit_losvds.py`
+- `archive/dev_tests/test_nnls.py`
+- active LOSVD regression coverage under `tests/test_fortran_orblib_output.py`
 
 CI currently:
 
@@ -531,7 +543,8 @@ CI currently:
 - Installs `requirements.txt`.
 - Only installs the project if `pyproject.toml` exists.
 - Builds legacy Fortran with `make nogal`.
-- Runs `dev_tests/test_nnls.py` directly as an executable script.
+- Originally ran `archive/dev_tests/test_nnls.py` directly as an executable script.
+  Current local pytest coverage lives under `tests/`.
 - Has `pytest -v` commented out.
 
 Concerns:

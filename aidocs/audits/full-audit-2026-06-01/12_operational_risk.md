@@ -4,17 +4,21 @@ Scope: local development safety, dependency setup, build reproducibility, file
 state, generated artifacts, CI/runtime environment assumptions, and destructive
 workflows.
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. The active generated Fortran artifact is
+`orblib_fortran/build/lib/liborblib_fortran.so`; legacy solver/GALAHAD artifacts
+are archived under `archive/legacy_nnls_fortran/`; and old development-test
+workflows are archived under `archive/dev_tests/`.
+
 ## Current local state
 
 - Local Python dependencies are installed in `.venv/`.
-- `.venv/`, pytest caches, Python caches, Fortran `.o/.mod` files, Fortran
-  executables, and logs are ignored by `.gitignore`.
-- Current untracked source/documentation state is `AGENTS.md` and `aidocs/`.
+- `.venv/`, pytest caches, Python caches, Fortran `.o/.mod` files, the
+  generated orblib shared library, and logs are ignored by `.gitignore`.
+- Current local AI documentation state is under `aidocs/`.
 - Current ignored generated state includes `.venv/`, `.pytest_cache/`,
-  `__pycache__/`, `legacy_fortran/*.o`, `legacy_fortran/*.mod`, and the
-  local Fortran executables.
-- Current ignored generated state also includes local GALAHAD installer output
-  under `legacy_fortran/galahad-2.3/{makefiles,modules,objects,versions}/`.
+  `__pycache__/`, Fortran object/module files, and
+  `orblib_fortran/build/lib/liborblib_fortran.so`.
 
 ## Findings
 
@@ -45,10 +49,11 @@ Evidence:
 
 - Configuration construction can update `all_models.ecsv` and inspect/delete
   model directories, as recorded in `02_configuration_runtime.md`.
-- `dev_tests/test_decomp.py` and `dev_tests/test_nnls.py` use
+- Archived `archive/dev_tests/test_decomp.py` and
+  `archive/dev_tests/test_nnls.py` use
   `reset_existing_output=True`.
 - Development shell scripts write output files and scenario folders under
-  `dev_tests/`.
+  `archive/dev_tests/`.
 
 Impact:
 
@@ -61,19 +66,20 @@ Separate read-only config loading from output-state repair/deletion. Tests
 should write into temporary directories unless explicitly run as destructive
 integration tests.
 
-### OR-003 - Medium - Fortran build artifacts are ignored but left in-place
+### OR-003 - Low - Fortran build artifacts are ignored but left in-place
 
 Evidence:
 
-- `.gitignore` excludes `legacy_fortran/*.mod`, `legacy_fortran/*.o`, and
-  compiled Fortran executables.
-- The local `make nogal` run produced ignored artifacts in `legacy_fortran/`.
+- `.gitignore` excludes generated Fortran object/module files and
+  `orblib_fortran/build/lib/liborblib_fortran.so`.
+- The active `make shared`/`make nogal` run produces the shared library under
+  `orblib_fortran/build/lib/`.
 
 Impact:
 
 This is normal for local builds, but it can confuse manual inspection because
-executables in the tree may not correspond to the current source or compiler
-profile.
+generated shared-library artifacts may not correspond to the current source or
+compiler profile.
 
 Recommended fix:
 
@@ -104,8 +110,8 @@ cache metadata, and derived analysis products.
 
 Evidence:
 
-- `legacy_fortran/compile_deps.sh` requires `HSLARCHIVE` and clones several
-  repositories into `legacy_fortran/`.
+- `archive/legacy_nnls_fortran/legacy_fortran/compile_deps.sh` requires
+  `HSLARCHIVE` and clones several repositories into the archived solver tree.
 - This checkout contains local `galahad-2.3`, `cuter`, and `hsl` trees, and
   the full GALAHAD-backed solver compilation now succeeds after a generated
   archive repair.
@@ -172,8 +178,8 @@ Evidence:
 - Generated backend scripts in orbit/weight workflows touch completion files
   after running commands, but earlier audit sections found missing `set -e` and
   weak return-code checks.
-- `dev_tests/run_all.sh` and `test_all.sh` rely on shell-side mutation and
-  output-file inspection.
+- archived `archive/dev_tests/run_all.sh` and `test_all.sh` rely on shell-side
+  mutation and output-file inspection.
 
 Impact:
 
@@ -184,12 +190,16 @@ Recommended fix:
 Add strict shell options in generated scripts, check command return codes, and
 validate outputs before writing done markers.
 
-### OR-009 - Low - package data includes optional executables only if already built
+### OR-009 - Resolved - package data depended on optional prebuilt binaries
 
 Evidence:
 
-- `setup.py` lists Fortran executables in `package_data`, and appends several
-  optional legacy executables only if `os.path.isfile(e)` is true at setup time.
+- Original finding: `setup.py` listed Fortran executables in `package_data` and
+  appended several optional legacy executables only if `os.path.isfile(e)` was
+  true at setup time.
+
+Current status: resolved locally. `setup.py` package data now points only at
+`../orblib_fortran/build/lib/liborblib_fortran.so`.
 
 Impact:
 
@@ -198,8 +208,8 @@ before installation.
 
 Recommended fix:
 
-Make executable packaging explicit: either build as part of the install process,
-ship no executables and require local build, or fail with a clear message when
+Keep shared-library packaging explicit: either build as part of the install
+process, ship no binary and require local build, or fail with a clear message when
 required binaries are absent.
 
 ## Local Operating Rule

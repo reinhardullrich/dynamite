@@ -4,9 +4,15 @@ Date: 2026-06-01
 
 Repository: `/home/reinhard/projects/thomas/dynamite`
 
+Current-status update: this summary has been adapted for the
+`fortran-cleanup` branch as of 2026-06-02. The original audit evidence remains
+useful for risk analysis, but several build/test/backend findings are now
+resolved or superseded by the direct shared-library orbit backend, archived
+legacy solver tree, archived development-test tree, and current pytest baseline.
+
 ## Verification Completed
 
-Local-only setup was used.
+Original local-only setup was used for the 2026-06-01 audit:
 
 - Python virtualenv created in `.venv/`.
 - Editable install with testing extras completed:
@@ -15,9 +21,9 @@ Local-only setup was used.
 - Core imports succeeded for DYNAMITE, NumPy, SciPy, Astropy, and Matplotlib.
 - Python compile check passed for `dynamite/`.
 - GNU Fortran 13.3.0 is available locally.
-- `make nogal` succeeded in `legacy_fortran/`.
-- Local GALAHAD 2.3 QP installation completed using the vendored
-  `legacy_fortran/galahad-2.3`, `cuter`, and `hsl` trees.
+- `make nogal` succeeded in the old removed Fortran layout before cleanup.
+- Local GALAHAD 2.3 QP installation completed using the then-active vendored
+  `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3`, `cuter`, and `hsl` trees.
 - Full GALAHAD-backed `make all` succeeded after repairing two generated static
   archives that were missing `gltr.o` and `hsl_ma57d.o`.
 - GALAHAD-linked `triaxnnls_*` binaries passed link/load checks with no missing
@@ -28,20 +34,32 @@ Local-only setup was used.
   `triaxnnls_noCRcut` and `triaxnnls_CRcut`.
 - Pytest collection was attempted and failed before collecting tests.
 
+Current 2026-06-02 verification after cleanup:
+
+- The active Fortran build is shared-library-only under `orblib_fortran/`.
+- Legacy NNLS/GALAHAD solver code is archived under
+  `archive/legacy_nnls_fortran/`.
+- Current pytest coverage exists under `tests/`; focused fast tests and opt-in
+  slow orblib shared-library LOSVD parity tests passed during the cleanup.
+
 ## Highest-Priority Findings
 
 ### 1. CI does not test the real package or the pytest suite
 
 CI installs `requirements.txt` but does not install this `setup.py` package
 unless a `pyproject.toml` exists. It also comments out pytest and directly runs
-only `dev_tests/test_nnls.py`.
+only `archive/dev_tests/test_nnls.py`.
 
-Local pytest collection currently fails due to:
+Original local pytest collection failed due to:
 
 - missing `dynamite.data_prep.data_prep_test`;
-- cwd-sensitive import-time config loading in `dev_tests/test_decomp.py`.
+- cwd-sensitive import-time config loading in `archive/dev_tests/test_decomp.py`.
 
-Priority: high.
+Current status: superseded. Old development-test content is archived under
+`archive/dev_tests/`, and the active pytest baseline lives under `tests/`.
+
+Priority: resolved for the local cleanup baseline; still useful as upstream CI
+guidance.
 
 ### 2. Runtime constructors and development tests can mutate or delete output state
 
@@ -141,8 +159,8 @@ Priority: high/medium depending on workflow.
 6. Make model-state writes atomic and fix external chi-square retry/update
    logic.
 
-7. Convert the current script-like `dev_tests/` into pytest-compatible tests
-   with temporary output directories.
+7. Maintain the new pytest baseline under `tests/`; the old script-like
+   workflows are archived under `archive/dev_tests/`.
 
 8. Add a reproducible audit environment:
    - keep `.venv/` local;
@@ -192,7 +210,8 @@ Highest-payoff improvement themes:
    - add a small public workflow API for validate/plan/run/resume/summarize.
 
 7. Treat Python `NNLS` as the modern solver path:
-   - keep legacy Fortran/GALAHAD as compatibility and parity-reference backend;
+   - keep archived legacy Fortran/GALAHAD only as historical/parity reference
+     material unless it is explicitly restored;
    - introduce a common `SolverProblem` / `SolverResult` interface;
    - add parity checks before changing defaults;
    - evaluate `scipy.lsq_linear` and sparse/iterative approaches only after
@@ -218,10 +237,10 @@ Recommendation:
 
 - remove GALAHAD from the required/recommended workflow for normal plain-NNLS
   DYNAMITE work;
-- keep legacy Fortran/GALAHAD only as compatibility/reproduction mode until
-  parity tests cover the scientific cases Thomas still needs;
-- convert the existing `dev_tests/test_reimplement_nnls.py` comparison into a
-  real pass/fail pytest parity test before deleting legacy solver code.
+- keep archived legacy Fortran/GALAHAD only as compatibility/reproduction
+  material unless a controlled backend is explicitly restored;
+- keep the current pytest parity tests under `tests/` as the active replacement
+  for old `archive/dev_tests/` comparisons.
 
 ## Local Worktree Status
 
@@ -236,10 +255,9 @@ Expected ignored local/generated state:
 - `.pytest_cache/`
 - Python `__pycache__/`
 - Fortran `.o/.mod` files
-- no-GALAHAD Fortran executables built under `legacy_fortran/`
-- GALAHAD Fortran build artifacts under `legacy_fortran/galahad-2.3/`
-- full legacy Fortran executables built under `legacy_fortran/`
+- `orblib_fortran/build/lib/liborblib_fortran.so`
 
-No upstream `docs/`, package source under `dynamite/`, Fortran source under
-`legacy_fortran/`, or development test files under `dev_tests/` were edited
-during this audit stage.
+Current cleanup edits intentionally touched package source under `dynamite/`,
+Fortran source under `orblib_fortran/`, local tests under `tests/`, and local
+AI docs under `aidocs/`. Upstream Sphinx `docs/` remains out of scope unless
+explicitly requested.

@@ -4,6 +4,13 @@ Scope: cross-cut correctness risks affecting scientific interpretation,
 including model parameter domains, unit handling, numerical integration,
 solver status, reproducibility, and derived analysis products.
 
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. Active orbit generation uses the direct
+shared-library API in `orblib_fortran/`. Legacy NNLS/GALAHAD solver programs
+and mass helpers are archived under `archive/legacy_nnls_fortran/`, so solver
+status caveats apply to archived solver code unless that backend is explicitly
+restored.
+
 This is not a validation of the DYNAMITE scientific method itself. The core
 Schwarzschild/MGE workflow is a known astronomy modelling approach. This audit
 focuses on implementation guardrails that decide whether a particular run is
@@ -19,10 +26,11 @@ Evidence:
   warning and returns the integral value anyway.
 - `dynamite/mges.py:865-870` logs intrinsic spherical-grid integration
   warnings.
-- `legacy_fortran/triaxpotent.f90:523-567` prints `dqxgs` integration errors
+- `orblib_fortran/source/triaxpotent.f90:523-567` prints `dqxgs` integration errors
   but continues.
-- `legacy_fortran/triaxmassbin_f.f90:81-85` treats selected integration
-  statuses as warnings.
+- `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/triaxmassbin_f.f90:81-85`
+  treats selected integration statuses as warnings in the archived mass-helper
+  path.
 
 Impact:
 
@@ -66,12 +74,12 @@ strictly positive before any log transform or backend run.
 
 Evidence:
 
-- Legacy solver process status is not reliably propagated to Python
+- Archived legacy solver process status was not reliably propagated to Python
   (`07_weight_solving.md`, `08_legacy_fortran_backend.md`).
 - `dynamite/model_iterator.py:557-558` treats a weights run as successful when
   only `mod.weights[0]` is not `NaN`.
-- `legacy_fortran/triaxnnls_CRcut.f90:1139-1145` prints non-zero GALAHAD
-  status but does not stop.
+- `archive/legacy_nnls_fortran/legacy_fortran/triaxnnls_CRcut.f90:1139-1145`
+  prints non-zero GALAHAD status but does not stop in the archived solver path.
 - The local GALAHAD runtime follow-up reached `QPB_solve` in both noCRcut and
   CRcut solver binaries. Both runs logged `QPB_solve exit status = -5`, still
   exited with shell status `0`, and wrote downstream output files.
@@ -100,9 +108,9 @@ After every solver run, validate:
 
 Evidence:
 
-- `legacy_fortran/orblibprogram.f90:43-54` intentionally uses stochastic seeds
-  when `random_seed <= 0`.
-- `legacy_fortran/Makefile:57-85` and `Makefile.linux:64-92` use
+- `orblib_fortran/source/unused/orblibprogram.f90:43-54` intentionally used
+  stochastic seeds when `random_seed <= 0` in the inactive executable driver.
+- `orblib_fortran/Makefile:57-85` and `Makefile.linux:64-92` use
   `-ffast-math` and `-march=native` in the default fast profile.
 - `dynamite/coloring.py:745-749` calls `pm.sample()` without an explicit
   random seed.
@@ -147,7 +155,7 @@ Evidence:
 
 - `dynamite/constants.py` defines global conversions such as `GRAV_CONST_KM`,
   `PARSEC_KM`, `RHO_CRIT`, `ARC_KPC()`, and `ARC_KM()`.
-- `dynamite/mges.py` and `legacy_fortran/` independently perform distance,
+- `dynamite/mges.py` and active `orblib_fortran/` routines independently perform distance,
   arcsec, km, and mass conversions.
 - No local unit-test configuration was found that asserts these conversions
   against known values across Python and Fortran paths.

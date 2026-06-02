@@ -1,10 +1,17 @@
 # 10 Tests, Examples, CI, and Upstream Docs Audit
 
-Scope: `.github/workflows/ci.yml`, `setup.py`, `requirements.txt`,
-`dev_tests/`, and upstream Sphinx/notebook documentation under `docs/`.
+Current-status update, 2026-06-02: this chapter has been adapted for the
+`fortran-cleanup` branch. Old development-test content is archived under
+`archive/dev_tests/`; active local pytest coverage lives under `tests/`; and
+the active Fortran inventory/build checks target the orblib shared library, not
+executables.
 
-This section records verification coverage. It does not modify `docs/` or
-`dev_tests/`.
+Scope: `.github/workflows/ci.yml`, `setup.py`, `requirements.txt`, active
+`tests/`, archived `archive/dev_tests/`, and upstream Sphinx/notebook
+documentation under `docs/`.
+
+This section records verification coverage. It does not modify upstream
+Sphinx `docs/`.
 
 ## Commands/checks run
 
@@ -12,13 +19,18 @@ This section records verification coverage. It does not modify `docs/` or
 MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m pytest --collect-only -q dev_tests
 ```
 
-Result: pytest collection fails before collecting any runnable tests.
+Original result before cleanup: pytest collection of old `dev_tests` failed
+before collecting any runnable tests.
+
+Current result after cleanup: active local pytest coverage is under `tests/`;
+focused fast tests and opt-in slow orblib shared-library parity tests passed
+during the cleanup.
 
 Errors:
 
-- `dev_tests/test_dataprep.py` imports missing
+- `archive/dev_tests/test_dataprep.py` imports missing
   `dynamite.data_prep.data_prep_test`.
-- `dev_tests/test_decomp.py` constructs a configuration at import time using
+- `archive/dev_tests/test_decomp.py` constructs a configuration at import time using
   the bare relative path `user_test_config_ml.yaml`, which fails from the repo
   root.
 
@@ -36,8 +48,8 @@ Evidence:
 Impact:
 
 CI imports the source tree directly rather than testing the installed package.
-That misses package-data behavior and packaging errors, especially around
-Fortran executables listed in `setup.py`.
+That misses package-data behavior and packaging errors, especially around the
+Fortran shared library listed in `setup.py`.
 
 Recommended fix:
 
@@ -53,8 +65,8 @@ or migrate packaging to `pyproject.toml` and keep CI aligned with it.
 
 Evidence:
 
-- `.github/workflows/ci.yml:61-63` comments out `pytest -v` and directly runs
-  `dev_tests/test_nnls.py`.
+- `.github/workflows/ci.yml:61-63` originally commented out `pytest -v` and
+  directly ran `archive/dev_tests/test_nnls.py`.
 
 Impact:
 
@@ -67,16 +79,16 @@ Recommended fix:
 Make pytest collection and a fast pytest subset mandatory. Keep the expensive
 model-generation tests as a separate marked job.
 
-### TED-003 - High - pytest collection fails from repo root
+### TED-003 - Resolved - old pytest collection failed from repo root
 
 Evidence:
 
 - Local command:
-  `MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m pytest --collect-only -q dev_tests`
+  `MPLCONFIGDIR=/tmp/dynamite-mplconfig .venv/bin/python -m pytest --collect-only -q archive/dev_tests`
 - Result:
-  - `ImportError` in `dev_tests/test_dataprep.py` because
+  - `ImportError` in `archive/dev_tests/test_dataprep.py` because
     `dynamite.data_prep.data_prep_test` is missing.
-  - `FileNotFoundError` in `dev_tests/test_decomp.py` because the test opens
+  - `FileNotFoundError` in `archive/dev_tests/test_decomp.py` because the test opens
     `user_test_config_ml.yaml` at import time from the current working
     directory.
 
@@ -87,18 +99,21 @@ executable scripts with test-like names, not a reliable automated test harness.
 
 Recommended fix:
 
+Current status: resolved for the local cleanup baseline. Old development-test
+content is archived, and active pytest coverage lives under `tests/`.
+
 Move script work into test functions, resolve fixture paths with
 `Path(__file__).parent`, and skip or remove tests that target missing sample
 modules.
 
-### TED-004 - Medium - development tests mutate outputs during import or top-level execution
+### TED-004 - Resolved - archived development tests mutate outputs during import or top-level execution
 
 Evidence:
 
-- `dev_tests/test_decomp.py:10-14` constructs `Configuration(...,
+- `archive/dev_tests/test_decomp.py:10-14` constructs `Configuration(...,
   reset_existing_output=True)` at import time.
-- `dev_tests/test_decomp.py:16` starts `ModelIterator(c)` at import time.
-- `dev_tests/test_nnls.py:34-39` also uses
+- `archive/dev_tests/test_decomp.py:16` starts `ModelIterator(c)` at import time.
+- `archive/dev_tests/test_nnls.py:34-39` also uses
   `reset_existing_output=True` during its main run.
 
 Impact:
@@ -109,19 +124,23 @@ triage because setup side effects happen before test boundaries exist.
 
 Recommended fix:
 
+Current status: resolved for active local tests because the old workflows are
+archived under `archive/dev_tests/`. Keep this as a warning if those archived
+scripts are reused.
+
 Use pytest fixtures with temporary output directories, explicit setup phases,
 and no model execution at module import time.
 
-### TED-005 - Medium - `dev_tests/run_all.sh` and `test_all.sh` assume local shell tools and global install style
+### TED-005 - Archived - old shell test scripts assume local shell tools and global install style
 
 Evidence:
 
-- `dev_tests/run_all.sh:14-28` loops over all `*.py`, writes output files in the
+- `archive/dev_tests/run_all.sh:14-28` loops over all `*.py`, writes output files in the
   current directory, uses `bc`, deletes/moves log files, and inspects `*.log`.
-- `dev_tests/test_all.sh:28-31` tells users to verify installation via
+- `archive/dev_tests/test_all.sh:28-31` tells users to verify installation via
   `python setup.py install --user`.
-- `dev_tests/test_all.sh` rewrites configs with shell pipelines and writes
-  scenario directories under `dev_tests/test_all`.
+- `archive/dev_tests/test_all.sh` rewrites configs with shell pipelines and writes
+  scenario directories under `archive/dev_tests/test_all`.
 
 Impact:
 
@@ -134,12 +153,12 @@ Recommended fix:
 Keep them as legacy/manual scripts, but add a modern pytest or nox-style local
 runner that writes only to a temporary directory.
 
-### TED-006 - Medium - no test marker strategy separates fast, slow, destructive, and optional-GALAHAD tests
+### TED-006 - Resolved/Partial - marker strategy separates fast, slow, and optional Fortran tests
 
 Evidence:
 
 - There is no `pytest.ini`, `tox.ini`, or `pyproject.toml` pytest config.
-- `dev_tests/` contains fast import-like scripts, long model-generation
+- `archive/dev_tests/` contains fast import-like scripts, long model-generation
   scripts, notebooks, Slurm paths, and solver comparison scripts in one folder.
 
 Impact:
@@ -148,6 +167,10 @@ Developers cannot run a dependable "fast local" test set before editing. CI
 also cannot express optional jobs cleanly.
 
 Recommended fix:
+
+Current status: partially resolved locally. Active tests use `slow` and
+`orblib_fortran` markers plus environment gates for slow/shared-library checks.
+No active GALAHAD tests remain because that backend is archived.
 
 Introduce pytest markers such as `unit`, `integration`, `slow`,
 `requires_fortran`, `requires_galahad`, `destructive`, and `notebook`.
@@ -176,7 +199,7 @@ build in a separate CI job. Notebook execution can remain optional/slow.
 Evidence:
 
 - `docs/index.rst:48` says to run `python setup.py install`.
-- `dev_tests/test_all.sh:28-31` references `python setup.py install --user`.
+- `archive/dev_tests/test_all.sh:28-31` references `python setup.py install --user`.
 - `docs/more_info/making_the_docs.rst:10-14` suggests conda or direct pip
   installs for docs dependencies.
 
@@ -203,13 +226,13 @@ uv venv .venv
 uv pip install -e ".[testing]"
 ```
 
-### TED-009 - Medium - executable-script tests lack assertions around generated science outputs
+### TED-009 - Resolved/Partial - executable-script tests lacked assertions around generated science outputs
 
 Evidence:
 
-- `dev_tests/test_nnls.py` compares plotted/model values to a comparison file
+- `archive/dev_tests/test_nnls.py` compares plotted/model values to a comparison file
   visually and prints tables.
-- `dev_tests/run_all.sh` treats a zero process exit as success.
+- `archive/dev_tests/run_all.sh` treats a zero process exit as success.
 
 Impact:
 
@@ -218,12 +241,15 @@ fail the test process.
 
 Recommended fix:
 
+Current status: partially resolved locally. Active slow tests regenerate the
+NGC6278 LOSVD workflow and compare against both the historical executable
+fixture and the current shared-library fixture. Archived scripts under
+`archive/dev_tests/` remain non-authoritative.
+
 Convert scientific comparisons into explicit numeric assertions with tolerances
 and recorded expected-output fixtures.
 
 ## Local Status
 
-No long model-generation tests or notebook executions were run in this audit
-stage because they write into `dev_tests/` and/or `docs/` output folders. The
-local verification performed here is dependency installation, Python compile,
-Fortran no-GALAHAD build, and pytest collection.
+Current cleanup verification used active tests under `tests/`. No upstream docs
+or archived `archive/dev_tests/` workflows were run as authoritative tests.

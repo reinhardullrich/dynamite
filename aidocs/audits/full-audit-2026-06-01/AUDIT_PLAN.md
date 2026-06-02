@@ -2,6 +2,12 @@
 
 Date started: 2026-06-01
 
+Current-status update, 2026-06-02: this plan has been adapted for the
+`fortran-cleanup` branch. Active Fortran work now concerns `orblib_fortran/`
+and the shared-library ABI; old development tests are archived under
+`archive/dev_tests/`; legacy NNLS/GALAHAD solver code is archived under
+`archive/legacy_nnls_fortran/`.
+
 ## Scope
 
 Run a proper full audit of the local DYNAMITE fork at:
@@ -26,8 +32,9 @@ Do not modify these areas unless explicitly requested:
 
 - upstream `docs/`
 - Python package source under `dynamite/`
-- Fortran source/build files under `legacy_fortran/`
-- development tests/examples under `dev_tests/`
+- active Fortran source/build files under `orblib_fortran/`
+- archived solver source under `archive/legacy_nnls_fortran/`
+- current tests under `tests/` and archived examples under `archive/dev_tests/`
 
 ## Install Rule
 
@@ -66,7 +73,7 @@ Files and surfaces:
 - `requirements.txt`
 - `.github/`
 - local editable install
-- package data for Fortran executables
+- package data for the orblib Fortran shared library
 - dependency constraints
 - fork/remotes hygiene
 
@@ -74,7 +81,7 @@ Questions:
 
 - Can the project install cleanly in a local venv?
 - Are dependencies pinned enough for reproducibility?
-- Are compiled Fortran executables packaged correctly?
+- Is the compiled Fortran shared library packaged correctly?
 - Does CI reflect real user install/test paths?
 
 ### 2. Configuration And Runtime Bootstrap
@@ -165,7 +172,7 @@ Questions:
 Files and surfaces:
 
 - `dynamite/weight_solvers.py`
-- `LegacyWeightSolver`
+- archived `LegacyWeightSolver`
 - `NNLS`
 - SciPy and optional cvxopt paths
 
@@ -180,10 +187,10 @@ Questions:
 
 Files and surfaces:
 
-- `legacy_fortran/`
-- `legacy_fortran/Makefile`
-- `legacy_fortran/Makefile.linux`
-- GALAHAD/CUTEst/HSL integration
+- `orblib_fortran/`
+- `orblib_fortran/Makefile`
+- `orblib_fortran/Makefile.linux`
+- archived GALAHAD/CUTEst/HSL integration under `archive/legacy_nnls_fortran/`
 
 Subsections:
 
@@ -195,8 +202,8 @@ Subsections:
 
 Questions:
 
-- Can no-GALAHAD targets build locally?
-- What blocks full GALAHAD build locally?
+- Can the active shared-library target build locally?
+- What would block a controlled archived GALAHAD restore, if requested?
 - Are compiler flags portable and safe?
 - Are Fortran runtime failures surfaced to Python?
 
@@ -218,7 +225,8 @@ Questions:
 
 Files and surfaces:
 
-- `dev_tests/`
+- `tests/`
+- `archive/dev_tests/`
 - tutorial configs and notebooks under upstream `docs/`
 - `.github/workflows/ci.yml`
 
@@ -271,7 +279,8 @@ Questions:
 1. Record local environment and installation attempts in `00_environment.md`.
 2. Build local Python venv and install editable package with testing extras.
 3. Run import/package sanity checks.
-4. Attempt safe Fortran build checks, starting with no-GALAHAD targets.
+4. Attempt safe Fortran build checks, starting with the active shared-library
+   target.
 5. Audit build/packaging first because later checks depend on environment.
 6. Audit Python runtime modules in the split above.
 7. Audit Fortran backend and Python/Fortran boundary.
