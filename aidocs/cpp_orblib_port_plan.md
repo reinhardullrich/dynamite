@@ -28,6 +28,45 @@ utilities are not part of this port.
 The goal is not "nice C++" at the cost of performance. The goal is a correct,
 maintainable, high-throughput compiled backend.
 
+## Parity Freeze Before Cleanup
+
+The C++ port is currently a parity port, not a scientific-behavior cleanup.
+Until full generated orbit-library parity is demonstrated, the active Fortran
+shared-library backend is the oracle even when comments, names, or local
+intent appear to disagree with the executed code.
+
+Rules for the remaining port:
+
+- Preserve active Fortran behavior first; record suspected bugs separately.
+- Do not fix, simplify, or reinterpret numerical behavior while porting the
+  same path.
+- If a behavior looks wrong, add or preserve a focused parity test before
+  changing surrounding code.
+- Any intentional scientific or numerical behavior change must happen after
+  full C++ parity, in a separate change with explicit before/after fixtures.
+- Prefer exact output compatibility over cleaner intermediate data structures
+  until Python readers and weight solvers pass against C++-generated outputs.
+
+Frozen parity decisions for the current branch:
+
+- `make_startpoints()` irregular-energy noreg handling preserves the active
+  `maxval(irregular(:)) .eq. i` condition. The comment/local variable name
+  suggests "last irregular energy", but the code flags energy index `1`
+  whenever any irregular entry is `1`.
+- `calc_startpos()` preserves the positive-y velocity formula and the tiny
+  fallback for negative or NaN kinetic terms.
+- `findReq()` preserves the `0.01*Req` to `1.1*Req` bisection interval, the
+  `1e-7` relative potential stopping rule, and the 60000-iteration cap.
+- DOP853 behavior preserves the current scalar tolerances, dense-output
+  sampling semantics, status/counter behavior, and retry-sensitive integration
+  flow before any alternative solver or controller is considered.
+- `Ran1` random-number state and the Fortran PSF Gaussian path, including the
+  single-precision deviate behavior, remain compatibility requirements.
+- Fortran-record binary `datfil/` output layout remains the output contract
+  for the first C++ backend.
+- The interpolation-grid disk-cache contract is conditional: implement it only
+  if fixture parity proves that in-memory interpolation setup is not enough.
+
 ## Acceptance Fixtures
 
 The C++ backend must be tested against existing Fortran-derived fixtures:
@@ -297,6 +336,9 @@ Current branch status:
 
 ## Known Fortran Parity Notes To Revisit
 
+- These notes are not cleanup instructions during the parity port. They are
+  candidates for later scientific/maintenance analysis only after the C++
+  backend matches the active Fortran-generated fixtures.
 - `orbitstart_f.f90`'s `make_startpoints()` has an apparent intent/code
   mismatch in the noreg flag for irregular energies. The local variable is
   named `LastIrregE`, and the nearby comment says "if this is the last

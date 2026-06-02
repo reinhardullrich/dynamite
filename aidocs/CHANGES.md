@@ -547,3 +547,13 @@ This file is append-only. Add new entries at the bottom.
   caching if required for parity, mid-boundary orbit-start search, final
   start-array orchestration, full orbit-engine wiring, and full-output
   orchestration.
+- Added an explicit parity-freeze policy to
+  `aidocs/cpp_orblib_port_plan.md` for the `fortran-to-cpp` branch. The policy
+  states that active Fortran behavior and Fortran-derived fixtures remain the
+  oracle until full C++ parity is proven, so suspected Fortran bugs are
+  preserved and documented rather than cleaned up during the port. It freezes
+  the currently known compatibility-sensitive decisions for irregular-energy
+  noreg handling, `calc_startpos()`, `findReq()`, DOP853 behavior, `Ran1`/PSF
+  random behavior, Fortran-record binary output, and conditional
+  interpolation-grid disk-cache implementation. Updated canonical knowledge to
+  make the parity freeze visible to future local agent sessions.

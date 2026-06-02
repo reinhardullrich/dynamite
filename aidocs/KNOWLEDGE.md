@@ -49,9 +49,9 @@ changes from the original project.
   multiprocessing boundaries, and replacement risks.
 - `aidocs/cpp_orblib_port_plan.md`: branch-specific plan for the
   `fortran-to-cpp` experiment. It records the required priority order
-  of correctness first and speed second, the DOP853 policy, allocation and
-  hot-path rules, fixture-based acceptance criteria, C++ shared-library shape,
-  and benchmark policy.
+  of correctness first and speed second, the current parity-freeze policy,
+  the DOP853 policy, allocation and hot-path rules, fixture-based acceptance
+  criteria, C++ shared-library shape, and benchmark policy.
 - `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
 - `aidocs/audits/dynamite_fortran_audit.md`: Fortran-side audit findings.
 - `aidocs/audits/dynamite_scientific_correctness_audit.md`: scientific
@@ -80,7 +80,12 @@ changes from the original project.
   `fortran-to-cpp` branch. The current branch builds
   `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, and exposes
   generation entry-point stubs that return status `-100` until the C++ orbit
-  engine is ported. The first ported numerical kernels are the C++ `Ran1`
+  engine is ported. This branch is under a parity freeze: active Fortran
+  behavior and Fortran-derived fixtures are the oracle until full C++ parity is
+  proven, even when a Fortran comment or local variable name appears to
+  describe different intended behavior. Suspected Fortran bugs are tracked for
+  later analysis, not fixed during the first C++ parity port. The first ported
+  numerical kernels are the C++ `Ran1`
   implementation in `orblib_cpp/include/ran1.hpp` and
   `orblib_cpp/source/ran1.cpp`, plus a translated DOP853 solver in
   `orblib_cpp/include/dop853.hpp` and `orblib_cpp/source/dop853.cpp`, a
