@@ -119,7 +119,11 @@ changes from the original project.
   mapping, per-aperture histogram accumulation, bin-order collapse,
   normalization, and sparse row-range formulas from `histogram_velbin()`,
   `histogram_store()`, `binning_add_it_up()`, and
-  `histogram_write_compat_sparse()`.
+  `histogram_write_compat_sparse()`. `orblib_cpp/include/orbit_qgrid.hpp` and
+  `orblib_cpp/source/orbit_qgrid.cpp` port the Fortran intrinsic qgrid
+  boundary setup, octant-folded moment accumulation, orbit-type channel
+  accumulation, and normalization formulas from `qgrid_setup()`,
+  `qgrid_store()`, and `qgrid_write()`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -136,7 +140,10 @@ changes from the original project.
   are tested against Python mirrors of the Fortran clamp, strict-bound, zero
   aperture-pixel, and normalization-counter behavior. LOSVD bin-order
   collapse, normalization, and sparse row-range preparation are tested against
-  Python mirrors of the Fortran writer-preparation formulas.
+  Python mirrors of the Fortran writer-preparation formulas. Intrinsic qgrid
+  boundary setup, accumulation, and normalization are tested against a Python
+  mirror of the Fortran `qgrid_*` formulas for non-rotating and rotating-frame
+  sign-table paths.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -235,9 +242,10 @@ source files.
   the orbit classification, moment, projection, LOS-velocity, PSF convolution,
   boxed-aperture pixel lookup, LOSVD velocity-bin mapping, per-aperture
   histogram accumulation, bin-order collapse, normalization, and sparse
-  row-range formulas. The legacy `interpolgrid` disk-cache contract,
-  orbit-start generation, qgrid accumulation, full orbit-engine wiring, and
-  binary output writing are the next unported dependencies.
+  row-range formulas, plus intrinsic qgrid boundary setup, accumulation, and
+  normalization formulas. The legacy `interpolgrid` disk-cache contract,
+  orbit-start generation, full orbit-engine wiring, and binary output writing
+  are the next unported dependencies.
 
 ## Separated Workspaces
 

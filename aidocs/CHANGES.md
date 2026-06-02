@@ -352,3 +352,15 @@ This file is append-only. Add new entries at the bottom.
   interpolation-grid disk caching if required for parity, orbit-start
   generation, qgrid accumulation, full orbit-engine wiring, and binary output
   writing.
+- Ported the Fortran intrinsic qgrid boundary setup, octant-folded moment
+  accumulation, orbit-type channel accumulation, and normalization formulas
+  from `qgrid_setup()`, `qgrid_store()`, and `qgrid_write()` into
+  `orblib_cpp/include/orbit_qgrid.hpp` and
+  `orblib_cpp/source/orbit_qgrid.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_qgrid_boundaries`, `orblib_cpp_api_accumulate_qgrid`, and
+  `orblib_cpp_api_normalize_qgrid` with opt-in pytest coverage for Fortran
+  boundary formulas, `hunt`-style bin equality behavior, non-rotating and
+  rotating-frame sign tables, positive-octant filtering, 16-channel
+  accumulation, orbit-type channels, and qgrid normalization. Remaining C++
+  gaps now include interpolation-grid disk caching if required for parity,
+  orbit-start generation, full orbit-engine wiring, and binary output writing.

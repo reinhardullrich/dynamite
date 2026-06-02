@@ -21,6 +21,7 @@ CPP_SOURCES = [
     "include/orbit_integrator.hpp",
     "include/orbit_projection.hpp",
     "include/orbit_psf.hpp",
+    "include/orbit_qgrid.hpp",
     "include/orbit_rhs.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
@@ -34,6 +35,7 @@ CPP_SOURCES = [
     "source/orbit_integrator.cpp",
     "source/orbit_projection.cpp",
     "source/orbit_psf.cpp",
+    "source/orbit_qgrid.cpp",
     "source/orbit_rhs.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
@@ -850,6 +852,128 @@ def _expected_orbit_projection(samples, orbit_type, projection_number, omega, th
         + np.cos(theta) * vsgn[2] * velocities[:, 2]
     )
     return projected_x, projected_y, los_velocity
+
+
+def _expected_qgrid_boundaries(rlogmin, rlogmax, n_radius, n_theta, n_phi, sigobs_km):
+    radius = np.empty(n_radius + 1, dtype=np.float64)
+    theta = np.empty(n_theta + 1, dtype=np.float64)
+    phi = np.empty(n_phi + 1, dtype=np.float64)
+    radius[0] = 0.0
+    for index in range(1, n_radius):
+        radius[index] = 10.0 ** (
+            rlogmin
+            + (rlogmax - rlogmin + np.log10(0.5)) * (index / n_radius)
+        )
+    radius[-1] = max(10.0**rlogmax * 100.0, np.max(sigobs_km) * 10.0)
+    theta[0] = 0.0
+    theta[-1] = 0.5 * np.pi
+    for index in range(1, n_theta):
+        theta[index] = 0.5 * np.pi * index / n_theta
+    phi[0] = 0.0
+    phi[-1] = 0.5 * np.pi
+    for index in range(1, n_phi):
+        phi[index] = 0.5 * np.pi * index / n_phi
+    return radius, theta, phi
+
+
+def _qgrid_index(channel, phi_bin, theta_bin, radius_bin, n_phi, n_theta):
+    return channel + 16 * (phi_bin + n_phi * (theta_bin + n_theta * radius_bin))
+
+
+def _fortran_hunt_boundary_bin(boundaries, value, transform):
+    for bin_index, boundary in enumerate(boundaries[1:-1]):
+        if value <= transform(boundary):
+            return bin_index
+    return boundaries.size - 2
+
+
+def _expected_qgrid_raw(samples, orbit_type, omega, radius, theta, phi):
+    samples = np.asarray(samples, dtype=np.float64)
+    n_radius = radius.size - 1
+    n_theta = theta.size - 1
+    n_phi = phi.size - 1
+    qgrid = np.zeros(16 * n_phi * n_theta * n_radius, dtype=np.float64)
+    if orbit_type == 1:
+        store_type_channel = 13
+    elif orbit_type == 3:
+        store_type_channel = 14
+    else:
+        store_type_channel = 15
+    if omega == 0.0:
+        position_signs = POSITION_SIGNS_NONROTATING
+        velocity_signs = VELOCITY_SIGNS_NONROTATING[orbit_type - 1]
+    else:
+        position_signs = POSITION_SIGNS_ROTATING
+        velocity_signs = VELOCITY_SIGNS_ROTATING[orbit_type - 1]
+
+    for sample in samples:
+        position = sample[:3]
+        velocity = sample[3:]
+        for projection_index in range(8):
+            folded_position = position * position_signs[projection_index]
+            x, y, z = folded_position
+            if x > 0.0 and y >= 0.0 and z > 0.0:
+                folded_velocity = velocity * velocity_signs[projection_index]
+                vx, vy, vz = folded_velocity
+                radius_squared = x * x + y * y + z * z
+                tan_theta_squared = (x * x + y * y) / (z * z)
+                tan_phi = y / x
+                radius_bin = _fortran_hunt_boundary_bin(radius, radius_squared, lambda b: b * b)
+                theta_bin = _fortran_hunt_boundary_bin(
+                    theta,
+                    tan_theta_squared,
+                    lambda b: np.tan(b) ** 2,
+                )
+                phi_bin = _fortran_hunt_boundary_bin(phi, tan_phi, np.tan)
+                values = np.array(
+                    [
+                        1.0,
+                        x,
+                        y,
+                        z,
+                        vx,
+                        vy,
+                        vz,
+                        vx * vx,
+                        vy * vy,
+                        vz * vz,
+                        vx * vy,
+                        vy * vz,
+                        vz * vx,
+                    ],
+                    dtype=np.float64,
+                )
+                for channel, value in enumerate(values):
+                    qgrid[_qgrid_index(channel, phi_bin, theta_bin, radius_bin, n_phi, n_theta)] += value
+                qgrid[
+                    _qgrid_index(store_type_channel, phi_bin, theta_bin, radius_bin, n_phi, n_theta)
+                ] += 1.0
+    return qgrid
+
+
+def _expected_qgrid_normalized(raw_qgrid, n_radius, n_theta, n_phi):
+    qgrid = np.array(raw_qgrid, copy=True)
+    total_count = 0.0
+    for radius_bin in range(n_radius):
+        for theta_bin in range(n_theta):
+            for phi_bin in range(n_phi):
+                total_count += qgrid[_qgrid_index(0, phi_bin, theta_bin, radius_bin, n_phi, n_theta)]
+
+    for radius_bin in range(n_radius):
+        for theta_bin in range(n_theta):
+            for phi_bin in range(n_phi):
+                count_index = _qgrid_index(0, phi_bin, theta_bin, radius_bin, n_phi, n_theta)
+                count = qgrid[count_index]
+                if count != 0.0:
+                    for channel in range(1, 13):
+                        qgrid[_qgrid_index(channel, phi_bin, theta_bin, radius_bin, n_phi, n_theta)] /= count
+                    if total_count != 0.0:
+                        qgrid[count_index] /= total_count
+                        for channel in range(13, 16):
+                            qgrid[
+                                _qgrid_index(channel, phi_bin, theta_bin, radius_bin, n_phi, n_theta)
+                            ] /= total_count
+    return qgrid
 
 
 def _fortran_gaussian_pair(rng):
@@ -2165,6 +2289,155 @@ def test_orblib_cpp_projects_orbit_samples_like_fortran(omega):
             np.testing.assert_allclose(projected_x, expected_x, rtol=0.0, atol=1e-14)
             np.testing.assert_allclose(projected_y, expected_y, rtol=0.0, atol=1e-14)
             np.testing.assert_allclose(los_velocity, expected_los, rtol=0.0, atol=1e-14)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize(("orbit_type", "omega"), [(3, 0.0), (2, 1.5e-16)])
+def test_orblib_cpp_accumulates_qgrid_like_fortran(orbit_type, omega):
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = -1.0
+    rlogmax = 1.0
+    sigobs_km = np.ascontiguousarray([0.3, 1.5], dtype=np.float64)
+    samples = np.ascontiguousarray(
+        [
+            [0.9, 0.3, 0.8, 10.0, -2.0, 4.0],
+            [-1.1, -0.7, -0.9, -5.0, 3.0, -6.0],
+            [2.0, 0.4, -1.3, 7.0, -11.0, 13.0],
+            [-0.6, -0.5, 1.4, -17.0, 19.0, -23.0],
+        ],
+        dtype=np.float64,
+    )
+    expected_radius, expected_theta, expected_phi = _expected_qgrid_boundaries(
+        rlogmin,
+        rlogmax,
+        n_radius,
+        n_theta,
+        n_phi,
+        sigobs_km,
+    )
+
+    radius = np.empty(n_radius + 1, dtype=np.float64)
+    theta = np.empty(n_theta + 1, dtype=np.float64)
+    phi = np.empty(n_phi + 1, dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    boundary_function = library.orblib_cpp_api_qgrid_boundaries
+    boundary_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    boundary_function.restype = None
+    boundary_function(
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_int(sigobs_km.size),
+        sigobs_km.ctypes.data_as(double_p),
+        radius.ctypes.data_as(double_p),
+        theta.ctypes.data_as(double_p),
+        phi.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(radius, expected_radius, rtol=0.0, atol=2e-15)
+    np.testing.assert_allclose(theta, expected_theta, rtol=0.0, atol=2e-15)
+    np.testing.assert_allclose(phi, expected_phi, rtol=0.0, atol=2e-15)
+
+    expected_raw = _expected_qgrid_raw(samples, orbit_type, omega, radius, theta, phi)
+    expected_normalized = _expected_qgrid_normalized(expected_raw, n_radius, n_theta, n_phi)
+    assert expected_raw[_qgrid_index(0, 0, 0, 0, n_phi, n_theta)] == 0.0
+    if omega == 0.0:
+        assert np.sum(expected_raw[0::16]) == samples.shape[0]
+    else:
+        assert np.sum(expected_raw[0::16]) == 2 * samples.shape[0]
+
+    qgrid = np.zeros(16 * n_phi * n_theta * n_radius, dtype=np.float64)
+    state_x = np.ascontiguousarray(samples[:, 0], dtype=np.float64)
+    state_y = np.ascontiguousarray(samples[:, 1], dtype=np.float64)
+    state_z = np.ascontiguousarray(samples[:, 2], dtype=np.float64)
+    state_vx = np.ascontiguousarray(samples[:, 3], dtype=np.float64)
+    state_vy = np.ascontiguousarray(samples[:, 4], dtype=np.float64)
+    state_vz = np.ascontiguousarray(samples[:, 5], dtype=np.float64)
+    accumulate_function = library.orblib_cpp_api_accumulate_qgrid
+    accumulate_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    accumulate_function.restype = None
+    status.value = -999
+    accumulate_function(
+        ctypes.c_int(orbit_type),
+        ctypes.c_double(omega),
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        radius.ctypes.data_as(double_p),
+        theta.ctypes.data_as(double_p),
+        phi.ctypes.data_as(double_p),
+        ctypes.c_int(samples.shape[0]),
+        state_x.ctypes.data_as(double_p),
+        state_y.ctypes.data_as(double_p),
+        state_z.ctypes.data_as(double_p),
+        state_vx.ctypes.data_as(double_p),
+        state_vy.ctypes.data_as(double_p),
+        state_vz.ctypes.data_as(double_p),
+        qgrid.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(qgrid, expected_raw, rtol=0.0, atol=1e-14)
+
+    normalize_function = library.orblib_cpp_api_normalize_qgrid
+    normalize_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    normalize_function.restype = None
+    status.value = -999
+    normalize_function(
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        qgrid.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(qgrid, expected_normalized, rtol=0.0, atol=1e-14)
 
 
 @pytest.mark.orblib_cpp

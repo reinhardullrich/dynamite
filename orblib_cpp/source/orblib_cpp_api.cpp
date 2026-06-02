@@ -7,6 +7,7 @@
 #include "orbit_integrator.hpp"
 #include "orbit_projection.hpp"
 #include "orbit_psf.hpp"
+#include "orbit_qgrid.hpp"
 #include "orbit_rhs.hpp"
 #include "potential.hpp"
 #include "ran1.hpp"
@@ -977,6 +978,129 @@ extern "C" void orblib_cpp_api_sparse_losvd_ranges(
                 histogram,
                 begin_offsets,
                 end_offsets
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_qgrid_boundaries(
+    int radius_bin_count,
+    int theta_bin_count,
+    int phi_bin_count,
+    double rlogmin,
+    double rlogmax,
+    int sigma_count,
+    const double* sigobs_km,
+    double* radius_boundaries,
+    double* theta_boundaries,
+    double* phi_boundaries,
+    int* status
+) noexcept {
+    if (sigobs_km == nullptr || radius_boundaries == nullptr || theta_boundaries == nullptr ||
+        phi_boundaries == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::setup_qgrid_boundaries(
+                radius_bin_count,
+                theta_bin_count,
+                phi_bin_count,
+                rlogmin,
+                rlogmax,
+                sigma_count,
+                sigobs_km,
+                radius_boundaries,
+                theta_boundaries,
+                phi_boundaries
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_accumulate_qgrid(
+    int orbit_type,
+    double omega,
+    int radius_bin_count,
+    int theta_bin_count,
+    int phi_bin_count,
+    const double* radius_boundaries,
+    const double* theta_boundaries,
+    const double* phi_boundaries,
+    int sample_count,
+    const double* x,
+    const double* y,
+    const double* z,
+    const double* vx,
+    const double* vy,
+    const double* vz,
+    double* qgrid,
+    int* status
+) noexcept {
+    if (radius_boundaries == nullptr || theta_boundaries == nullptr ||
+        phi_boundaries == nullptr || x == nullptr || y == nullptr || z == nullptr ||
+        vx == nullptr || vy == nullptr || vz == nullptr || qgrid == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::accumulate_qgrid_samples(
+                orbit_type,
+                omega,
+                radius_bin_count,
+                theta_bin_count,
+                phi_bin_count,
+                radius_boundaries,
+                theta_boundaries,
+                phi_boundaries,
+                sample_count,
+                x,
+                y,
+                z,
+                vx,
+                vy,
+                vz,
+                qgrid
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_normalize_qgrid(
+    int radius_bin_count,
+    int theta_bin_count,
+    int phi_bin_count,
+    double* qgrid,
+    int* status
+) noexcept {
+    if (qgrid == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::normalize_qgrid(
+                radius_bin_count,
+                theta_bin_count,
+                phi_bin_count,
+                qgrid
             )) {
             set_status(status, kStatusInvalidArgument);
             return;

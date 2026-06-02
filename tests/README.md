@@ -71,6 +71,8 @@ Current coverage:
   mirrors of the Fortran `histogram_velbin()` and `histogram_store()` formulas;
 - C++ LOSVD bin-order collapse, normalization, and sparse row-range validation
   against Python mirrors of the Fortran writer-preparation formulas;
+- C++ intrinsic qgrid boundary, accumulation, and normalization validation
+  against a Python mirror of the Fortran `qgrid_*` formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

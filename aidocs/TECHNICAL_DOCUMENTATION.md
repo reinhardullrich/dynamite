@@ -814,6 +814,9 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_collapse_losvd_binning`
 - `orblib_cpp_api_normalize_losvd_histogram`
 - `orblib_cpp_api_sparse_losvd_ranges`
+- `orblib_cpp_api_qgrid_boundaries`
+- `orblib_cpp_api_accumulate_qgrid`
+- `orblib_cpp_api_normalize_qgrid`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -962,6 +965,19 @@ The first actual ported Fortran kernels are:
   `orblib_cpp_api_sparse_losvd_ranges` validate the memory-side preparation.
   Actual binary LOSVD file serialization and full orbit-engine wiring remain
   unported.
+- Intrinsic qgrid boundary setup, moment accumulation, orbit-type channel
+  accumulation, and normalization from `qgrid_setup()`, `qgrid_store()`, and
+  `qgrid_write()` in `orblib_f_new_mirror.f90`, implemented in
+  `orblib_cpp/include/orbit_qgrid.hpp` and
+  `orblib_cpp/source/orbit_qgrid.cpp`. The port preserves the Fortran radial
+  and angular boundary formulas, `hunt`-style equality behavior on inner
+  boundaries, non-rotating and rotating-frame symmetry sign tables,
+  positive-octant filtering, 16-channel accumulation layout, orbit-type
+  channel mapping, per-cell moment normalization, and global light/type
+  normalization. Test-only C ABI helpers `orblib_cpp_api_qgrid_boundaries`,
+  `orblib_cpp_api_accumulate_qgrid`, and `orblib_cpp_api_normalize_qgrid`
+  validate the memory-side qgrid math. Actual binary qgrid file serialization
+  and full orbit-engine wiring remain unported.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python
