@@ -14,14 +14,7 @@ with open("requirements.txt", "r") as fp:
     required = fp.read().splitlines()
 
 orblib_fortran = [
-    "../orblib_fortran/bin/orbitstart",
-    "../orblib_fortran/bin/orbitstart_bar",
-    "../orblib_fortran/bin/orblib_new_mirror",
-    "../orblib_fortran/bin/orblib_bar",
-    "../orblib_fortran/bin/triaxmass",
-    "../orblib_fortran/bin/triaxmass_bar",
-    "../orblib_fortran/bin/triaxmassbin",
-    "../orblib_fortran/bin/triaxmassbin_bar"
+    "../orblib_fortran/build/lib/liborblib_fortran.so",
 ]
 
 setuptools.setup(

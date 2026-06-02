@@ -148,13 +148,13 @@ EXTRACTED_CONFIGS = [
     {
         "name": "different_dark_halos",
         "orblib": {"nE": 6, "nI2": 5, "nI3": 4},
-        "weight_solver": {"type": "LegacyWeightSolver", "nnls_solver": 1},
+        "weight_solver": {"type": "NNLS", "nnls_solver": "scipy"},
         "n_max_mods": 3,
     },
     {
         "name": "legacy_reimplementation",
         "orblib": {"nE": 6, "nI2": 4, "nI3": 4, "random_seed": 4242},
-        "weight_solver": {"type": "LegacyWeightSolver", "nnls_solver": 1},
+        "weight_solver": {"type": "NNLS", "nnls_solver": "scipy"},
         "n_max_mods": 10,
     },
     {
@@ -166,7 +166,7 @@ EXTRACTED_CONFIGS = [
     {
         "name": "slurm_local",
         "orblib": {"nE": 2, "nI2": 4, "nI3": 3, "random_seed": 0},
-        "weight_solver": {"type": "LegacyWeightSolver", "nnls_solver": 1},
+        "weight_solver": {"type": "NNLS", "nnls_solver": "scipy"},
         "n_max_mods": 5,
     },
     {
@@ -236,11 +236,8 @@ def test_extracted_shell_example_intent_is_represented(name, source):
 @pytest.mark.parametrize("config", EXTRACTED_CONFIGS)
 def test_extracted_example_config_settings_are_valid(config):
     weight_solver = config["weight_solver"]
-    assert weight_solver["type"] in {"LegacyWeightSolver", "NNLS"}
-    if weight_solver["type"] == "LegacyWeightSolver":
-        assert weight_solver["nnls_solver"] == 1
-    else:
-        assert weight_solver["nnls_solver"] in {"scipy", "cvxopt"}
+    assert weight_solver["type"] == "NNLS"
+    assert weight_solver["nnls_solver"] in {"scipy", "cvxopt"}
 
     orblib = config["orblib"]
     assert orblib["nE"] > 0

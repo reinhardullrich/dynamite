@@ -97,8 +97,7 @@ dynamite/
     source/             Human-written Fortran source
       numerics/         Bundled numerical routines
       unused/           Inactive retained Fortran sources
-    build/              Ignored generated object/module files
-    bin/                Ignored compiled runtime executables
+    build/lib/          Ignored generated shared library
   docs/                 Upstream Sphinx docs and tutorial notebooks
   dev_tests/            Upstream development tests, configs, sample data
 ```
@@ -263,8 +262,11 @@ This section chooses how orbital weights are solved.
 
 Observed solver types:
 
-- `LegacyWeightSolver`: Fortran-backed legacy NNLS path.
-- `NNLS`: Python NNLS path.
+- `NNLS`: active Python NNLS path.
+
+`LegacyWeightSolver` is archived and rejected by current configuration
+validation. Its old Fortran support sources are kept under
+`archive/legacy_nnls_fortran/` for reference only.
 
 Common settings:
 
@@ -315,10 +317,12 @@ threshold or a threshold expressed as a fraction of `sqrt(2*nobs)` into
 
 ### legacy_settings
 
-`legacy_settings.directory` identifies the active Fortran executable directory.
+`legacy_settings.directory` is retained for legacy configuration shape, but
+the active orbit-library runtime uses `dynamite/orblib_api.py` and its shared
+library path instead of this setting.
 
 If the value is `default`, `Configuration` resolves it to the repository's
-`orblib_fortran/bin` directory. A trailing slash is removed.
+`orblib_fortran/build/lib` directory. A trailing slash is removed.
 
 ### io_settings
 
@@ -541,7 +545,6 @@ NGC6278_output/
   plots/
   models/
     orblib_000_000/
-      infil/
       datfil/
       ml05.00/
 ```
@@ -570,8 +573,10 @@ Initialization:
 
 Main methods:
 
-- `setup_directories()`: creates model, `infil/`, and `datfil/` directories.
-- `get_orblib()`: instantiates `LegacyOrbitLibrary` and runs it.
+- `setup_directories()`: creates the model directory and `datfil/` output
+  directory. The active direct-input runtime does not create `infil/`.
+- `get_orblib()`: instantiates `LegacyOrbitLibrary`; its active generation path
+  delegates to the direct shared-library backend.
 - `get_weights(orblib)`: chooses and runs the configured weight solver.
 
 `get_weights()` writes results back to the model object:
@@ -667,10 +672,21 @@ exists as a specialized subclass.
 
 ## Orbit Library Generation
 
-`orblib.LegacyOrbitLibrary` is the main orbit-library implementation.
+`orblib.LegacyOrbitLibrary` is still the object used by readers and weight
+solvers, but active generation now delegates to
+`dynamite/orblib_api.py`. The API facade exposes `OrbitLibraryRequest`,
+`OrbitLibraryResult`, `run_orbit_library()`, and the
+`fortran_shared_library` backend. `Model.get_orblib()` and
+`LegacyOrbitLibrary.get_orblib()` use that backend for generation.
 
-Despite the abstract `OrbitLibrary` base class, the runtime path uses legacy
-Fortran programs. Python prepares files, calls executables, and reads results.
+The shared backend calls
+`orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`. Python passes
+non-bar MGE potential arrays, viewing angles, black-hole parameters,
+dark-halo parameters, orbit-grid settings, orbit-start arrays, PSF tables,
+boxed-aperture geometry, velocity-histogram settings, bin maps, and output
+paths directly to the C ABI. It does not create `parameters_pot.in`,
+`orbstart.in`, `orblib.in`, `orblibbox.in`, `begin.dat`, or `beginbox.dat`, and
+the direct wrappers disable the `interpolgrid` file cache while they run.
 
 Important initialization inputs:
 
@@ -684,7 +700,6 @@ Important state:
 - `settings.orblib_settings`
 - `legacy_directory`
 - `input_directory`
-- whether the configured solver is `LegacyWeightSolver`
 - whether orbit libraries should run in parallel
 - velocity scaling factor for models reusing an orbit library
 
@@ -696,82 +711,81 @@ datfil/tube_box_done
 
 already exists in the orbit-library directory.
 
-If the orbit library is missing, it:
+If the orbit library is missing, the active backend:
 
-1. Writes Fortran orbit-library input files into `infil/`.
-2. Copies aperture and bin files for kinematic and population data.
-3. Generates orbit initial conditions if `begin.dat` and `beginbox.dat` are
-   missing.
-4. Runs tube and box orbit-library programs.
-5. For non-legacy weight solving, calculates intrinsic masses through the MGE
-   code.
+1. Extracts model, PSF, aperture, histogram, and binning inputs from Python
+   configuration/data objects.
+2. Calls `orblib_api_run_orbitstart_memory` to generate tube and box orbit
+   starts in memory.
+3. Calls `orblib_api_run_orblib_direct` for the tube and box libraries with
+   those orbit-start arrays.
+4. Compresses the generated binary `datfil/*_qgrid.dat` and
+   `datfil/*_losvd_hist.dat` outputs to `.bz2`.
+5. Calculates intrinsic masses through the Python MGE code for active NNLS
+   weight solving.
 6. Touches `datfil/tube_box_done` if both `tube_done` and `box_done` exist.
 
-Generated files mentioned in docstrings include:
+Generated files include:
 
-- `begin.dat`
-- `beginbox.dat`
-- `orblib.dat.bz2`
+- `orblib_qgrid.dat.bz2`
+- `orblib_losvd_hist.dat.bz2`
 - `orblib.dat_orbclass.out`
-- `orblibbox.dat.bz2`
+- `orblibbox_qgrid.dat.bz2`
+- `orblibbox_losvd_hist.dat.bz2`
 - `orblibbox.dat_orbclass.out`
-- `mass_aper.dat` for legacy solver mode
-- `mass_qgrid.dat` or `mass_qgrid.ecsv`
-- `mass_radmass.dat` or `mass_radmass.ecsv`
-- status and log files
+- `mass_qgrid.ecsv`
+- `mass_radmass.ecsv`
 
-The orbit-library code translates Python/domain parameters into legacy input
-files such as:
-
-- `parameters_pot.in`
-- `parameters_lum.in`
-- `orblib.in`
-- `orblibbox.in`
-- `triaxmass.in`
-- `triaxmassbin.in`
-
-The dark halo path supports zero or one non-Plummer dark component. More than
-one non-Plummer dark component raises an error in the legacy input path.
+The direct-input shared-library path currently supports the non-bar triaxial
+orbit-library route. The dark halo path supports zero or one non-Plummer dark
+component; more than one non-Plummer dark component raises an error before
+calling Fortran. Binary `datfil/` outputs remain because the existing Python
+readers and weight solvers consume that format.
 
 ## Fortran Backend Relationship
 
-The Python package treats `orblib_fortran/` as an executable numerical backend.
+The Python package treats `orblib_fortran/` as a shared-library numerical
+backend for active orbit-library generation.
 
 Active roles:
 
 - generate orbit initial conditions
 - integrate tube and box orbits
 - build orbit libraries
-- compute mass grids
 
-Active executable names from packaging or code context include:
+Executable driver sources are retained under `orblib_fortran/source/unused/`
+for historical reference. They are not part of the supported build, and normal
+builds no longer create `orblib_fortran/bin/`.
 
-- `orbitstart`
-- `orbitstart_bar`
-- `orblib_new_mirror`
-- `orblib_bar`
-- `triaxmass`
-- `triaxmass_bar`
-- `triaxmassbin`
-- `triaxmassbin_bar`
+The shared-library target is built with:
 
-The Fortran layer is not just optional historical code for full traditional
-runs. Orbit-library generation still depends on these executables. Generated
-object files and Fortran module files are kept under `orblib_fortran/build/`;
-the final executables are kept under `orblib_fortran/bin/`. A config value of
-`legacy_settings.directory: default` resolves to that bin directory.
+```bash
+make -C orblib_fortran all
+```
 
-The old `triaxnnls_*` GALAHAD/NNLS solver sources are archived under
-`archive/legacy_nnls_fortran/`. The untested `orbgen`/`partgen` utilities are
-archived under `archive/legacy_orbgen_partgen/`. They are not part of the
-active `orblib_fortran` build.
+`make -C orblib_fortran shared` is equivalent. It writes
+`orblib_fortran/build/lib/liborblib_fortran.so`. The exported ABI version is
+`2` and includes `orblib_api_abi_version`,
+`orblib_api_run_orbitstart_memory`, and `orblib_api_run_orblib_direct`.
+Python isolates shared-library calls in worker processes by default because
+the Fortran modules use global state and several legacy `STOP` paths can
+terminate the calling process.
+
+The old `triaxnnls_*` GALAHAD/NNLS solver sources and `triaxmass*`
+mass-helper sources are archived under `archive/legacy_nnls_fortran/`. The
+untested `orbgen`/`partgen` utilities are archived under
+`archive/legacy_orbgen_partgen/`. They are not part of the active
+`orblib_fortran` build.
 
 ## Weight Solving
 
-`weight_solvers.WeightSolver` is the base class. Implementations include:
+`weight_solvers.WeightSolver` is the base class. The active implementation is:
 
-- `LegacyWeightSolver`
 - `NNLS`
+
+The `LegacyWeightSolver` source remains in `dynamite/weight_solvers.py` for
+historical reference, but configuration validation and `Model.get_weights()`
+reject it because its Fortran helpers are archived.
 
 The solver stage finds non-negative orbital weights that best reproduce the
 observations and mass constraints.
@@ -790,17 +804,16 @@ These become:
 - `Model.kinchi2`
 - `Model.kinmapchi2`
 
-### LegacyWeightSolver
+### Archived LegacyWeightSolver
 
-The Python `LegacyWeightSolver` class still calls old Fortran NNLS-style
-programs:
+The old Python `LegacyWeightSolver` class called Fortran NNLS-style programs:
 
 - `triaxnnls_CRcut`
 - `triaxnnls_noCRcut`
 - barred variants where applicable
 
-It prepares old-format kinematic input files, writes `nn.in`, runs the solver,
-and reads the solver outputs.
+It prepared old-format kinematic input files, wrote `nn.in`, ran the solver,
+and read the solver outputs. This path is no longer active.
 
 It supports the `CRcut` setting for the counter-rotating orbit problem.
 
@@ -872,7 +885,6 @@ Key state files and directories:
 - `<output_directory>/models/`
 - `<output_directory>/plots/`
 - model-specific YAML config backups
-- `infil/` input files for legacy programs
 - `datfil/` orbit-library data and status files
 - weight files under the `ml.../` directory
 

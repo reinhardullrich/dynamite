@@ -2,9 +2,11 @@
 
 Date: 2026-06-02
 
-Scope: `orblib_fortran/source/orblib_f_new_mirror.f90`, the two executable
-drivers that use it (`orblibprogram.f90` and `orblibprogram_bar.f90`), and the
-Python runtime boundary in `dynamite/orblib.py` and
+Scope: `orblib_fortran/source/orblib_f_new_mirror.f90`, the shared-library ABI
+in `orblib_fortran/source/orblib_api.f90`, the inactive legacy executable
+drivers retained under `orblib_fortran/source/unused/`, and the Python runtime
+boundary in
+`dynamite/orblib.py`, `dynamite/orblib_api.py`, and
 `dynamite/model_iterator.py`.
 
 This note focuses on what the orbit-library Fortran code does, how it is wired
@@ -16,8 +18,10 @@ need to preserve.
 `orblib_f_new_mirror.f90` is not just an ODE integrator. It is the current
 compiled orbit-library backend. For each model it:
 
-- reads MGE/potential/orbit-library settings prepared by Python,
-- reads orbit initial conditions from `begin.dat` or `beginbox.dat`,
+- receives MGE/potential/orbit-library settings from Python-owned arrays and
+  scalars,
+- receives orbit initial conditions as Python-owned arrays through the direct
+  shared-library ABI,
 - integrates orbit trajectories with DOP853,
 - classifies orbit families from angular-momentum sign behavior,
 - projects each integrated trajectory through triaxial or barred-model
@@ -29,10 +33,10 @@ compiled orbit-library backend. For each model it:
 - writes binary Fortran record files that Python later reads.
 
 The computationally dominant work is orbit integration plus per-sample
-projection/PSF/aperture/histogram loops. The Fortran executable itself is
+projection/PSF/aperture/histogram loops. The Fortran core itself is
 effectively single-process and single-threaded. DYNAMITE gets parallelism by
-running several model processes at once and, optionally, by running the tube
-and box orbit-library executables concurrently.
+running several model processes at once; the shared-library backend isolates
+each Fortran call in a worker process.
 
 Replacing this with pure Python would be risky and likely slow unless the hot
 loops are moved to compiled code. A realistic replacement should use a compiled
@@ -47,21 +51,19 @@ flowchart TD
     B --> C["ModelIterator / SplitModelIterator"]
     C --> D["Model.get_orblib()"]
     D --> E["LegacyOrbitLibrary.get_orblib()"]
+    E --> API["SharedLibraryFortranOrbitBackend"]
 
-    E --> F["create_fortran_input_orblib()"]
-    F --> F1["infil/parameters_pot.in"]
-    F --> F2["infil/orbstart.in"]
-    F --> F3["infil/orblib.in"]
-    F --> F4["infil/orblibbox.in"]
+    API --> P["Python arrays/scalars for MGE, halo, orbit grid"]
+    API --> AP["Python arrays for PSF, aperture, histogram, binning"]
 
-    F2 --> G["orbitstart or orbitstart_bar"]
-    G --> G1["datfil/begin.dat"]
-    G --> G2["datfil/beginbox.dat"]
+    P --> G["orblib_api_run_orbitstart_memory"]
+    G --> G1["begin arrays in memory"]
+    G --> G2["beginbox arrays in memory"]
 
-    G1 --> H["orblib_new_mirror or orblib_bar"]
-    G2 --> I["orblib_new_mirror or orblib_bar"]
-    F3 --> H
-    F4 --> I
+    G1 --> H["orblib_api_run_orblib_direct tube"]
+    G2 --> I["orblib_api_run_orblib_direct box"]
+    AP --> H
+    AP --> I
 
     H --> J["datfil/orblib_qgrid.dat.bz2"]
     H --> K["datfil/orblib_losvd_hist.dat.bz2"]
@@ -80,26 +82,34 @@ flowchart TD
     L --> R
     P --> R
 
-    R --> S["Python NNLS or LegacyWeightSolver"]
+    R --> S["Python NNLS"]
     S --> T["weights, chi2, model outputs"]
 ```
 
 Key source points:
 
-- Python writes Fortran input files in `LegacyOrbitLibrary.create_fortran_input_orblib()`.
-- Python launches `orbitstart*` in `LegacyOrbitLibrary.get_orbit_ics()`.
-- Python chooses `orblib_new_mirror` or `orblib_bar` in
-  `write_executable_for_integrate_orbits*()`.
+- `LegacyOrbitLibrary.get_orblib()` delegates active generation to
+  `SharedLibraryFortranOrbitBackend`.
+- `SharedLibraryFortranOrbitBackend.run_orbitstart_memory()` calls
+  `orblib_api_run_orbitstart_memory` and receives `begin`/`beginbox` arrays.
+- `SharedLibraryFortranOrbitBackend.generate_orbit_library()` calls
+  `orblib_api_run_orblib_direct` for tube and box libraries.
+- The direct shared-library wrappers disable the `interpolgrid` file cache
+  while they run.
 - Python reads the Fortran binary records in `read_orbit_base()` and
   `read_losvd_histograms()`.
+- New Python callers can use `dynamite.orblib_api.run_orbit_library()` or
+  `Model.run_orblib_api()` to receive Python-readable results through the
+  request/result facade. Binary `datfil/` outputs remain because the existing
+  readers and solvers consume them.
 
 ## Internal Fortran Module Map
 
-`orblib_f_new_mirror.f90` is one large source file with many modules. The two
-driver programs are thin:
+`orblib_f_new_mirror.f90` is one large source file with many modules. The
+inactive legacy driver programs are thin:
 
-- `orblibprogram.f90` calls `setup()`, `run()`, and `stob()`.
-- `orblibprogram_bar.f90` calls `setup_bar()`, `run()`, and `stob()`.
+- `source/unused/orblibprogram.f90` calls `setup()`, `run()`, and `stob()`.
+- `source/unused/orblibprogram_bar.f90` calls `setup_bar()`, `run()`, and `stob()`.
 
 The main in-file coordinator is `module high_level`.
 
@@ -183,7 +193,9 @@ Important routines:
 - `integrator_setup()` / `integrator_setup_bar()`: read model parameters,
   initialize the interpolated potential, read integration settings, read
   initial conditions, allocate dither arrays.
-- `ini_integ()`: reads `begin.dat` or `beginbox.dat`.
+- `ini_integ()`: legacy file path that reads `begin.dat` or `beginbox.dat`.
+- `integrator_setup_direct()`: active shared-library path that receives the
+  orbit-start table directly from Python memory.
 - `integrator_whichorbit()`: maps an output bundle index and dither index back
   to the actual start point in the full initial-condition grid.
 - `real_integrator()`: calls DOP853 and performs energy-conservation retry
@@ -391,16 +403,17 @@ Parallelism is process-level:
   multiple model jobs in parallel.
 - `SplitModelIterator` runs orbit-library creation with `ncpus`, then weight
   solving with `ncpus_weights`.
-- `orblibs_in_parallel: True` runs tube and box orbit-library executables
-  concurrently for one model. That means up to two Fortran orbit-library
-  processes per active model.
+- The `fortran_shared_library` API backend isolates each Fortran shared-library
+  call in a worker process by default. This avoids corrupting the Python
+  process when legacy Fortran `STOP` paths are hit and avoids sharing
+  module-level Fortran state between tube and box runs. It currently runs the
+  tube and box shared-library calls sequentially.
 
 Practical CPU planning:
 
-- With `orblibs_in_parallel: False`, active Fortran orbit jobs are roughly
-  `ncpus`.
-- With `orblibs_in_parallel: True`, active Fortran orbit jobs can be roughly
-  `2 * ncpus`.
+- Active Fortran orbit jobs are roughly `ncpus`, with one worker process per
+  active shared-library call. Tube and box libraries are currently run
+  sequentially inside each model.
 - On the local TUXEDO Pulse 15 Gen1 baseline, the CPU has 8 cores / 16 threads.
   For orbit integration, physical cores are usually the meaningful limit.
 - Avoid setting `ncpus: all_available` together with
@@ -427,8 +440,9 @@ These changes do not replace the Fortran numerical kernel.
 ### What Is Moderately Replaceable
 
 The Python side already replaced projected and intrinsic mass calculations for
-the Python `NNLS` weight solver path. The orblib Fortran mass helpers are not
-central to this orbit-library engine.
+the active Python `NNLS` weight solver path. The old `triaxmass*` Fortran mass
+helpers are archived under `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/`
+and are not part of this orbit-library engine.
 
 ### What Is Hard To Replace
 
@@ -455,8 +469,8 @@ process with a versioned backend interface:
 
 ```mermaid
 flowchart LR
-    A["Python LegacyOrbitLibrary"] --> B["OrbitBackend interface"]
-    B --> C["Current Fortran executable backend"]
+    A["Python LegacyOrbitLibrary / orblib_api"] --> B["OrbitBackend interface"]
+    B --> C["Current Fortran shared-library backend"]
     B --> D["Future compiled backend"]
     D --> E["C++/OpenMP or Cython/Numba integration"]
     D --> F["Binary or structured output writer"]

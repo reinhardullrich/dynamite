@@ -7,8 +7,7 @@ dynamite/
   dynamite/          Main Python package
   orblib_fortran/    Active Fortran orbit-library backend
     source/          Human-written Fortran source
-    build/           Ignored compiler object/module files
-    bin/             Ignored runtime executables
+    build/lib/       Ignored generated shared library
   archive/           Archived dev tests and legacy Fortran solver/utilities
   docs/              Sphinx docs, API docs, tutorials, images, notebooks
   setup.py           Python packaging metadata
@@ -139,13 +138,15 @@ This is the closest thing to the high-level "run everything" engine.
 `dynamite/orblib.py`
 
 Creates orbit libraries for a model. The main implementation is
-`LegacyOrbitLibrary`, which prepares input files for the active Fortran backend
-and then runs the orblib executables from `orblib_fortran/bin/`.
+`LegacyOrbitLibrary`, which now delegates active generation to
+`dynamite/orblib_api.py`. The shared-library backend passes Python-owned arrays
+and scalars into `orblib_fortran/build/lib/liborblib_fortran.so`; it does not
+write Fortran `infil/` input files or launch the orbit executables for normal
+generation.
 
 Generated output includes files such as:
 
-- Orbit initial conditions.
-- Tube and box orbit libraries.
+- Tube and box qgrid/LOSVD orbit-library files.
 - Orbit classifications.
 - Intrinsic mass tables.
 - Status files indicating completed tube/box orbit calculations.
@@ -159,9 +160,11 @@ kinematics.
 
 Solver options include:
 
-- `LegacyWeightSolver`: compatibility path for legacy Fortran NNLS-style code.
 - `NNLS`: Python-based non-negative least-squares approach, using SciPy or
   optionally cvxopt.
+
+`LegacyWeightSolver` is archived and rejected by the active configuration
+path; its old Fortran support sources live under `archive/legacy_nnls_fortran/`.
 
 This stage produces chi-square values that are used to compare models.
 
@@ -189,9 +192,10 @@ The current local README describes a two-stage active installation:
 1. Compile the active Fortran programs in `orblib_fortran/`.
 2. Install the Python package with `python -m pip install .`.
 
-The active Fortran build writes executables to `orblib_fortran/bin/`, object
-files to `orblib_fortran/build/obj/`, and module files to
-`orblib_fortran/build/mod/`.
+The active Fortran build writes only the shared library to
+`orblib_fortran/build/lib/`. Temporary object/module directories may be created
+during compilation, but they are not runtime artifacts. Executable driver
+sources are retained in `orblib_fortran/source/unused/` for reference.
 
 ## Things To Know Before Working On It
 
@@ -204,6 +208,6 @@ files to `orblib_fortran/build/obj/`, and module files to
 - Real runs can consume significant disk space because orbit libraries are
   large.
 - The codebase mixes modern Python orchestration with legacy compiled numerical
-  executables.
+  code exposed through a direct shared-library ABI.
 - Archived tests and examples in `archive/dev_tests/` are useful references for
   working configurations.

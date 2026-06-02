@@ -201,9 +201,12 @@ class Configuration(object):
                           f'{const.GRAV_CONST_KM = }, {const.PARSEC_KM = }, ' \
                           f'{const.RHO_CRIT = }.')
 
-        legacy_dir = \
-            os.path.realpath(os.path.dirname(__file__)+'/../orblib_fortran/bin')
-        self.logger.debug(f'Default orblib Fortran directory: {legacy_dir}.')
+        legacy_dir = os.path.realpath(
+            os.path.dirname(__file__) + '/../orblib_fortran/build/lib',
+        )
+        self.logger.debug(
+            f'Default orblib Fortran shared-library directory: {legacy_dir}.',
+        )
 
         self.config_file_name = filename
         try:
@@ -574,16 +577,15 @@ class Configuration(object):
             self.all_models.update_orblib_flags(d)
         self.all_models.update_model_table()
 
-        if self.settings.weight_solver_settings['type']!='LegacyWeightSolver':
-            if self.system.is_bar_disk_system():
-                bardisk = self.system.get_unique_bar_component()
-                bardisk.mass_aper = None
-                bardisk.mge_lum_tot = bardisk.mge_lum + bardisk.disk_lum
-                bardisk.mass_aper = bardisk.mge_lum_tot.get_projected_masses()
-            else:
-                stars = self.system.get_unique_triaxial_visible_component()
-                stars.mass_aper = None
-                stars.mass_aper = stars.mge_lum.get_projected_masses()
+        if self.system.is_bar_disk_system():
+            bardisk = self.system.get_unique_bar_component()
+            bardisk.mass_aper = None
+            bardisk.mge_lum_tot = bardisk.mge_lum + bardisk.disk_lum
+            bardisk.mass_aper = bardisk.mge_lum_tot.get_projected_masses()
+        else:
+            stars = self.system.get_unique_triaxial_visible_component()
+            stars.mass_aper = None
+            stars.mass_aper = stars.mge_lum.get_projected_masses()
 
         # self.backup_config_file(reset=False)
 
@@ -1016,6 +1018,11 @@ class Configuration(object):
             raise ValueError(txt)
 
         ws_type = self.settings.weight_solver_settings['type']
+        if ws_type == 'LegacyWeightSolver':
+            txt = 'LegacyWeightSolver is archived and no longer supported by ' \
+                  'the active runtime. Use weight-solver type NNLS.'
+            self.logger.error(txt)
+            raise ValueError(txt)
 
         for c in self.system.cmp_list:
             if issubclass(type(c), physys.VisibleComponent) \
@@ -1030,12 +1037,6 @@ class Configuration(object):
                             self.logger.error(txt)
                             raise ValueError(txt)
                         if check_bl:
-                            # check weight solver type
-                            if ws_type == 'LegacyWeightSolver':
-                                txt = "LegacyWeightSolver can't be used with "\
-                                      "BayesLOSVD - use weight-solver type NNLS"
-                                self.logger.error(txt)
-                                raise ValueError(txt)
                             # check for compatible chi2 variant
                             if which_chi2 == 'kinmapchi2':
                                 txt = 'kinmapchi2 cannot be used with ' \
@@ -1093,57 +1094,19 @@ class Configuration(object):
             raise ValueError(f'Only specify one of {chi2abs}, {chi2scaled}, '
                              'not both')
 
-        if ws_type == 'LegacyWeightSolver':
-            self.logger.warning('LegacyWeightSolver is DEPRECATED and will be '
-                                'removed in a future version of DYNAMITE. Use '
-                                'weight solver type NNLS instead if you can.')
-            # check velocity histograms settings if LegacyWeightSolver is used.
-            # (i) check all velocity histograms have center 0, (ii) force them
-            # all to have equal widths and (odd) number of bins
-            # these requirements are not needed by orblib_f.f90, but are assumed
-            # by the NNLS routine triaxnnl_*.f90 (see 2144-2145 of orblib_f.f90)
-            # Therefore this check is based on WeightSolver type.
+        # Enforce odd velocity histogram bin counts for active Python NNLS.
+        if self.system.is_bar_disk_system():
+            stars = self.system.get_unique_bar_component()
+        else:
             stars = self.system.get_unique_triaxial_visible_component()
-            hist_widths = [k.hist_width for k in stars.kinematic_data]
-            hist_centers = [k.hist_center for k in stars.kinematic_data]
-            hist_bins = [k.hist_bins for k in stars.kinematic_data]
-            self.logger.debug('checking all values of hist_center == 0...')
-            assert all([x==0 for x in hist_centers]), 'all hist_center values must be 0'
-            self.logger.debug('... check passed')
-            equal_widths = all([x == hist_widths[0] for x in hist_widths])
-            if equal_widths is False:
-                max_width = max(hist_widths)
-                msg = 'Value of `hist_width` must be the same for all kinematic'
-                msg += f' data - defaulting to widest provided i.e. {max_width}'
-                self.logger.info(msg)
-                for k in stars.kinematic_data:
-                    k.hist_width = max_width
-            equal_bins = all([x == hist_bins[0] for x in hist_bins])
-            if equal_bins is False:
-                max_bins = max(hist_bins)
-                msg = 'Value of `hist_bins` must be the same for all kinematic'
-                msg += f' data - defaulting to largest provided i.e. {max_bins}'
-                self.logger.info(msg)
-                if max_bins%2 == 0:
-                    msg = 'Value of `hist_bins` must be odd: '
-                    msg += f'replacing {max_bins} with {max_bins+1}'
-                    self.logger.info(msg)
-                    max_bins += 1
-                for k in stars.kinematic_data:
-                    k.hist_bins = max_bins
-        else:  # enforce odd number of histogram bins
-            if self.system.is_bar_disk_system():
-                stars = self.system.get_unique_bar_component()
-            else:
-                stars = self.system.get_unique_triaxial_visible_component()
-            hist_bins = [k.hist_bins % 2 for k in stars.kinematic_data]
-            if any([h == 0 for h in hist_bins]):
-                all_hist_bins = {k.name: k.hist_bins
-                                 for k in stars.kinematic_data}
-                txt = 'Value of hist_bins must be odd for all kinematic ' \
-                      f'data, but they are {all_hist_bins}.'
-                self.logger.error(txt)
-                raise ValueError(txt)
+        hist_bins = [k.hist_bins % 2 for k in stars.kinematic_data]
+        if any([h == 0 for h in hist_bins]):
+            all_hist_bins = {k.name: k.hist_bins
+                             for k in stars.kinematic_data}
+            txt = 'Value of hist_bins must be odd for all kinematic ' \
+                  f'data, but they are {all_hist_bins}.'
+            self.logger.error(txt)
+            raise ValueError(txt)
 
     def validate_chi2(self, which_chi2=None):
         """

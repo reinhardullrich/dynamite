@@ -8,7 +8,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORBLIB_FORTRAN_DIR = REPO_ROOT / "orblib_fortran"
-ORBLIB_FORTRAN_BIN_DIR = ORBLIB_FORTRAN_DIR / "bin"
+ORBLIB_FORTRAN_SHARED_LIBRARY = (
+    ORBLIB_FORTRAN_DIR / "build" / "lib" / "liborblib_fortran.so"
+)
 ARCHIVED_NNLS_FORTRAN_DIR = (
     REPO_ROOT / "archive" / "legacy_nnls_fortran" / "legacy_fortran"
 )
@@ -21,10 +23,10 @@ def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(
         reason="set DYNAMITE_RUN_SLOW_TESTS=1 to run slow integration tests"
     )
-    skip_orblib_exec = pytest.mark.skip(
+    skip_orblib_fortran = pytest.mark.skip(
         reason=(
-            "set DYNAMITE_RUN_ORBLIB_FORTRAN_EXEC_TESTS=1 to run tests "
-            "requiring built orblib Fortran executables"
+            "set DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 to run tests requiring "
+            "the built orblib Fortran shared library"
         )
     )
     for item in items:
@@ -32,9 +34,9 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_slow)
         if (
             "orblib_fortran" in item.keywords
-            and os.environ.get("DYNAMITE_RUN_ORBLIB_FORTRAN_EXEC_TESTS") != "1"
+            and os.environ.get("DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS") != "1"
         ):
-            item.add_marker(skip_orblib_exec)
+            item.add_marker(skip_orblib_fortran)
 
 
 def require_gfortran():

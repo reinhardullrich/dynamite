@@ -84,9 +84,107 @@ module initial_parameters
         rho_crit = (3.0_dp*(7.0d-5/parsec_km)**2)/(8.0_dp*pi_d*grav_const_km)
 
     private ! default private
-    public :: iniparam, iniparam_bar
+    public :: iniparam, iniparam_bar, iniparam_from_arrays
 
 contains
+
+    subroutine reset_allocated_parameters()
+        if (allocated(surf_km)) deallocate(surf_km)
+        if (allocated(psi_obs)) deallocate(psi_obs)
+        if (allocated(sigobs_km)) deallocate(sigobs_km)
+        if (allocated(qobs)) deallocate(qobs)
+        if (allocated(surf_km_d)) deallocate(surf_km_d)
+        if (allocated(psi_obs_d)) deallocate(psi_obs_d)
+        if (allocated(sigobs_km_d)) deallocate(sigobs_km_d)
+        if (allocated(qobs_d)) deallocate(qobs_d)
+        if (allocated(surf_km_b)) deallocate(surf_km_b)
+        if (allocated(psi_obs_b)) deallocate(psi_obs_b)
+        if (allocated(sigobs_km_b)) deallocate(sigobs_km_b)
+        if (allocated(qobs_b)) deallocate(qobs_b)
+        if (allocated(dmparam)) deallocate(dmparam)
+    end subroutine reset_allocated_parameters
+
+    subroutine iniparam_from_arrays(ngauss_input, surf_pc_input, &
+                                    sigobs_arcsec_input, qobs_input, &
+                                    psi_obs_input, distance, &
+                                    theta_view_deg, phi_view_deg, &
+                                    psi_view_deg, upsilon, xmbh_solar, &
+                                    softl_arcsec, nener_input, &
+                                    rlogmin_input, rlogmax_input, &
+                                    ni2_input, ni3_input, &
+                                    orbit_dithering_input, quad_nr_input, &
+                                    quad_nth_input, quad_nph_input, &
+                                    dm_profile_type_input, &
+                                    n_dmparam_input, dmparam_input)
+        integer(kind=i4b), intent(in) :: ngauss_input
+        real(kind=dp), intent(in), dimension(ngauss_input) :: surf_pc_input
+        real(kind=dp), intent(in), dimension(ngauss_input) :: sigobs_arcsec_input
+        real(kind=dp), intent(in), dimension(ngauss_input) :: qobs_input
+        real(kind=dp), intent(in), dimension(ngauss_input) :: psi_obs_input
+        real(kind=dp), intent(in) :: distance, theta_view_deg, phi_view_deg
+        real(kind=dp), intent(in) :: psi_view_deg, upsilon, xmbh_solar
+        real(kind=dp), intent(in) :: softl_arcsec, rlogmin_input, rlogmax_input
+        integer(kind=i4b), intent(in) :: nener_input, ni2_input, ni3_input
+        integer(kind=i4b), intent(in) :: orbit_dithering_input
+        integer(kind=i4b), intent(in) :: quad_nr_input, quad_nth_input
+        integer(kind=i4b), intent(in) :: quad_nph_input
+        integer(kind=i4b), intent(in) :: dm_profile_type_input, n_dmparam_input
+        real(kind=dp), intent(in) :: dmparam_input(*)
+
+        call reset_allocated_parameters()
+
+        ngauss_mge = ngauss_input
+        decmposed = 0_i4b
+        ngaus_bulge = 0_i4b
+        ngaus_disk = 0_i4b
+
+        allocate (surf_km(ngauss_mge), sigobs_km(ngauss_mge), &
+                  qobs(ngauss_mge), psi_obs(ngauss_mge))
+
+        qobs(:) = qobs_input(:)
+        psi_obs(:) = psi_obs_input(:)
+        theta_view = theta_view_deg
+        phi_view = phi_view_deg
+        psi_view = psi_view_deg
+        xmbh = xmbh_solar
+        nEner = nener_input
+        rLogMin = rlogmin_input
+        rLogMax = rlogmax_input
+        nI2 = ni2_input
+        nI3 = ni3_input
+        orbit_dithering = orbit_dithering_input
+        quad_nr = quad_nr_input
+        quad_nth = quad_nth_input
+        quad_nph = quad_nph_input
+        dm_profile_type = dm_profile_type_input
+        n_dmparam = n_dmparam_input
+
+        allocate (dmparam(n_dmparam))
+        if (n_dmparam > 0) dmparam(1:n_dmparam) = dmparam_input(1:n_dmparam)
+
+        nEner = nEner*orbit_dithering
+        nI2 = nI2*orbit_dithering
+        nI3 = nI3*orbit_dithering
+
+        conversion_factor = distance*1.0e6_dp*tan(pi_d/(648d3))*parsec_km
+
+        surf_km(:) = surf_pc_input(:)/parsec_km**2
+        surf_km(:) = surf_km(:)*upsilon
+        sigobs_km(:) = sigobs_arcsec_input(:)*conversion_factor
+        softl_km = softl_arcsec*conversion_factor
+
+        psi_obs(:) = psi_obs(:) + psi_view
+        theta_view = theta_view*(pi_d/180.0_dp)
+        phi_view = phi_view*(pi_d/180.0_dp)
+        psi_obs = psi_obs*(pi_d/180.0_dp)
+        psi_view = psi_view*(pi_d/180.0_dp)
+
+        rLogMin = rLogMin + log10(conversion_factor)
+        rLogMax = rLogMax + log10(conversion_factor)
+
+        totalmass = twopi_d*sum(surf_km(:)*qobs(:)*sigobs_km(:)**2)
+        Omega = 0.0_dp
+    end subroutine iniparam_from_arrays
 
     subroutine iniparam()
 
@@ -94,6 +192,8 @@ contains
         real(kind=dp), dimension(:), allocatable :: surf_pc, sigobs_arcsec
         real(kind=dp) :: distance, upsilon, softl_arcsec
         integer(kind=i4b) :: j
+
+        call reset_allocated_parameters()
 
         print *, "Gravitational Constant in km^3/(s^2 Msun)", grav_const_km
         print *, "parsec in km", parsec_km
@@ -202,6 +302,8 @@ contains
         real (kind=dp), dimension(:), allocatable :: surf_pc_b, sigobs_arcsec_b    ! (BT)
         real(kind=dp) :: distance, upsilon, softl_arcsec
         integer(kind=i4b) :: j
+
+        call reset_allocated_parameters()
 
         print *, "Gravitational Constant in km^3/(s^2 Msun)", grav_const_km
         print *, "parsec in km", parsec_km

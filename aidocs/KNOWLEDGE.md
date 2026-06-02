@@ -64,22 +64,39 @@ changes from the original project.
 - `dynamite/`: upstream Python package. This nested `dynamite/dynamite` layout
   is normal for this Python project and should not be flattened.
 - `orblib_fortran/`: active Fortran backend for orbit starts, orbit
-  integration, orbit-library construction, and mass calculations. Human-written
-  Fortran source lives under `orblib_fortran/source/`, with bundled numerical
-  routine sources under `orblib_fortran/source/numerics/` and inactive retained
-  Fortran sources under `orblib_fortran/source/unused/`; generated
-  object/module files live under ignored `orblib_fortran/build/` after
-  compilation; final executables live under ignored `orblib_fortran/bin/`.
+  integration, and orbit-library construction. Human-written Fortran source
+  lives under `orblib_fortran/source/`, with bundled numerical routine sources
+  under `orblib_fortran/source/numerics/` and inactive retained Fortran sources
+  under `orblib_fortran/source/unused/`; the supported build target writes only
+  the shared library to ignored `orblib_fortran/build/lib/`. Legacy
+  `triaxmass*` mass-helper sources are archived and are not part of the active
+  build.
+- `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
+  typed request/result objects, `run_orbit_library()`, and the active
+  `fortran_shared_library` backend. The backend calls
+  `orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`; Python
+  passes non-bar MGE/orbit/dark-halo settings, orbit starts, PSF tables,
+  aperture geometry, histogram settings, binning maps, and output paths as
+  typed arrays/scalars. It no longer creates Fortran `infil/` inputs, no longer
+  calls Fortran entry points that accept input filenames, and disables the
+  internal `interpolgrid` file cache during direct shared-library calls. Binary
+  `datfil/` orbit-library outputs remain the active output contract for the
+  existing Python readers and weight solvers.
 - `tests/`: local pytest baseline for Fortran replacement work. The default
-  suite covers fixture contracts, extracted historical workflow facts, and
-  small Fortran kernel parity checks; opt-in slow/legacy tests include a
-  generated orbit-library LOSVD output comparison against the self-contained
-  NGC6278 fixture in `tests/fixtures/orblib_losvd/`.
+  suite covers fixture contracts, extracted historical workflow facts, small
+  Fortran kernel parity checks, and fast coverage for the direct-input
+  orbit-library API facade; opt-in slow tests include a generated
+  orbit-library LOSVD output comparison against the self-contained NGC6278
+  fixture in `tests/fixtures/orblib_losvd/`, with fixed direct shared-library
+  inputs and tolerances for small aggregate differences from the historical
+  executable-generated reference.
 - `docs/`: upstream Sphinx documentation.
 - `archive/dev_tests/`: archived upstream development tests, notebooks, sample
   configurations, and historical fixtures kept for human reference.
 - `archive/legacy_nnls_fortran/`: archived legacy NNLS/GALAHAD Fortran solver
-  sources, no longer part of the active `orblib_fortran` build.
+  sources and legacy `triaxmass*` mass-helper sources, no longer part of the
+  active `orblib_fortran` build. The active runtime rejects
+  `LegacyWeightSolver`; use Python `NNLS`.
 - `archive/legacy_orbgen_partgen/`: archived untested `orbgen`/`partgen`
   particle/orbit export utilities, no longer part of the active Fortran tree.
 - `.github/workflows/ci.yml`: upstream CI workflow.
@@ -162,11 +179,11 @@ Current local audit environment:
 - `pip check` passed after the local editable install.
 - GNU Fortran 13.3.0 at `/usr/bin/gfortran` was used for the active
   no-GALAHAD Fortran build.
-- `orblib_fortran/Makefile` and `orblib_fortran/Makefile.linux` write object
-  files to `orblib_fortran/build/obj/` and module files to
-  `orblib_fortran/build/mod/`. Runtime executables are written to
-  `orblib_fortran/bin/`, and Python's default `legacy_settings.directory`
-  resolves to that bin directory.
+- `orblib_fortran/Makefile` and `orblib_fortran/Makefile.linux` treat the
+  shared library as the only supported runtime build product. `make`,
+  `make all`, `make nogal`, and `make shared` build
+  `orblib_fortran/build/lib/liborblib_fortran.so`; temporary object/module
+  directories may exist during compilation but are generated artifacts.
 - Use `MPLCONFIGDIR=/tmp/dynamite-mplconfig` for local/headless Matplotlib
   commands to avoid config-cache warnings.
 - For future fresh setup, `uv` is acceptable and likely faster, but the current

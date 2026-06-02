@@ -90,3 +90,61 @@ This file is append-only. Add new entries at the bottom.
 - Moved inactive retained Fortran files `pij.f90` and `dopri5.f` into
   `orblib_fortran/source/unused/`; `dopri5.f` remains an explicitly inactive
   alternate integrator reference while active builds continue to use DOP853.
+- Added `dynamite/orblib_api.py`, a Python-facing orbit-library API facade with
+  typed request/result objects, an executable-backed Fortran adapter, and an
+  explicit reserved shared-library backend placeholder. Added
+  `Model.run_orblib_api()` as the convenience entry point and fast unit tests
+  for the facade while keeping the existing `LegacyOrbitLibrary` path intact.
+- Implemented the first Fortran shared-library backend: added
+  `orblib_fortran/source/orblib_api.f90` with C-ABI wrappers for orbit-start
+  and orbit-library runs, added `make shared` targets that build
+  `orblib_fortran/build/lib/liborblib_fortran.so`, and wired
+  `backend='fortran_shared_library'` through `ctypes` in `dynamite/orblib_api.py`.
+  The shared-library backend replaces direct Fortran executable launches but
+  still uses the existing `infil/`/`datfil/` file contract internally.
+- Archived the legacy `triaxmass*`/`triaxmassbin*` Fortran mass-helper sources
+  and their `nag.f` dependency under
+  `archive/legacy_nnls_fortran/legacy_fortran/mass_helpers/`, removed those
+  programs from the active `orblib_fortran` build and package data, removed
+  generated `triaxmass` input/script hooks from `dynamite/orblib.py`, and made
+  `LegacyWeightSolver` fail early in configuration/model execution. The active
+  orbit backend now builds only orbit-start and orbit-library programs while
+  Python `NNLS` handles the weight-solver path.
+- Added the first direct-input shared-library ABI slice for non-bar orbit-start
+  generation: `orblib_api_run_orbitstart_memory` accepts MGE/orbit/dark-halo
+  inputs as typed arrays and scalars, and
+  `SharedLibraryFortranOrbitBackend.run_orbitstart_memory()` returns Python
+  `begin`/`beginbox` arrays without requiring `orbstart.in`,
+  `parameters_pot.in`, or `begin*.dat`. Full orbit-library generation still
+  uses the current `infil/`/`datfil/` file contract, with binary `datfil/`
+  outputs retained as the temporary output boundary.
+- Implemented the direct Python-input shared-library orbit-library generation
+  path for non-bar models. `orblib_api_run_orblib_direct` now receives
+  orbit-start arrays, integration settings, PSF tables, aperture geometry,
+  histogram settings, binning maps, and output paths from Python instead of
+  reading `orblib.in`, `orblibbox.in`, aperture files, bin files, or
+  `begin*.dat`. The shared-library ABI was bumped to version `2`, the old
+  file-taking C-ABI entry points were removed from `orblib_api.f90`, and direct
+  calls disable the `interpolgrid` file cache. `Model.get_orblib()` and
+  `LegacyOrbitLibrary.get_orblib()` now delegate generation to the direct
+  shared-library backend, and `Model.setup_directories()` no longer creates
+  `infil/` for active model runs while retaining binary `datfil/` outputs for
+  the existing Python readers. Verified with `make -C orblib_fortran shared`,
+  `python3 -m py_compile ...`, focused `tests/test_orblib_api.py` fast tests,
+  and `.venv/bin/python -m pytest tests -m 'not slow and not orblib_fortran'`
+  (`61 passed, 3 deselected`).
+- Made the active Fortran backend shared-library-only. `make`, `make all`,
+  `make nogal`, and `make shared` now build only
+  `orblib_fortran/build/lib/liborblib_fortran.so`; executable driver sources
+  were moved to `orblib_fortran/source/unused/`; package metadata now points at
+  the shared object instead of `orblib_fortran/bin/*`; and the Fortran
+  inventory test now checks the shared library rather than executable files.
+  Local generated `orblib_fortran/bin/` was removed; intermediate `.mod`/object
+  build artifacts remain ignored generated files and may be left locally after
+  future builds.
+- Adjusted the opt-in slow orblib Fortran LOSVD regression test for the direct
+  shared-library path: the standalone fixture model is registered in
+  `all_models` before orbit generation, and the total LOSVD mass comparison now
+  allows the observed stable aggregate delta from the historical executable
+  reference while preserving the grid, shape, nonnegative, mean, quantile, and
+  max-difference checks.

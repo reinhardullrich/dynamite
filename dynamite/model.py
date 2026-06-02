@@ -1162,11 +1162,10 @@ class Model(object):
         # create self.directory if it doesn't exist
         self.create_model_directory(self.directory)
         # and also the model directories
-        self.create_model_directory(self.directory_noml+'infil/')
         self.create_model_directory(self.directory_noml+'datfil/')
 
     def get_orblib(self):
-        """Make the orbit library
+        """Make the orbit library through the direct Python-input API.
 
         Returns
         -------
@@ -1179,6 +1178,32 @@ class Model(object):
                 parset=self.parset)
         orblib.get_orblib()
         return orblib
+
+    def run_orblib_api(self,
+                       backend='fortran_shared_library',
+                       generate_if_missing=True,
+                       include_losvd_histograms=True,
+                       include_populations=False,
+                       include_intrinsic_moments=False,
+                       include_orbit_properties=False,
+                       cache_intrinsic_moments=True):
+        """Run the orbit library through the Python-facing API.
+
+        The active backend passes Python-owned arrays/scalars into the Fortran
+        shared library and reads the generated ``datfil`` outputs back into
+        Python objects.
+        """
+        request = dyn.orblib_api.OrbitLibraryRequest.from_model(
+            self,
+            backend=backend,
+            generate_if_missing=generate_if_missing,
+            include_losvd_histograms=include_losvd_histograms,
+            include_populations=include_populations,
+            include_intrinsic_moments=include_intrinsic_moments,
+            include_orbit_properties=include_orbit_properties,
+            cache_intrinsic_moments=cache_intrinsic_moments,
+        )
+        return dyn.orblib_api.run_orbit_library(request)
 
     def get_weights(self, orblib=None):
         """Get the orbital weights
@@ -1202,9 +1227,10 @@ class Model(object):
         """
         ws_type = self.config.settings.weight_solver_settings['type']
         if ws_type=='LegacyWeightSolver':
-            weight_solver = ws.LegacyWeightSolver(
-                    config=self.config,
-                    model=self)
+            raise ValueError(
+                'LegacyWeightSolver is archived and no longer supported by '
+                'the active runtime. Use weight-solver type NNLS.'
+            )
         elif ws_type=='NNLS':
             weight_solver = ws.NNLS(config=self.config, model=self)
         else:

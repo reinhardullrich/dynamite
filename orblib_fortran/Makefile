@@ -1,8 +1,9 @@
 
 ##############################################################
 #
-# This file can be used to compile the executables using any
-# standard Fortran 90 compiler (e.g. the Linux INTEL Fortran 95)
+# This file builds the Python-facing shared library using a standard Fortran
+# compiler. Executable driver sources are retained under source/unused for
+# reference, but they are not part of the supported runtime build.
 # This makefile was written by Remco van den Bosch, using the
 # Leiden, 2009
 #
@@ -14,13 +15,13 @@ compiler=gfortran
 #PROFILEDIR=~/profile/
 
 BUILDDIR ?= build
-BINDIR ?= bin
 SRCDIR ?= source
 NUMERICSDIR := $(SRCDIR)/numerics
 UNUSEDDIR := $(SRCDIR)/unused
 OBJDIR := $(BUILDDIR)/obj
 MODDIR := $(BUILDDIR)/mod
-BUILD_DIRS := $(BINDIR) $(OBJDIR) $(MODDIR)
+LIBDIR := $(BUILDDIR)/lib
+BUILD_DIRS := $(OBJDIR) $(MODDIR) $(LIBDIR)
 
 ifeq ($(compiler),ifort)
 ifdef FAST
@@ -93,14 +94,14 @@ ifeq ($(compiler),gfortran)
   fortran90 = gfortran $(flags) $(modflags) -c
   fortran77 = gfortran $(flags) $(modflags) -c
   link = gfortran $(flags) $(modflags) -o
+  shared_link = gfortran $(flags) $(modflags) -fPIC -shared -o
 endif
 
 ##########################################################
 
-PROGRAMS = $(BINDIR)/orbitstart $(BINDIR)/orbitstart_bar $(BINDIR)/orblib_new_mirror $(BINDIR)/orblib_bar $(BINDIR)/triaxmass $(BINDIR)/triaxmass_bar $(BINDIR)/triaxmassbin $(BINDIR)/triaxmassbin_bar
-
-all : $(PROGRAMS)
+all : shared
 nogal : all
+shared : $(LIBDIR)/liborblib_fortran.so
 
 $(BUILD_DIRS):
 	mkdir -p $@
@@ -111,8 +112,8 @@ $(BUILD_DIRS):
 #
 #########################################################
 
-RCS : Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orblibprogram.f90 $(SRCDIR)/triaxmassbin.f90 $(SRCDIR)/triaxmass.f90 $(SRCDIR)/orbitstart.f90 $(SRCDIR)/dmpotent.f90
-	ci -q -l -mcompile Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orblibprogram.f90 $(SRCDIR)/triaxmassbin.f90 $(SRCDIR)/triaxmass.f90 $(SRCDIR)/orbitstart.f90 $(SRCDIR)/dmpotent.f90
+RCS : Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90 $(SRCDIR)/dmpotent.f90
+	ci -q -l -mcompile Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90 $(SRCDIR)/dmpotent.f90
 
 ##########################################################
 #
@@ -146,12 +147,6 @@ $(OBJDIR)/iniparam_f.o: $(SRCDIR)/iniparam_f.f90 $(OBJDIR)/numeric_kinds_f.o | $
 $(OBJDIR)/triaxpotent.o : $(SRCDIR)/triaxpotent.f90 $(OBJDIR)/ellipint.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/iniparam_f.o | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(SRCDIR)/triaxpotent.f90
 
-$(OBJDIR)/triaxmass_f.o : $(SRCDIR)/triaxmass_f.f90 $(OBJDIR)/nag.o $(OBJDIR)/triaxpotent.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/triaxmass_f.f90
-
-$(OBJDIR)/triaxmassbin_f.o : $(SRCDIR)/triaxmassbin_f.f90 $(OBJDIR)/nag.o $(OBJDIR)/triaxpotent.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/triaxmassbin_f.f90
-
 $(OBJDIR)/dmpotent.o : $(SRCDIR)/dmpotent.f90 $(OBJDIR)/triaxpotent.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/iniparam_f.o | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(SRCDIR)/dmpotent.f90
 
@@ -176,9 +171,6 @@ $(OBJDIR)/ellipint.o : $(NUMERICSDIR)/ellipint.f90 $(OBJDIR)/numeric_kinds_f.o |
 $(OBJDIR)/numrep.o: $(NUMERICSDIR)/numrep.f90 $(OBJDIR)/numeric_kinds_f.o | $(BUILD_DIRS)
 	$(fortran77) -o $@ $(NUMERICSDIR)/numrep.f90
 
-$(OBJDIR)/nag.o : $(NUMERICSDIR)/nag.f | $(BUILD_DIRS)
-	$(fortran77) -o $@ $(NUMERICSDIR)/nag.f
-
 $(OBJDIR)/numrec_arloc.o : $(NUMERICSDIR)/numrec_arloc.f | $(BUILD_DIRS)
 	$(fortran77) -o $@ $(NUMERICSDIR)/numrec_arloc.f
 
@@ -194,38 +186,6 @@ $(OBJDIR)/dqxgs.o : $(NUMERICSDIR)/dqxgs.f | $(BUILD_DIRS)
 $(OBJDIR)/specfunc_beta.o : $(NUMERICSDIR)/specfunc_beta.f90 $(OBJDIR)/numeric_kinds_f.o | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(NUMERICSDIR)/specfunc_beta.f90
 
-####################################################
-#
-# triaxmass
-#
-###################################################
-
-triaxmass: $(BINDIR)/triaxmass
-
-$(BINDIR)/triaxmass: $(MGEOBJ) $(OBJDIR)/nag.o $(OBJDIR)/triaxmass_f.o $(SRCDIR)/triaxmass.f90 | $(BUILD_DIRS)
-	$(link) $@ $(MGEOBJ) $(OBJDIR)/triaxmass_f.o $(OBJDIR)/nag.o $(SRCDIR)/triaxmass.f90
-
-triaxmass_bar: $(BINDIR)/triaxmass_bar
-
-$(BINDIR)/triaxmass_bar: $(MGEOBJ) $(OBJDIR)/nag.o $(OBJDIR)/triaxmass_f.o $(SRCDIR)/triaxmass_bar.f90 | $(BUILD_DIRS)
-	$(link) $@ $(MGEOBJ) $(OBJDIR)/triaxmass_f.o $(OBJDIR)/nag.o $(SRCDIR)/triaxmass_bar.f90
-
-####################################################
-#
-# triaxmassbin
-#
-###################################################
-
-triaxmassbin: $(BINDIR)/triaxmassbin
-
-$(BINDIR)/triaxmassbin: $(MGEOBJ) $(OBJDIR)/triaxmassbin_f.o $(SRCDIR)/triaxmassbin.f90 | $(BUILD_DIRS)
-	$(link) $@ $(MGEOBJ) $(OBJDIR)/triaxmassbin_f.o $(SRCDIR)/triaxmassbin.f90
-
-triaxmassbin_bar: $(BINDIR)/triaxmassbin_bar
-
-$(BINDIR)/triaxmassbin_bar: $(MGEOBJ) $(OBJDIR)/triaxmassbin_f.o $(SRCDIR)/triaxmassbin_bar.f90 | $(BUILD_DIRS)
-	$(link) $@ $(MGEOBJ) $(OBJDIR)/triaxmassbin_f.o $(SRCDIR)/triaxmassbin_bar.f90
-
 ######################################################
 #
 # orblib_f, The orbit library program.
@@ -234,6 +194,7 @@ $(BINDIR)/triaxmassbin_bar: $(MGEOBJ) $(OBJDIR)/triaxmassbin_f.o $(SRCDIR)/triax
 
 ORBLIBNMCDE= $(MGECDE) $(NUMERICSDIR)/numrec_arloc.f $(DOPCDE) $(SRCDIR)/orblib_f_new_mirror.f90
 ORBLIBNMOBJ= $(MGEOBJ) $(OBJDIR)/numrec_arloc.o $(DOPOBJ) $(OBJDIR)/orblib_f_new_mirror.o
+ORBLIBAPICDE= $(ORBLIBNMCDE) $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90
 
 ifeq ($(FAST),TRUE)
   ORBLIBNMOBJ=$(ORBLIBNMCDE)
@@ -242,28 +203,12 @@ endif
 $(OBJDIR)/orblib_f_new_mirror.o : $(SRCDIR)/orblib_f_new_mirror.f90 $(MGEOBJ) $(OBJDIR)/numrec_arloc.o $(DOPOBJ) | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(SRCDIR)/orblib_f_new_mirror.f90
 
-orblib_new_mirror : $(BINDIR)/orblib_new_mirror
-
-$(BINDIR)/orblib_new_mirror : $(ORBLIBNMOBJ) $(SRCDIR)/orblibprogram.f90 | $(BUILD_DIRS)
-	$(link) $@  $(ORBLIBNMOBJ) $(SRCDIR)/orblibprogram.f90
-
-orblib_bar : $(BINDIR)/orblib_bar
-
-$(BINDIR)/orblib_bar : $(ORBLIBNMOBJ) $(SRCDIR)/orblibprogram_bar.f90 | $(BUILD_DIRS)
-	$(link) $@  $(ORBLIBNMOBJ) $(SRCDIR)/orblibprogram_bar.f90
+$(LIBDIR)/liborblib_fortran.so : $(ORBLIBAPICDE)
+	mkdir -p $(MODDIR) $(LIBDIR)
+	$(shared_link) $@ $(ORBLIBAPICDE)
 
 $(OBJDIR)/orbitstart_f.o : $(ORBLIBNMOBJ) $(MGEOBJ) $(SRCDIR)/orbitstart_f.f90 | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(SRCDIR)/orbitstart_f.f90
-
-orbitstart : $(BINDIR)/orbitstart
-
-$(BINDIR)/orbitstart : $(ORBLIBNMOBJ) $(OBJDIR)/orbitstart_f.o $(SRCDIR)/orbitstart.f90 | $(BUILD_DIRS)
-	$(link) $@  $(ORBLIBNMOBJ) $(OBJDIR)/orbitstart_f.o $(SRCDIR)/orbitstart.f90
-
-orbitstart_bar : $(BINDIR)/orbitstart_bar
-
-$(BINDIR)/orbitstart_bar : $(ORBLIBNMOBJ) $(OBJDIR)/orbitstart_f.o $(SRCDIR)/orbitstart_bar.f90 | $(BUILD_DIRS)
-	$(link) $@  $(ORBLIBNMOBJ) $(OBJDIR)/orbitstart_f.o $(SRCDIR)/orbitstart_bar.f90
 
 ##########################################
 #
@@ -272,9 +217,8 @@ $(BINDIR)/orbitstart_bar : $(ORBLIBNMOBJ) $(OBJDIR)/orbitstart_f.o $(SRCDIR)/orb
 ##########################################
 
 distclean:
-	rm -rf $(BINDIR)
 	rm -rf $(BUILDDIR)
-	rm -f *.o *.il *.mod *.dyn work.* *.d *.exe ifc* *.dpi *.spi gmon.out orbitstart orbitstart_bar orblib_new_mirror orblib_bar triaxmass triaxmass_bar triaxmassbin triaxmassbin_bar
+	rm -f *.o *.il *.mod *.dyn work.* *.d *.exe ifc* *.dpi *.spi gmon.out orbitstart orbitstart_bar orblib_new_mirror orblib_bar
 
 clean:
 	rm -rf $(BUILDDIR)

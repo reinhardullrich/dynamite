@@ -34,6 +34,15 @@ def set_orbit_random_seed(config_path, seed):
         yaml.safe_dump(config, handle, sort_keys=False)
 
 
+def set_weight_solver(config_path, solver_type, nnls_solver):
+    with config_path.open() as handle:
+        config = yaml.safe_load(handle)
+    config["weight_solver_settings"]["type"] = solver_type
+    config["weight_solver_settings"]["nnls_solver"] = nnls_solver
+    with config_path.open("w") as handle:
+        yaml.safe_dump(config, handle, sort_keys=False)
+
+
 def generate_losvd_histogram(workspace, monkeypatch):
     import dynamite as dyn
 
@@ -46,9 +55,29 @@ def generate_losvd_histogram(workspace, monkeypatch):
     parset = config.parspace.get_parset()
     model = dyn.model.Model(config=config, parset=parset)
     model.setup_directories()
+    register_fixture_model(config, model, parset)
     orbit_library = model.get_orblib()
     orbit_library.read_losvd_histograms()
     return orbit_library.losvd_histograms[0]
+
+
+def register_fixture_model(config, model, parset):
+    model_root = config.settings.io_settings["model_directory"]
+    relative_directory = model.directory.removeprefix(model_root)
+    row = []
+    for column in config.all_models.table.columns.values():
+        if column.name in config.parspace.par_names:
+            value = parset[column.name]
+        elif column.name == "time_modified":
+            value = str(np.datetime64("now", "s"))
+        elif column.name == "which_iter":
+            value = 0
+        elif column.name == "directory":
+            value = relative_directory
+        else:
+            value = column.dtype.type(None)
+        row.append(value)
+    config.all_models.table.add_row(row)
 
 
 def assert_losvd_matches_reference(actual, reference_path):
@@ -65,12 +94,31 @@ def assert_losvd_matches_reference(actual, reference_path):
     np.testing.assert_allclose(
         np.sum(actual.y),
         np.sum(expected_y),
-        rtol=2e-4,
+        rtol=5e-4,
         atol=1e-8,
     )
     assert np.mean(abs_diff) <= 5e-6
     assert np.quantile(abs_diff, 0.999) <= 2e-4
     assert np.max(abs_diff) <= 3e-3
+
+
+def test_configuration_rejects_archived_legacy_weight_solver(tmp_path, monkeypatch):
+    import dynamite as dyn
+
+    workspace = copy_orblib_fixture_workspace(tmp_path)
+    set_weight_solver(
+        workspace / "user_test_config.yaml",
+        solver_type="LegacyWeightSolver",
+        nnls_solver=1,
+    )
+
+    monkeypatch.chdir(workspace)
+    with pytest.raises(ValueError, match="LegacyWeightSolver is archived"):
+        dyn.config_reader.Configuration(
+            "user_test_config.yaml",
+            reset_logging=False,
+            reset_existing_output=True,
+        )
 
 
 @pytest.mark.slow

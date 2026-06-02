@@ -162,7 +162,7 @@ module integrator
 
     ! functions and variables copied from original orblib
     private :: integrator_whichorbit, derivs, SOLOUT
-    public :: ini_integ
+    public :: ini_integ, integrator_setup_direct
 
     ! information about the initial conditions for the orbit integration,
     ! and the grid in integral space.
@@ -293,6 +293,82 @@ contains
         print *, "  ** integrator module setup finished"
 
     end subroutine integrator_setup_bar
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine integrator_setup_direct(begin_values, begin_noreg, begin_rows, &
+                                       n_orbits_input, points_input, &
+                                       start_input, number_input, &
+                                       accuracy_input)
+        use initial_parameters, only: orbit_dithering, param_nEner => nEner, &
+                                      param_nI2 => nI2, param_nI3 => nI3
+        integer(kind=i4b), intent(in) :: begin_rows
+        real(kind=dp), intent(in), dimension(begin_rows, 9) :: begin_values
+        integer(kind=i4b), intent(in), dimension(begin_rows) :: begin_noreg
+        real(kind=dp), intent(in) :: n_orbits_input
+        integer(kind=i4b), intent(in) :: points_input
+        integer(kind=i4b), intent(in) :: start_input, number_input
+        real(kind=dp), intent(in) :: accuracy_input
+        integer(kind=i4b) :: i, ndith3
+
+        print *, "  ** Setting up integrator module from direct Python input"
+
+        if (allocated(xini)) then
+            deallocate (xini, yini, zini, vxini, vyini, vzini, gener, gi2, gi3, &
+                        vcirc, tcirc, rcirc, regurizable)
+        end if
+        if (allocated(integrator_orbittypes)) deallocate(integrator_orbittypes)
+        if (allocated(integrator_moments)) deallocate(integrator_moments)
+
+        nEner = param_nEner
+        nI2 = param_nI2
+        nI3 = param_nI3
+        if (begin_rows /= nEner*nI2*nI3) stop "direct begin array has wrong row count"
+
+        allocate (xini(begin_rows), yini(begin_rows), zini(begin_rows), &
+                  vxini(begin_rows), vyini(begin_rows), vzini(begin_rows), &
+                  rcirc(begin_rows), tcirc(begin_rows), vcirc(begin_rows), &
+                  gEner(begin_rows), gI2(begin_rows), gI3(begin_rows), &
+                  regurizable(begin_rows))
+
+        do i = 1, begin_rows
+            gI3(i) = modulo((i - 1), nI3) + 1
+            gI2(i) = modulo(((i - 1)/nI3), nI2) + 1
+            gEner(i) = ((i - 1)/(nI3*nI2)) + 1
+            xini(i) = begin_values(i, 1)
+            yini(i) = begin_values(i, 2)
+            zini(i) = begin_values(i, 3)
+            vxini(i) = begin_values(i, 4)
+            vyini(i) = begin_values(i, 5)
+            vzini(i) = begin_values(i, 6)
+            rcirc(i) = begin_values(i, 7)
+            tcirc(i) = begin_values(i, 8)
+            vcirc(i) = begin_values(i, 9)
+            regurizable(i) = begin_noreg(i)
+        end do
+
+        integrator_n_orbits = n_orbits_input
+        if (integrator_n_orbits < 1) stop " Too few orbits"
+        integrator_points = points_input
+        if (integrator_points < 1) stop " Too few points"
+        integrator_dithering = orbit_dithering
+        ndith3 = integrator_dithering**3
+        allocate (integrator_orbittypes(ndith3))
+        allocate (integrator_moments(5, ndith3))
+        integrator_start = start_input
+        call integrator_set_current(integrator_start - 1)
+        integrator_number = number_input
+        if (integrator_number == -1) integrator_number = &
+            (nEner*nI2*nI3/integrator_dithering**3)
+        if (integrator_number < 1) stop " To few starting points"
+        if (integrator_number > &
+            (nEner*nI2*nI3/integrator_dithering**3)) &
+            & stop " Too many orbits in total"
+        integrator_accuracy = accuracy_input
+        if (integrator_accuracy < 0 .or. 0.5 < integrator_accuracy) &
+          & stop " wrong accuracy"
+
+        print *, "  ** direct integrator module setup finished"
+    end subroutine integrator_setup_direct
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine integrator_stop()
@@ -1107,7 +1183,7 @@ module psf
     ! (i,j,pf) contains a sigma's in random order for psf pf
     real(kind=dp), private, allocatable, dimension(:, :) :: psf_randomsigma
     ! setupup of psf variables
-    public :: psf_setup
+    public :: psf_setup, psf_setup_direct
     ! generate gaussian psf points of input array.
     public :: psf_gaussian
 
@@ -1169,6 +1245,37 @@ contains
         print *, "  ** PSF module setup Finished"
 
     end subroutine psf_setup
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine psf_setup_direct(psf_count, max_gauss, psf_kind_input, &
+                                psf_iten_input, psf_sigma_input)
+        use initial_parameters, only: conversion_factor
+        use random_gauss_generator, only: random_gauss_seed
+        integer(kind=i4b), intent(in) :: psf_count, max_gauss
+        integer(kind=i4b), intent(in), dimension(psf_count) :: psf_kind_input
+        real(kind=dp), intent(in), dimension(max_gauss, psf_count) :: psf_iten_input
+        real(kind=dp), intent(in), dimension(max_gauss, psf_count) :: psf_sigma_input
+        integer(kind=i4b) :: i
+
+        print *, "  ** Setting up PSF module from direct Python input"
+        call psf_stop()
+        psf_n = psf_count
+        allocate (psf_kind(psf_n))
+        psf_kind(:) = psf_kind_input(:)
+        if (minval(psf_kind(:)) < 1) stop "gaussian value too low"
+        allocate (psf_sigma(maxval(psf_kind(:)), psf_n))
+        allocate (psf_iten(maxval(psf_kind(:)), psf_n))
+        psf_sigma(:, :) = 0.0_dp
+        psf_iten(:, :) = 0.0_dp
+        do i = 1, psf_n
+            psf_iten(1:psf_kind(i), i) = psf_iten_input(1:psf_kind(i), i)
+            psf_sigma(1:psf_kind(i), i) = psf_sigma_input(1:psf_kind(i), i)
+        end do
+        psf_sigma(:, :) = psf_sigma(:, :)*conversion_factor
+        call random_gauss_seed()
+        call psf_sigma_map()
+        print *, "  ** direct PSF module setup Finished"
+    end subroutine psf_setup_direct
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine psf_gaussian(pf, vec, gaus)
@@ -1307,6 +1414,7 @@ contains
         if (allocated(aperture_size)) then
             deallocate (aperture_size)
             deallocate (aperture_start)
+            deallocate (aperture_psf)
             deallocate (ap_hist_dim)
         end if
         print *, "  * Aperture module stopped"
@@ -1339,6 +1447,7 @@ module aperture_boxed
     public :: aper_boxed_stop
 
     public :: aperture_boxed_field
+    public :: aperture_boxed_setup_direct
 
 contains
 
@@ -1438,6 +1547,37 @@ contains
     end subroutine aperture_boxed_readfile
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine aperture_boxed_setup_direct(aperture_count, ap_begin_input, &
+                                           ap_size_input, ap_rot_input, &
+                                           ap_binx_input, ap_biny_input)
+        use initial_parameters, only: conversion_factor
+        use aperture, only: aperture_size, aperture_start
+        integer(kind=i4b), intent(in) :: aperture_count
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_begin_input
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_size_input
+        real(kind=dp), intent(in), dimension(aperture_count) :: ap_rot_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_binx_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_biny_input
+        integer(kind=i4b) :: i
+
+        call aper_boxed_stop()
+        allocate (ap_box_size(aperture_count, 2), ap_box_begin(aperture_count, 2))
+        allocate (ap_box_bx(aperture_count), ap_box_idx(aperture_count))
+        allocate (ap_box_idy(aperture_count), ap_box_rot(aperture_count))
+
+        do i = 1, aperture_count
+            ap_box_begin(i, :) = ap_begin_input(i, :)*conversion_factor
+            ap_box_size(i, :) = ap_size_input(i, :)*conversion_factor
+            ap_box_rot(i) = ap_rot_input(i)*(pi_d/180.0_dp)
+            ap_box_bx(i) = ap_binx_input(i)
+            ap_box_idx(i) = ap_binx_input(i)/ap_box_size(i, 1)
+            ap_box_idy(i) = ap_biny_input(i)/ap_box_size(i, 2)
+            aperture_start(i) = i
+            aperture_size(i) = ap_binx_input(i)*ap_biny_input(i)
+        end do
+    end subroutine aperture_boxed_setup_direct
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine aperture_boxed_find(ap, vec, res)
         ! vec is a n*m*2 matrix with vectors.
         ! res is an n*m matrix with has the resulting pixel of each vector
@@ -1529,7 +1669,7 @@ module aperture_routines
     implicit none
     private
 
-    public :: aperture_setup
+    public :: aperture_setup, aperture_setup_direct
 
     public :: aperture_stop
 
@@ -1587,6 +1727,42 @@ contains
         print *, "  ** aperture setup finished"
 
     end subroutine aperture_setup
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine aperture_setup_direct(aperture_count, ap_begin_input, &
+                                     ap_size_input, ap_rot_input, &
+                                     ap_binx_input, ap_biny_input, &
+                                     aperture_psf_input, ap_hist_dim_input)
+        use aperture_boxed, only: aperture_boxed_setup_direct
+        use psf, only: psf_n
+        integer(kind=i4b), intent(in) :: aperture_count
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_begin_input
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_size_input
+        real(kind=dp), intent(in), dimension(aperture_count) :: ap_rot_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_binx_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_biny_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: aperture_psf_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_hist_dim_input
+
+        print *, "  ** Setting up aperture module from direct Python input"
+        call aper_stop()
+        aperture_n = aperture_count
+        allocate (aperture_size(aperture_n))
+        allocate (aperture_start(aperture_n))
+        allocate (aperture_psf(aperture_n))
+        allocate (ap_hist_dim(aperture_n))
+        aperture_psf(:) = aperture_psf_input(:)
+        ap_hist_dim(:) = ap_hist_dim_input(:)
+        if (minval(aperture_psf(:)) < 1 .or. maxval(aperture_psf(:)) > psf_n) &
+            stop " Direct aperture references an unknown PSF"
+        if (minval(ap_hist_dim(:)) < 0 .or. maxval(ap_hist_dim(:)) > 1) &
+            stop " Direct aperture histogram dimension must be 0 or 1"
+        ap_hist0d_n = count(ap_hist_dim(:) == 0)
+        call aperture_boxed_setup_direct(aperture_count, ap_begin_input, &
+                                         ap_size_input, ap_rot_input, &
+                                         ap_binx_input, ap_biny_input)
+        print *, "  ** direct aperture setup finished"
+    end subroutine aperture_setup_direct
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine aperture_stop()
@@ -1658,7 +1834,7 @@ module binning
     private
 
     ! set's up the binning array's
-    public :: binning_setup
+    public :: binning_setup, binning_setup_direct
 
     ! deallocate memory
     public :: binning_stop
@@ -1759,6 +1935,39 @@ contains
     end subroutine binning_setup
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine binning_setup_direct(aperture_count, bin_type_input, &
+                                    bin_size_input, max_bin_size, &
+                                    bin_order_input)
+        integer(kind=i4b), intent(in) :: aperture_count, max_bin_size
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_type_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_size_input
+        integer(kind=i4b), intent(in), dimension(max_bin_size, aperture_count) :: bin_order_input
+        integer(kind=i4b) :: i
+
+        print *, "  * Starting direct Binning setup"
+        call binning_stop()
+        allocate (bin_type(aperture_count))
+        allocate (bin_max(aperture_count))
+        allocate (bin_size(aperture_count))
+        bin_type(:) = bin_type_input(:)
+        bin_size(:) = bin_size_input(:)
+        bin_max(:) = 0
+        allocate (bin_order(max_bin_size, aperture_count))
+        bin_order(:, :) = 0
+        do i = 1, aperture_count
+            if (bin_type(i) == 1) then
+                if (bin_size(i) < 1 .or. bin_size(i) > max_bin_size) &
+                    stop " Direct binning has invalid bin size"
+                bin_order(1:bin_size(i), i) = bin_order_input(1:bin_size(i), i)
+                bin_max(i) = maxval(bin_order(1:bin_size(i), i))
+            else if (bin_type(i) /= 0) then
+                stop " Direct binning type must be 0 or 1"
+            end if
+        end do
+        print *, "  ** direct Binning module setup finished."
+    end subroutine binning_setup_direct
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine binning_bin(ap, h, newsize)
         integer(kind=i4b), intent(in)                     :: ap
         real(kind=dp), intent(in out), dimension(:, :) :: h
@@ -1846,7 +2055,7 @@ module histograms
 
     public :: histogram_stop
 
-    public :: histogram_setup
+    public :: histogram_setup, histogram_setup_direct
 
 contains
 
@@ -2090,6 +2299,86 @@ contains
         print *, "  ** Histogram module setup finished"
 
     end subroutine histogram_setup
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine histogram_setup_direct(hist_width_input, hist_center_input, &
+                                      hist_bins_input, aperture_count, &
+                                      bin_type_input, bin_size_input, &
+                                      max_bin_size, bin_order_input)
+        use aperture, only: aperture_n, aperture_size, aperture_psf, ap_hist_dim
+        use binning, only: binning_setup_direct, bin_max
+        use psf, only: psf_n
+        real(kind=dp), intent(in), dimension(psf_n) :: hist_width_input
+        real(kind=dp), intent(in), dimension(psf_n) :: hist_center_input
+        integer(kind=i4b), intent(in), dimension(psf_n) :: hist_bins_input
+        integer(kind=i4b), intent(in) :: aperture_count, max_bin_size
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_type_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_size_input
+        integer(kind=i4b), intent(in), dimension(max_bin_size, aperture_count) :: bin_order_input
+        integer(kind=i4b)  :: i, j, ap
+        real(kind=dp)  :: width, center, bins
+
+        print *, "  * Starting direct Histogram module"
+        call histogram_stop()
+        h_n = aperture_n
+        allocate (hist_basic(h_n, 3), h_beg(h_n), h_end(h_n), h_bin(h_n))
+        allocate (h_width(h_n), h_start(h_n), h_n_stored(h_n), h_blocks(h_n))
+
+        do i = 1, psf_n
+            width = hist_width_input(i)
+            center = hist_center_input(i)
+            bins = hist_bins_input(i)
+            if (width <= 0) stop " Width to small"
+            if (bins < 1) stop " Too few bins"
+            do j = 1, h_n
+                if (aperture_psf(j) == i) then
+                    hist_basic(j, 1) = width
+                    hist_basic(j, 2) = center
+                    hist_basic(j, 3) = bins
+                end if
+            end do
+        end do
+
+        h_beg(:) = hist_basic(:, 2) - (0.5_dp*hist_basic(:, 1))
+        h_end(:) = hist_basic(:, 2) + (0.5_dp*hist_basic(:, 1))
+        h_bin(:) = hist_basic(:, 3)
+        h_width(:) = hist_basic(:, 1)/hist_basic(:, 3)
+
+        allocate (histogram(sum(aperture_size(:)), maxval(h_bin(:))))
+        h_blocks(:) = aperture_size(:)
+        i = 1
+        do ap = 1, h_n
+            h_start(ap) = i
+            i = i + h_blocks(ap)
+        end do
+
+        call histogram_reset()
+        call binning_setup_direct(aperture_count, bin_type_input, &
+                                  bin_size_input, max_bin_size, &
+                                  bin_order_input)
+
+        h_nconstr = 0
+        do ap = 1, h_n
+            if (ap_hist_dim(ap) == 1) then
+                if (bin_max(ap) == 0) then
+                    h_nconstr = h_nconstr + aperture_size(ap)
+                else
+                    h_nconstr = h_nconstr + bin_max(ap)
+                end if
+            end if
+        end do
+
+        hist_thesame = .true.
+        width = hist_basic(1, 1)
+        center = hist_basic(1, 2)
+        bins = hist_basic(1, 3)
+        do ap = 2, h_n
+            if (width /= hist_basic(ap, 1)) hist_thesame = .false.
+            if (center /= hist_basic(ap, 2)) hist_thesame = .false.
+            if (bins /= hist_basic(ap, 3)) hist_thesame = .false.
+        end do
+        print *, "  ** direct Histogram module setup finished"
+    end subroutine histogram_setup_direct
 
 end module histograms
 
@@ -2397,7 +2686,7 @@ module output
                                   , out_file_losvd, out_file_orbclass
     character(len=84), private :: out_tmp_file
 
-    public :: output_setup
+    public :: output_setup, output_setup_direct
 
     public :: output_close
 
@@ -2508,6 +2797,83 @@ contains
         print *, "  ** Output file setup finished."
 
     end subroutine output_setup
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine output_setup_direct(out_qgrid, out_pops, out_losvd, out_orbclass)
+        use integrator, only: integrator_setup_write, integrator_set_current,&
+             &                   integrator_current
+        use aperture, only: ap_hist0d_n
+        use histograms, only: histogram_setup_write
+        use quadrantgrid, only: qgrid_setup_write
+        character(len=*), intent(in) :: out_qgrid, out_pops, out_losvd, out_orbclass
+        character(len=8)  :: d
+        character(len=10) :: t
+        character(len=5)  :: g
+        integer(kind=i4b) :: error, tmp
+
+        print *, "  ** Setting up output module from direct Python input"
+        out_file_qgrid = out_qgrid
+        out_file_pops = out_pops
+        out_file_losvd = out_losvd
+        out_file_orbclass = out_orbclass
+
+        out_tmp_file = out_file_qgrid
+        out_tmp_file(len_trim(out_file_qgrid) + 1:len_trim(out_file_qgrid) + 4) = ".tmp"
+
+        call date_and_time(date=d, time=t, zone=g)
+        print *, "  * Date : ", d, " ", t, " ", g
+
+        out_handle = 50
+        error = 0
+        open (unit=out_handle + 1, iostat=error, file=out_tmp_file, action="write", &
+             & status="new", position="rewind")
+        if (error == 0) then
+            open (unit=out_handle, iostat=error, file=out_file_qgrid, action="write", &
+                  status="new", form="unformatted")
+            call integrator_setup_write(out_handle)
+            call qgrid_setup_write(out_handle)
+            close (unit=out_handle, iostat=error)
+            if (error /= 0) stop "  Error closing qgrid file."
+            if (ap_hist0d_n > 0) then
+                open (unit=out_handle, iostat=error, file=out_file_pops, action="write", &
+                    status="new", form="unformatted")
+                close (unit=out_handle, iostat=error)
+                if (error /= 0) stop "  Error closing pops file."
+            end if
+            open (unit=out_handle, iostat=error, file=out_file_losvd, action="write", &
+                  status="new", form="unformatted")
+            call histogram_setup_write(out_handle)
+            close (unit=out_handle, iostat=error)
+            if (error /= 0) stop "  Error closing losvd file."
+
+            write (unit=out_handle + 1, fmt=*, iostat=error) integrator_current
+            if (error /= 0) stop "  Error writing to status file."
+            close (unit=out_handle + 1, iostat=error)
+            if (error /= 0) stop "  Error closing status file."
+        else
+            print *, "  * Trying to resume previous calculations"
+            open (unit=out_handle + 1, iostat=error, file=out_tmp_file, action="read", &
+                 & status="old", position="rewind")
+            if (error /= 0) stop "  Error: Inconsistent status file."
+            read (unit=out_handle + 1, fmt=*) tmp
+            if (tmp == -1) stop " Error: Orbit library already finished or orbit &
+                 & library in inconsistent state"
+            call integrator_set_current(tmp)
+            close (unit=out_handle + 1, iostat=error)
+            if (error /= 0) stop "  Error closing status file."
+
+            open (unit=out_handle, iostat=error, file=out_file_qgrid, action="write", &
+                 & status="old", position="append", form="unformatted")
+            if (error /= 0) stop "  Error opening library file. Does it exist?"
+            close (unit=out_handle, iostat=error)
+            if (error /= 0) stop "  Error closing library file."
+            print *, "  * Resuming with orbit :", tmp + 1
+        end if
+
+        open (unit=30, file=out_file_orbclass, status="replace", action="write")
+
+        print *, "  ** direct Output file setup finished."
+    end subroutine output_setup_direct
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine output_close()
@@ -2632,7 +2998,7 @@ module high_level
     private
 
     ! setup/run/stop the program.
-    public :: setup, setup_bar, run, stob
+    public :: setup, setup_bar, setup_direct, run, stob
 
 contains
 
@@ -2679,6 +3045,73 @@ contains
         print *, "  ** Setup Finished"
 
     end subroutine setup_bar
+
+    !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    subroutine setup_direct(begin_values, begin_noreg, begin_rows, &
+                            n_orbits_input, points_input, start_input, &
+                            number_input, accuracy_input, psf_count, &
+                            max_psf_gauss, psf_kind_input, psf_iten_input, &
+                            psf_sigma_input, aperture_count, ap_begin_input, &
+                            ap_size_input, ap_rot_input, ap_binx_input, &
+                            ap_biny_input, aperture_psf_input, &
+                            ap_hist_dim_input, hist_width_input, &
+                            hist_center_input, hist_bins_input, &
+                            bin_type_input, bin_size_input, max_bin_size, &
+                            bin_order_input, out_qgrid, out_pops, out_losvd, &
+                            out_orbclass)
+        use integrator, only: integrator_setup_direct
+        use projection, only: projection_setup
+        use quadrantgrid, only: qgrid_setup
+        use aperture_routines, only: aperture_setup_direct
+        use histograms, only: histogram_setup_direct
+        use psf, only: psf_setup_direct
+        use output, only: output_setup_direct
+        integer(kind=i4b), intent(in) :: begin_rows
+        real(kind=dp), intent(in) :: n_orbits_input
+        integer(kind=i4b), intent(in) :: points_input, start_input, number_input
+        integer(kind=i4b), intent(in) :: psf_count, max_psf_gauss
+        integer(kind=i4b), intent(in) :: aperture_count, max_bin_size
+        real(kind=dp), intent(in) :: accuracy_input
+        real(kind=dp), intent(in), dimension(begin_rows, 9) :: begin_values
+        integer(kind=i4b), intent(in), dimension(begin_rows) :: begin_noreg
+        integer(kind=i4b), intent(in), dimension(psf_count) :: psf_kind_input
+        real(kind=dp), intent(in), dimension(max_psf_gauss, psf_count) :: psf_iten_input
+        real(kind=dp), intent(in), dimension(max_psf_gauss, psf_count) :: psf_sigma_input
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_begin_input
+        real(kind=dp), intent(in), dimension(aperture_count, 2) :: ap_size_input
+        real(kind=dp), intent(in), dimension(aperture_count) :: ap_rot_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_binx_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_biny_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: aperture_psf_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: ap_hist_dim_input
+        real(kind=dp), intent(in), dimension(psf_count) :: hist_width_input
+        real(kind=dp), intent(in), dimension(psf_count) :: hist_center_input
+        integer(kind=i4b), intent(in), dimension(psf_count) :: hist_bins_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_type_input
+        integer(kind=i4b), intent(in), dimension(aperture_count) :: bin_size_input
+        integer(kind=i4b), intent(in), dimension(max_bin_size, aperture_count) :: bin_order_input
+        character(len=*), intent(in) :: out_qgrid, out_pops, out_losvd, out_orbclass
+
+        print *, "  ** Start direct Python-input setup"
+        call integrator_setup_direct(begin_values, begin_noreg, begin_rows, &
+                                     n_orbits_input, points_input, &
+                                     start_input, number_input, &
+                                     accuracy_input)
+        call projection_setup()
+        call qgrid_setup()
+        call psf_setup_direct(psf_count, max_psf_gauss, psf_kind_input, &
+                              psf_iten_input, psf_sigma_input)
+        call aperture_setup_direct(aperture_count, ap_begin_input, &
+                                   ap_size_input, ap_rot_input, &
+                                   ap_binx_input, ap_biny_input, &
+                                   aperture_psf_input, ap_hist_dim_input)
+        call histogram_setup_direct(hist_width_input, hist_center_input, &
+                                    hist_bins_input, aperture_count, &
+                                    bin_type_input, bin_size_input, &
+                                    max_bin_size, bin_order_input)
+        call output_setup_direct(out_qgrid, out_pops, out_losvd, out_orbclass)
+        print *, "  ** Direct setup Finished"
+    end subroutine setup_direct
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine run()

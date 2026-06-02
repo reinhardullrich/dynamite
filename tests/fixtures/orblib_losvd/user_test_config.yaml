@@ -137,7 +137,7 @@ orblib_settings:
     random_seed: 0 #4242 # integer; any value <= 0 results in stochastic seed
 
 weight_solver_settings:
-    type: "LegacyWeightSolver"
+    type: "NNLS"
     setting1: True
     setting2: False
     regularisation: 0
@@ -145,7 +145,7 @@ weight_solver_settings:
     GH_sys_err: '0.0 0.0 0.0 0.0 0.3 0.3 0.6 0.6'
     lum_intr_rel_err: 0.01
     sb_proj_rel_err: 0.02
-    nnls_solver: 1
+    nnls_solver: "scipy"
     reattempt_failures: True
 
 parameter_space_settings:

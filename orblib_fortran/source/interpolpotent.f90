@@ -11,7 +11,7 @@ module interpolpot
     public:: ip_accel
 
     ! setup the constants for the potential
-    public:: ip_setup, ip_setup_bar
+    public:: ip_setup, ip_setup_bar, ip_set_cache_enabled
 
     ! setup the constants for the potential
     public:: ip_stop
@@ -20,6 +20,7 @@ module interpolpot
     !integer(kind=i4b),private,parameter :: nRadius=768,nTheta=64,nPhi=64
     !integer(kind=i4b),private,parameter :: nRadius=8,nTheta=4,nPhi=4
     real(kind=dp), private, allocatable, dimension(:, :, :, :) :: grid
+    logical, private :: ip_cache_enabled = .true.
 
     real(kind=dp), private::thetastep, phistep, rlogstep, rlogminp, rmin2, rmax2
 
@@ -44,11 +45,11 @@ contains
 
         call tp_setup()
         call dm_setup()
-        call ip_read(error)
+        if (ip_cache_enabled) call ip_read(error)
         if (error == 0) call ip_testaccuracy(error)
         if (error /= 0) then
             call ip_setup_grid()
-            call ip_save()
+            if (ip_cache_enabled) call ip_save()
             call ip_testaccuracy(error)
             if (error /= 0) stop "failed to setup interpolation grid"
         end if
@@ -68,17 +69,22 @@ contains
 
         call tp_setup_bar()
         call dm_setup()
-        call ip_read(error)
+        if (ip_cache_enabled) call ip_read(error)
         if (error == 0) call ip_testaccuracy(error)
         if (error /= 0) then
             call ip_setup_grid()
-            call ip_save()
+            if (ip_cache_enabled) call ip_save()
             call ip_testaccuracy(error)
             if (error /= 0) stop "failed to setup interpolation grid"
         end if
 
         print *, "  * Potential interpolation setup"
     end subroutine ip_setup_bar
+
+    subroutine ip_set_cache_enabled(enabled)
+        logical, intent(in) :: enabled
+        ip_cache_enabled = enabled
+    end subroutine ip_set_cache_enabled
 
 
     subroutine ip_stop()

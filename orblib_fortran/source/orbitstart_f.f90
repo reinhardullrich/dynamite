@@ -30,12 +30,57 @@ module orbitstart
 
     ! functions and variables copied from original orblib
     private :: derivs, soloutob, findtubeorbitwidth, calc_startpos, findtube
+    private :: orbitstart_store_record
 
-    public :: runorbitstart
+    public :: runorbitstart, runorbitstart_memory
 
     private :: findReq, make_startpoints, find_type, solouttype
     character(len=256), private  :: orbitstart_status, orbitstart_begin, orbitstart_beginbox
+    logical, private :: orbitstart_memory_output = .false.
+    integer(kind=i4b), private :: orbitstart_memory_max_rows = 0_i4b
+    integer(kind=i4b), private :: orbitstart_memory_status = 0_i4b
+    integer(kind=i4b), private :: orbitstart_begin_rows = 0_i4b
+    integer(kind=i4b), private :: orbitstart_beginbox_rows = 0_i4b
+    real(kind=dp), pointer, private :: orbitstart_begin_values(:) => null()
+    real(kind=dp), pointer, private :: orbitstart_beginbox_values(:) => null()
+    integer(kind=i4b), pointer, private :: orbitstart_begin_noreg(:) => null()
+    integer(kind=i4b), pointer, private :: orbitstart_beginbox_noreg(:) => null()
 contains
+
+    subroutine runorbitstart_memory(max_rows, begin_values, begin_noreg, &
+                                    beginbox_values, beginbox_noreg, &
+                                    rows_written, box_rows_written, status)
+        integer(kind=i4b), intent(in) :: max_rows
+        real(kind=dp), target, intent(out) :: begin_values(9*max_rows)
+        integer(kind=i4b), target, intent(out) :: begin_noreg(max_rows)
+        real(kind=dp), target, intent(out) :: beginbox_values(9*max_rows)
+        integer(kind=i4b), target, intent(out) :: beginbox_noreg(max_rows)
+        integer(kind=i4b), intent(out) :: rows_written, box_rows_written
+        integer(kind=i4b), intent(out) :: status
+
+        orbitstart_memory_output = .true.
+        orbitstart_memory_max_rows = max_rows
+        orbitstart_memory_status = 0_i4b
+        orbitstart_begin_rows = 0_i4b
+        orbitstart_beginbox_rows = 0_i4b
+        orbitstart_begin_values => begin_values
+        orbitstart_begin_noreg => begin_noreg
+        orbitstart_beginbox_values => beginbox_values
+        orbitstart_beginbox_noreg => beginbox_noreg
+
+        call runorbitstart()
+
+        rows_written = orbitstart_begin_rows
+        box_rows_written = orbitstart_beginbox_rows
+        status = orbitstart_memory_status
+
+        nullify(orbitstart_begin_values)
+        nullify(orbitstart_begin_noreg)
+        nullify(orbitstart_beginbox_values)
+        nullify(orbitstart_beginbox_noreg)
+        orbitstart_memory_output = .false.
+        orbitstart_memory_max_rows = 0_i4b
+    end subroutine runorbitstart_memory
 
     subroutine runorbitstart()
 
@@ -58,9 +103,11 @@ contains
         real(kind=dp) ::t1, t2, t3
         integer            ::i1, i2
 
-        read (unit=*, fmt="(a256)") orbitstart_status
-        read (unit=*, fmt="(a256)") orbitstart_begin
-        read (unit=*, fmt="(a256)") orbitstart_beginbox
+        if (.not. orbitstart_memory_output) then
+            read (unit=*, fmt="(a256)") orbitstart_status
+            read (unit=*, fmt="(a256)") orbitstart_begin
+            read (unit=*, fmt="(a256)") orbitstart_beginbox
+        end if
 
         print *, "Maximum triaxiality:", maxval(triaxpar)
 
@@ -152,13 +199,45 @@ contains
            call make_boxstartpoints(epot, tcirc, rcirc, vcirc)
         end if
 
-        ! write a status file, confirming that we finished succesfully
-        open (unit=31, file=orbitstart_status, status="new", action="write", &
-              position="rewind")
-        write (unit=31, fmt=*) " finished "
-        close (unit=31)
+        if (.not. orbitstart_memory_output) then
+            ! write a status file, confirming that we finished succesfully
+            open (unit=31, file=orbitstart_status, status="new", action="write", &
+                  position="rewind")
+            write (unit=31, fmt=*) " finished "
+            close (unit=31)
+        end if
 
     end subroutine runorbitstart
+
+    subroutine orbitstart_store_record(is_box, record_values, noreg)
+        logical, intent(in) :: is_box
+        real(kind=dp), intent(in), dimension(9) :: record_values
+        integer(kind=i4b), intent(in) :: noreg
+        integer(kind=i4b) :: row, offset
+
+        if (orbitstart_memory_status /= 0_i4b) return
+        if (is_box) then
+            orbitstart_beginbox_rows = orbitstart_beginbox_rows + 1_i4b
+            row = orbitstart_beginbox_rows
+            if (row > orbitstart_memory_max_rows) then
+                orbitstart_memory_status = 20_i4b
+                return
+            end if
+            offset = (row - 1_i4b)*9_i4b
+            orbitstart_beginbox_values(offset + 1:offset + 9) = record_values(:)
+            orbitstart_beginbox_noreg(row) = noreg
+        else
+            orbitstart_begin_rows = orbitstart_begin_rows + 1_i4b
+            row = orbitstart_begin_rows
+            if (row > orbitstart_memory_max_rows) then
+                orbitstart_memory_status = 20_i4b
+                return
+            end if
+            offset = (row - 1_i4b)*9_i4b
+            orbitstart_begin_values(offset + 1:offset + 9) = record_values(:)
+            orbitstart_begin_noreg(row) = noreg
+        end if
+    end subroutine orbitstart_store_record
 
     subroutine find_unregorbits(boundout, boundmid, irregular, noreggrid)
         use initial_parameters, only: nEner, nI2, nI3
@@ -196,7 +275,9 @@ contains
         integer(kind=i4b) :: i, j, k
         integer(kind=i4b) :: noreg, LastIrregE
 
-        print *, " Writing ", orbitstart_begin
+        if (.not. orbitstart_memory_output) then
+            print *, " Writing ", orbitstart_begin
+        end if
 
         bndin(:, :) = boundin(:, :)
         bndmid(:, :) = boundmid(:, :)
@@ -210,9 +291,11 @@ contains
             end if
         end do
 
-        open (unit=31, file=orbitstart_begin, status="new", action="write", &
-              position="rewind")
-        write (unit=31, fmt=*) nEner, nI2, nI3
+        if (.not. orbitstart_memory_output) then
+            open (unit=31, file=orbitstart_begin, status="new", action="write", &
+                  position="rewind")
+            write (unit=31, fmt=*) nEner, nI2, nI3
+        end if
 
         do i = 1, NEner
             ! reset the do_not_regularize counter for each energy
@@ -230,20 +313,27 @@ contains
                     ! if this is the last irregular energy do not regularize
                     if (maxval(irregular(:)) .eq. i) noreg = 1
 
-                    write (unit=31, fmt="(3I5,9ES30.10,I4)") i, j, k, startpos, rcirc(i), tcirc(i), vcirc(i), noreg
+                    if (orbitstart_memory_output) then
+                        call orbitstart_store_record(.false., &
+                            (/ startpos(:), rcirc(i), tcirc(i), vcirc(i) /), noreg)
+                    else
+                        write (unit=31, fmt="(3I5,9ES30.10,I4)") i, j, k, startpos, rcirc(i), tcirc(i), vcirc(i), noreg
+                    end if
                 end do
             end do
         end do
-        close (unit=31)
+        if (.not. orbitstart_memory_output) close (unit=31)
 
         if (Omega /= 0.0_dp ) then ! make retrograde orbits (BT) 
            print*, 'include figure rotation, start to making retrograte initial conditions'
            
-           print*," Writing ", orbitstart_beginbox
-           open (unit=31,file=orbitstart_beginbox,status="new",action="write",&
-                position="rewind")
+           if (.not. orbitstart_memory_output) then
+              print*," Writing ", orbitstart_beginbox
+              open (unit=31,file=orbitstart_beginbox,status="new",action="write",&
+                   position="rewind")
+           end if
            
-           write (unit=31, fmt=*) nEner,nI2,nI3
+           if (.not. orbitstart_memory_output) write (unit=31, fmt=*) nEner,nI2,nI3
            do i=1,NEner
               ! reset the do_not_regularize counter for each energy
               do j=1,nI2
@@ -263,11 +353,16 @@ contains
                     ! if this is the last irregular energy do not regularize
                     if (maxval(irregular(:)) .eq. i)  noreg=1
                     
-                    write (unit=31, fmt="(3I5,9ES30.10,I4)") i,j,k,startpos2,rcirc(i),tcirc(i),vcirc(i),noreg   
+                    if (orbitstart_memory_output) then
+                       call orbitstart_store_record(.true., &
+                           (/ startpos2(:), rcirc(i), tcirc(i), vcirc(i) /), noreg)
+                    else
+                       write (unit=31, fmt="(3I5,9ES30.10,I4)") i,j,k,startpos2,rcirc(i),tcirc(i),vcirc(i),noreg
+                    end if
                  enddo
               enddo
            enddo
-           close (unit=31)
+           if (.not. orbitstart_memory_output) close (unit=31)
            print*, 'retrograte orbit IC is created'
         endif
 
@@ -279,10 +374,12 @@ contains
         real(kind=dp) :: t1, theta, phi, rorbit, xp, yp, zp
         integer(kind=i4b) :: i, j, k
 
-        print *, " Writing ", orbitstart_beginbox
-        open (unit=31, file=orbitstart_beginbox, status="new", action="write", &
-              position="rewind")
-        write (unit=31, fmt=*) nEner, nI2, nI3
+        if (.not. orbitstart_memory_output) then
+            print *, " Writing ", orbitstart_beginbox
+            open (unit=31, file=orbitstart_beginbox, status="new", action="write", &
+                  position="rewind")
+            write (unit=31, fmt=*) nEner, nI2, nI3
+        end if
         do i = 1, NEner
             do j = 1, nI2
                 do k = 1, nI3
@@ -295,12 +392,18 @@ contains
                     xp = Rorbit*sin(theta)*cos(phi)   ! x
                     yp = Rorbit*sin(theta)*sin(phi)   ! y
                     zp = Rorbit*cos(theta)            ! z
-                    write (unit=31, fmt="(3I5,9ES30.10,I4)") i, j, k, xp, yp, zp, 0.0_dp &
-                        , 0.0_dp, 0.0_dp, rcirc(i), tcirc(i), vcirc(i), 0
+                    if (orbitstart_memory_output) then
+                        call orbitstart_store_record(.true., &
+                            (/ xp, yp, zp, 0.0_dp, 0.0_dp, 0.0_dp, &
+                               rcirc(i), tcirc(i), vcirc(i) /), 0_i4b)
+                    else
+                        write (unit=31, fmt="(3I5,9ES30.10,I4)") i, j, k, xp, yp, zp, 0.0_dp &
+                            , 0.0_dp, 0.0_dp, rcirc(i), tcirc(i), vcirc(i), 0
+                    end if
                 end do
             end do
         end do
-        close (unit=31)
+        if (.not. orbitstart_memory_output) close (unit=31)
     end subroutine make_boxstartpoints
 
     subroutine find_innerboundary(boundin, irregular, boundout, tcirc, epot, theta)

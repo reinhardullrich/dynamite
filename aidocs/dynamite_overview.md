@@ -43,10 +43,10 @@ numerical backend.
 Important language split:
 
 - `dynamite/`: main Python package.
-- `orblib_fortran/`: active Fortran 77/90 programs used for orbit initial
-  conditions, orbit libraries, and mass calculations. Human-written source is
-  under `orblib_fortran/source/`; compiled artifacts go to ignored `build/`
-  and `bin/` folders.
+- `orblib_fortran/`: active Fortran 77/90 shared-library backend used for
+  orbit initial conditions and orbit-library construction. Human-written source
+  is under `orblib_fortran/source/`; the supported build writes
+  `orblib_fortran/build/lib/liborblib_fortran.so`.
 - `archive/legacy_nnls_fortran/`: archived legacy NNLS/GALAHAD solver sources.
 - `archive/legacy_orbgen_partgen/`: archived untested particle/orbit export
   utilities.
@@ -158,8 +158,8 @@ The most important Python modules are:
 - `model.py`: represents individual models and tracks the `all_models.ecsv`
   table.
 - `model_iterator.py`: drives iterative model creation and execution.
-- `orblib.py`: creates orbit libraries, mostly by preparing inputs and calling
-  legacy Fortran executables.
+- `orblib.py`: keeps the orbit-library reader/container interface and delegates
+  active generation to the direct shared-library API.
 - `weight_solvers.py`: solves for non-negative orbit weights using either
   legacy Fortran solvers or Python NNLS-based solvers.
 - `kinematics.py`: handles kinematic data formats such as Gauss-Hermite and
@@ -177,10 +177,9 @@ backend. It includes source for:
 - Orbit initial condition generation.
 - Orbit integration.
 - Orbit library construction.
-- Triaxial mass calculations.
 
-The Python code often acts as an orchestration layer around these compiled
-programs: it writes input files, runs the executables, reads their outputs, and
+The Python code passes inputs directly to the shared library through
+`dynamite/orblib_api.py`, reads the generated binary `datfil/` outputs, and
 stores the results in a structured project output tree.
 
 Legacy NNLS/GALAHAD solver code now lives under `archive/legacy_nnls_fortran/`
