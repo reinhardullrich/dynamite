@@ -136,7 +136,8 @@ changes from the original project.
   construction from `make_boxstartpoints()`. It also ports the DOP853
   plane-crossing sampler and projected-radius width calculation from
   `findtubeorbitwidth()`, plus the `findtube()` golden-section tube-radius
-  minimization and `find_type()` orbit-type probing.
+  minimization, `find_type()` orbit-type probing, and the `find_innerboundary()`
+  inner short-axis tube boundary search loop.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -273,8 +274,9 @@ source files.
   tube-start radius/noreg scheduling plus begin/retrograde record-array
   construction, box-start single-record and flattened-array construction, and
   tube-orbit DOP853 crossing-width measurement plus `findtube()` tube-radius
-  golden-section minimization plus `find_type()` orbit-type probing. The
-  legacy `interpolgrid` disk-cache contract, full orbit-start boundary search,
+  golden-section minimization plus `find_type()` orbit-type probing and
+  `find_innerboundary()` inner-boundary orchestration. The legacy
+  `interpolgrid` disk-cache contract, outer/mid orbit-start boundary search,
   runtime orbit-start orchestration, and full orbit-engine wiring are the next
   unported dependencies. A known parity
   note is recorded in `aidocs/cpp_orblib_port_plan.md`: Fortran

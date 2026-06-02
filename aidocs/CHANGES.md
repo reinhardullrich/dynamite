@@ -506,3 +506,17 @@ This file is append-only. Add new entries at the bottom.
   remaining C++ gaps now include interpolation-grid disk caching if required
   for parity, orbit-start boundary search/runtime orchestration, full
   orbit-engine wiring, and full-output orchestration.
+- Ported the orbit-start `find_innerboundary()` short-axis-tube boundary loop
+  into C++ as `dynamite::orblib_cpp::find_inner_boundaries` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_inner_boundaries` with opt-in pytest coverage
+  against a Python mirror of the Fortran loop using the already-tested C++
+  `find_tube_radius()` and `find_orbit_type()` ABI helpers as probe oracles.
+  The port preserves the reverse `nI2` scan, first/second boundary-guess
+  formulas, previous-energy scaling for the last angular cell, edge-near
+  irregular flagging, and the active Fortran `otype == 1` found-x-tubes rule.
+  Updated C++ port documentation and test documentation; remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, outer/mid
+  orbit-start boundary search/runtime orchestration, full orbit-engine wiring,
+  and full-output orchestration.
