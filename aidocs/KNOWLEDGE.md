@@ -147,7 +147,13 @@ changes from the original project.
   `runorbitstart()` grid-preparation layer as `prepare_orbit_start_grid()`,
   covering logarithmic circular radii, initial circular energies/periods,
   angular-grid setup, `findReq()` outer boundaries, inner-boundary dispatch,
-  and post-inner circular metadata recomputation.
+  and post-inner circular metadata recomputation. The same module now includes
+  `build_orbit_start_arrays()`, which composes the memory-side
+  `runorbitstart()` branch logic, outer/middle-boundary search,
+  irregular-energy dithering expansion, `noreggrid`, tube begin records,
+  rotating-frame retrograde beginbox records, and non-rotating box beginbox
+  records. The production C++ generation entry points are still stubs until
+  this start-array layer is wired into the full orbit engine.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -179,7 +185,10 @@ changes from the original project.
   bisection stopping rule, golden-section tube-radius search, and `find_type()`
   sampling classifier. The composed orbit-start grid-preparation helper is
   tested against analytic black-hole setup formulas plus the lower-level
-  inner-boundary ABI as the expensive probe oracle.
+  inner-boundary ABI as the expensive probe oracle. The composed start-array
+  orchestration helper is tested for triaxial branch selection, diagnostic
+  counters, `noreggrid`, begin records, and rotating-frame retrograde beginbox
+  records.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -287,9 +296,10 @@ source files.
   construction, box-start single-record and flattened-array construction, and
   tube-orbit DOP853 crossing-width measurement plus `findtube()` tube-radius
   golden-section minimization plus `find_type()` orbit-type probing and
-  `find_innerboundary()`/`find_outerboundary()` boundary orchestration. The
-  legacy `interpolgrid` disk-cache contract, mid-boundary orbit-start search,
-  runtime orbit-start orchestration, and full orbit-engine wiring are the next
+  `find_innerboundary()`/`find_outerboundary()` boundary orchestration, plus
+  memory-side `runorbitstart()` start-array orchestration. The legacy
+  `interpolgrid` disk-cache contract if fixture parity requires it, production
+  C++ generation entry-point wiring, and full orbit-engine wiring are the next
   unported dependencies. A known parity
   note is recorded in `aidocs/cpp_orblib_port_plan.md`: Fortran
   `make_startpoints()` comments describe a "last irregular energy" noreg rule,

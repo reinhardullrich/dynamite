@@ -95,7 +95,9 @@ Current coverage:
   Python mirror of Fortran `find_outerboundary()`, plus composed
   pre-boundary grid-preparation validation for logarithmic circular radii,
   angular-grid setup, `findReq()` outer boundaries, inner-boundary wiring, and
-  post-inner circular metadata recomputation;
+  post-inner circular metadata recomputation, plus composed start-array
+  orchestration validation for triaxial branch selection, `noreggrid`, tube
+  begin records, and rotating-frame retrograde beginbox records;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

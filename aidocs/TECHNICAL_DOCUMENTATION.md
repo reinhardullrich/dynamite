@@ -832,6 +832,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_orbitstart_find_tube_radius`
 - `orblib_cpp_api_orbitstart_find_type`
 - `orblib_cpp_api_orbitstart_prepare_grid`
+- `orblib_cpp_api_orbitstart_build_start_arrays`
 - `orblib_cpp_api_orbitstart_inner_boundaries`
 - `orblib_cpp_api_orbitstart_outer_boundaries`
 - `orblib_cpp_api_integrate_orbit_final_state`
@@ -1075,8 +1076,13 @@ The first actual ported Fortran kernels are:
   circular radii, initial circular energies/periods, the `theta` grid,
   `findReq()` outer boundaries, the inner-boundary search, and the post-inner
   circular velocity/period recomputation using caller-provided output arrays.
-  Mid-boundary search and full runtime orbit-start orchestration are not
-  ported yet.
+  The `runorbitstart()` branch and start-array orchestration is ported as
+  `dynamite::orblib_cpp::build_orbit_start_arrays`, composing triaxiality
+  branch selection, outer/middle-boundary search, irregular-energy dithering
+  expansion, `noreggrid`, tube begin records, `Omega != 0` retrograde
+  beginbox records, and `Omega == 0` box beginbox records. The production C++
+  generation entry points are still stubs until this start-array layer is
+  wired into the full orbit engine.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

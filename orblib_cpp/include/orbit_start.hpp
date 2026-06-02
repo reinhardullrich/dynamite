@@ -35,6 +35,17 @@ struct OrbitStartGridDiagnostics {
     int inner_type_function_evaluations = 0;
 };
 
+struct OrbitStartOrchestrationDiagnostics {
+    OrbitStartGridDiagnostics grid;
+    int outer_width_evaluations = 0;
+    int outer_type_function_evaluations = 0;
+    int box_equivalent_radius_iterations = 0;
+    int used_triaxial_branch = 0;
+    int rounded_irregular_energy_count = 0;
+    int begin_record_count = 0;
+    int beginbox_record_count = 0;
+};
+
 bool prepare_orbit_start_grid(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,
@@ -58,6 +69,42 @@ bool prepare_orbit_start_grid(
     int* irregular,
     int* inner_orbit_types,
     OrbitStartGridDiagnostics& diagnostics
+) noexcept;
+
+bool build_orbit_start_arrays(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    double rlogmin,
+    double rlogmax,
+    int orbit_dithering,
+    double omega,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* inner_boundaries,
+    double* middle_boundaries,
+    double* outer_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    int* middle_orbit_types,
+    int* noreg_grid,
+    double* begin_records,
+    int* begin_noreg_flags,
+    double* beginbox_records,
+    int* beginbox_noreg_flags,
+    int* box_iterations,
+    OrbitStartOrchestrationDiagnostics& diagnostics
 ) noexcept;
 
 bool compute_unregularized_orbit_grid(

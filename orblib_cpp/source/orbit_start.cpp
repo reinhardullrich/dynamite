@@ -263,6 +263,37 @@ int orbit_type_observer(
     return 1;
 }
 
+bool orbit_start_uses_triaxial_branch(const TriaxialMgeSetup& mge) noexcept {
+    if (mge.triaxiality.empty()) {
+        return false;
+    }
+    const auto [min_triaxiality, max_triaxiality] =
+        std::minmax_element(mge.triaxiality.begin(), mge.triaxiality.end());
+    return *max_triaxiality > 0.01 || *min_triaxiality > 0.99;
+}
+
+int round_irregular_energy_count(
+    const int* irregular,
+    int energy_count,
+    int orbit_dithering
+) noexcept {
+    int last_irregular_energy = 0;
+    for (int energy = 0; energy < energy_count; ++energy) {
+        if (irregular[energy] == 1) {
+            last_irregular_energy = energy + 1;
+        }
+    }
+    const double rounded = std::floor(
+        (static_cast<double>(last_irregular_energy) - 1.0 +
+         static_cast<double>(orbit_dithering)) /
+        static_cast<double>(orbit_dithering)
+    ) * static_cast<double>(orbit_dithering);
+    if (rounded <= 0.0) {
+        return 0;
+    }
+    return std::min(static_cast<int>(rounded), energy_count);
+}
+
 }  // namespace
 
 bool calculate_orbit_start_state(
@@ -536,6 +567,199 @@ bool prepare_orbit_start_grid(
             2.0 * kPi * circular_radii[energy] * radius_scale / circular_velocities[energy];
         if (!std::isfinite(circular_periods[energy]) || circular_periods[energy] <= 0.0) {
             return false;
+        }
+    }
+
+    return true;
+}
+
+bool build_orbit_start_arrays(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    double rlogmin,
+    double rlogmax,
+    int orbit_dithering,
+    double omega,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* inner_boundaries,
+    double* middle_boundaries,
+    double* outer_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    int* middle_orbit_types,
+    int* noreg_grid,
+    double* begin_records,
+    int* begin_noreg_flags,
+    double* beginbox_records,
+    int* beginbox_noreg_flags,
+    int* box_iterations,
+    OrbitStartOrchestrationDiagnostics& diagnostics
+) noexcept {
+    diagnostics = OrbitStartOrchestrationDiagnostics{};
+    if (energy_count <= 1 || i2_count <= 3 || i3_count <= 0 || orbit_dithering <= 0 ||
+        rlogmax <= rlogmin || integrator_accuracy <= 0.0 || crossing_capacity <= 0 ||
+        type_sample_count <= 0 || circular_radii == nullptr ||
+        circular_velocities == nullptr || circular_periods == nullptr ||
+        energies == nullptr || theta_values == nullptr || inner_boundaries == nullptr ||
+        middle_boundaries == nullptr || outer_boundaries == nullptr || irregular == nullptr ||
+        inner_orbit_types == nullptr || middle_orbit_types == nullptr ||
+        noreg_grid == nullptr || begin_records == nullptr || begin_noreg_flags == nullptr ||
+        beginbox_records == nullptr || beginbox_noreg_flags == nullptr ||
+        box_iterations == nullptr || !std::isfinite(rlogmin) || !std::isfinite(rlogmax) ||
+        !std::isfinite(omega)) {
+        return false;
+    }
+
+    if (!prepare_orbit_start_grid(
+            mge,
+            halo,
+            black_hole_mass,
+            black_hole_softening_km,
+            potential,
+            energy_count,
+            i2_count,
+            rlogmin,
+            rlogmax,
+            integrator_accuracy,
+            crossing_capacity,
+            type_sample_count,
+            circular_radii,
+            circular_velocities,
+            circular_periods,
+            energies,
+            theta_values,
+            outer_boundaries,
+            inner_boundaries,
+            irregular,
+            inner_orbit_types,
+            diagnostics.grid
+        )) {
+        return false;
+    }
+
+    const bool use_triaxial_branch = orbit_start_uses_triaxial_branch(mge);
+    diagnostics.used_triaxial_branch = use_triaxial_branch ? 1 : 0;
+    if (use_triaxial_branch) {
+        if (!find_outer_boundaries(
+                potential,
+                energy_count,
+                i2_count,
+                i3_count,
+                inner_boundaries,
+                outer_boundaries,
+                energies,
+                circular_periods,
+                theta_values,
+                integrator_accuracy,
+                crossing_capacity,
+                type_sample_count,
+                middle_boundaries,
+                irregular,
+                middle_orbit_types,
+                diagnostics.outer_width_evaluations,
+                diagnostics.outer_type_function_evaluations
+            )) {
+            return false;
+        }
+
+        diagnostics.rounded_irregular_energy_count = round_irregular_energy_count(
+            irregular,
+            energy_count,
+            orbit_dithering
+        );
+        for (int energy = 0; energy < diagnostics.rounded_irregular_energy_count; ++energy) {
+            irregular[energy] = 1;
+        }
+    } else {
+        for (int energy = 0; energy < energy_count; ++energy) {
+            irregular[energy] = 0;
+        }
+        for (int index = 0; index < energy_count * i2_count; ++index) {
+            middle_boundaries[index] = outer_boundaries[index];
+            middle_orbit_types[index] = 5;
+        }
+    }
+
+    if (!compute_unregularized_orbit_grid(
+            energy_count,
+            i2_count,
+            outer_boundaries,
+            middle_boundaries,
+            irregular,
+            noreg_grid
+        )) {
+        return false;
+    }
+
+    const bool include_retrograde = omega != 0.0;
+    if (!build_tube_start_records(
+            mge,
+            halo,
+            black_hole_mass,
+            black_hole_softening_km,
+            energy_count,
+            i2_count,
+            i3_count,
+            inner_boundaries,
+            middle_boundaries,
+            outer_boundaries,
+            irregular,
+            noreg_grid,
+            theta_values,
+            energies,
+            circular_periods,
+            circular_radii,
+            circular_velocities,
+            begin_records,
+            begin_noreg_flags,
+            include_retrograde,
+            include_retrograde ? beginbox_records : nullptr,
+            include_retrograde ? beginbox_noreg_flags : nullptr
+        )) {
+        return false;
+    }
+
+    const int total_records = energy_count * i2_count * i3_count;
+    diagnostics.begin_record_count = total_records;
+    diagnostics.beginbox_record_count = total_records;
+    if (include_retrograde) {
+        for (int index = 0; index < total_records; ++index) {
+            box_iterations[index] = 0;
+        }
+    } else {
+        if (!build_box_start_records(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                energy_count,
+                i2_count,
+                i3_count,
+                energies,
+                circular_periods,
+                circular_radii,
+                circular_velocities,
+                beginbox_records,
+                beginbox_noreg_flags,
+                box_iterations
+            )) {
+            return false;
+        }
+        for (int index = 0; index < total_records; ++index) {
+            diagnostics.box_equivalent_radius_iterations += box_iterations[index];
         }
     }
 

@@ -2580,6 +2580,195 @@ extern "C" void orblib_cpp_api_orbitstart_prepare_grid(
     }
 }
 
+extern "C" void orblib_cpp_api_orbitstart_build_start_arrays(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    double rlogmin,
+    double rlogmax,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    int orbit_dithering,
+    double omega,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* inner_boundaries,
+    double* middle_boundaries,
+    double* outer_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    int* middle_orbit_types,
+    int* noreg_grid,
+    double* begin_records,
+    int* begin_noreg_flags,
+    double* beginbox_records,
+    int* beginbox_noreg_flags,
+    int* box_iterations,
+    int* used_triaxial_branch,
+    int* rounded_irregular_energy_count,
+    int* equivalent_radius_iterations,
+    int* inner_width_evaluations,
+    int* inner_type_function_evaluations,
+    int* outer_width_evaluations,
+    int* outer_type_function_evaluations,
+    int* box_equivalent_radius_iterations,
+    int* begin_record_count,
+    int* beginbox_record_count,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        n_radius < 2 || n_theta < 2 || n_phi < 2 || rlogmax <= rlogmin ||
+        energy_count <= 1 || i2_count <= 3 || i3_count <= 0 || orbit_dithering <= 0 ||
+        integrator_accuracy <= 0.0 || crossing_capacity <= 0 || type_sample_count <= 0 ||
+        circular_radii == nullptr || circular_velocities == nullptr ||
+        circular_periods == nullptr || energies == nullptr || theta_values == nullptr ||
+        inner_boundaries == nullptr || middle_boundaries == nullptr ||
+        outer_boundaries == nullptr || irregular == nullptr || inner_orbit_types == nullptr ||
+        middle_orbit_types == nullptr || noreg_grid == nullptr || begin_records == nullptr ||
+        begin_noreg_flags == nullptr || beginbox_records == nullptr ||
+        beginbox_noreg_flags == nullptr || box_iterations == nullptr ||
+        used_triaxial_branch == nullptr || rounded_irregular_energy_count == nullptr ||
+        equivalent_radius_iterations == nullptr || inner_width_evaluations == nullptr ||
+        inner_type_function_evaluations == nullptr || outer_width_evaluations == nullptr ||
+        outer_type_function_evaluations == nullptr ||
+        box_equivalent_radius_iterations == nullptr || begin_record_count == nullptr ||
+        beginbox_record_count == nullptr || !std::isfinite(omega)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin;
+        config.rlogmax = rlogmax;
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        const double black_hole_softening_km = black_hole_softening_arcsec * mge.conversion_factor;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::OrbitStartOrchestrationDiagnostics diagnostics;
+        if (!dynamite::orblib_cpp::build_orbit_start_arrays(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                interpolated,
+                energy_count,
+                i2_count,
+                i3_count,
+                rlogmin,
+                rlogmax,
+                orbit_dithering,
+                omega,
+                integrator_accuracy,
+                crossing_capacity,
+                type_sample_count,
+                circular_radii,
+                circular_velocities,
+                circular_periods,
+                energies,
+                theta_values,
+                inner_boundaries,
+                middle_boundaries,
+                outer_boundaries,
+                irregular,
+                inner_orbit_types,
+                middle_orbit_types,
+                noreg_grid,
+                begin_records,
+                begin_noreg_flags,
+                beginbox_records,
+                beginbox_noreg_flags,
+                box_iterations,
+                diagnostics
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        *used_triaxial_branch = diagnostics.used_triaxial_branch;
+        *rounded_irregular_energy_count = diagnostics.rounded_irregular_energy_count;
+        *equivalent_radius_iterations = diagnostics.grid.equivalent_radius_iterations;
+        *inner_width_evaluations = diagnostics.grid.inner_width_evaluations;
+        *inner_type_function_evaluations = diagnostics.grid.inner_type_function_evaluations;
+        *outer_width_evaluations = diagnostics.outer_width_evaluations;
+        *outer_type_function_evaluations = diagnostics.outer_type_function_evaluations;
+        *box_equivalent_radius_iterations = diagnostics.box_equivalent_radius_iterations;
+        *begin_record_count = diagnostics.begin_record_count;
+        *beginbox_record_count = diagnostics.beginbox_record_count;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_orbitstart_inner_boundaries(
     int ngauss,
     const double* surf_pc,

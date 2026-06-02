@@ -557,3 +557,14 @@ This file is append-only. Add new entries at the bottom.
   random behavior, Fortran-record binary output, and conditional
   interpolation-grid disk-cache implementation. Updated canonical knowledge to
   make the parity freeze visible to future local agent sessions.
+- Ported the memory-side `runorbitstart()` start-array orchestration into C++
+  as `dynamite::orblib_cpp::build_orbit_start_arrays` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_build_start_arrays` with opt-in pytest coverage
+  for triaxial branch selection, outer/middle-boundary composition,
+  irregular-energy dithering expansion, `noreggrid`, tube begin records,
+  `Omega != 0` retrograde beginbox records, and diagnostic counters. Updated
+  canonical knowledge, C++ port documentation, technical documentation, and
+  test documentation. The C++ generation entry points remain explicit stubs
+  until this start-array layer is wired into the full orbit engine.
