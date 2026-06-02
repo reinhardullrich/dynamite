@@ -225,6 +225,19 @@ Current branch status:
   generation, full orbit-engine wiring, and full-output orchestration still
   remain.
 
+## Known Fortran Parity Notes To Revisit
+
+- `orbitstart_f.f90`'s `make_startpoints()` has an apparent intent/code
+  mismatch in the noreg flag for irregular energies. The local variable is
+  named `LastIrregE`, and the nearby comment says "if this is the last
+  irregular energy do not regularize", but the active condition is
+  `if (maxval(irregular(:)) .eq. i) noreg = 1`. Because `irregular` is a
+  0/1 flag vector, this condition flags energy index `i == 1` whenever any
+  energy is irregular, rather than flagging the last irregular energy. The C++
+  port currently preserves this exact behavior for parity and tests it
+  explicitly. This should be analyzed later before any intentional cleanup or
+  scientific behavior change.
+
 ## DOP853 Policy
 
 The active Fortran backend uses DOP853, an explicit Runge-Kutta method of order

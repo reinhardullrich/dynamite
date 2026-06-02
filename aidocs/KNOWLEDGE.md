@@ -267,7 +267,12 @@ source files.
   tube-start radius/noreg scheduling, and box-start single-record
   construction. The legacy `interpolgrid` disk-cache contract, full
   orbit-start boundary search/state-array generation, and full orbit-engine
-  wiring are the next unported dependencies.
+  wiring are the next unported dependencies. A known parity note is recorded
+  in `aidocs/cpp_orblib_port_plan.md`: Fortran `make_startpoints()` comments
+  describe a "last irregular energy" noreg rule, but the code uses
+  `maxval(irregular(:)) .eq. i`, which flags energy index 1 when any
+  irregular flag is present; the C++ port intentionally preserves this until
+  it is analyzed.
 
 ## Separated Workspaces
 

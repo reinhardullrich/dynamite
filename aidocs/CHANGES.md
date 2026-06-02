@@ -436,3 +436,10 @@ This file is append-only. Add new entries at the bottom.
   columns, and bisection iteration count. Remaining C++ gaps now include
   interpolation-grid disk caching if required for parity, full orbit-start
   boundary search/state-array generation, and full orbit-engine wiring.
+- Documented the Fortran `make_startpoints()` irregular-energy noreg behavior
+  as a later analysis item in `aidocs/cpp_orblib_port_plan.md` and
+  `aidocs/KNOWLEDGE.md`. The code comment and local variable imply a "last
+  irregular energy" rule, but the active Fortran condition is
+  `maxval(irregular(:)) .eq. i`; because `irregular` is a 0/1 flag vector,
+  this flags energy index 1 whenever any irregular energy exists. The C++
+  port intentionally preserves this behavior for current parity.
