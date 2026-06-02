@@ -94,8 +94,8 @@ Key source points:
   `orblib_api_run_orbitstart_memory` and receives `begin`/`beginbox` arrays.
 - `SharedLibraryFortranOrbitBackend.generate_orbit_library()` calls
   `orblib_api_run_orblib_direct` for tube and box libraries.
-- The direct shared-library wrappers disable the `interpolgrid` file cache
-  while they run.
+- The orbit-start worker runs in the model directory and writes the
+  `interpolgrid` cache there; tube and box workers then reuse the same cache.
 - Python reads the Fortran binary records in `read_orbit_base()` and
   `read_losvd_histograms()`.
 - New Python callers can use `dynamite.orblib_api.run_orbit_library()` or
@@ -175,6 +175,48 @@ trajectories. Internally, `integrator_number` is based on
 physical trajectories and mirrored tube-orbit variants, so the exact "orbit
 count" depends on whether one means integrated starting trajectories, output
 bundles, tube/box files, or final combined weight-solver columns.
+
+## Precision Compatibility Problem
+
+The historical executable-generated LOSVD fixture is not a pure mathematical
+reference for the orbit integration. It also captures the old text-file
+interface precision and cache behavior. When the direct shared-library path was
+introduced, it accidentally changed three parts of that numerical contract:
+
+- `parameters_pot.in` used formatted decimal output before Fortran read the
+  model: MGE intensity to 2 decimals, sigma and flattening to 5 decimals,
+  observed PA to 2 decimals, and viewing angles to 9 decimals.
+- `begin.dat` and `beginbox.dat` used `9ES30.10`, so orbit starts were rounded
+  through that textual representation before integration.
+- The old run wrote one `interpolgrid` file from orbit-start generation and the
+  later tube and box orbit-library calls read that same grid. The initial direct
+  memory path disabled or bypassed this sharing and could recompute the grid per
+  worker.
+
+Those differences look small, but the high-energy box-orbit part of the library
+is sensitive enough that tiny perturbations in starts or potential interpolation
+can move aggregate LOSVD mass. The generated direct shared-library output was
+stable across repeated runs, so this was not random nondeterminism; it was a
+changed numerical interface contract relative to the legacy executable path.
+
+The active fix preserves the legacy precision where it affects compatibility
+without reintroducing Fortran input files:
+
+- Python quantizes the direct `parameters_pot` values before calling
+  `orblib_api_run_orbitstart_memory`.
+- `integrator_setup_direct()` internally round-trips each direct begin row
+  through the legacy `9ES30.10` format before assigning initial conditions.
+- The orbit-start worker runs in the model directory so the generated
+  `interpolgrid` is shared by the later tube and box shared-library workers.
+
+The tests now separate two questions:
+
+- Historical compatibility: the generated shared-library LOSVD is compared
+  against the old executable-generated fixture with legacy tolerance, including
+  the restored `2e-4` aggregate mass tolerance plus unchanged grid, shape,
+  nonnegative, mean, quantile, and max-difference checks.
+- Current-backend determinism: the same generated output is compared against a
+  shared-library fixture with full-array `1e-12` tolerance.
 
 ## Module Responsibilities
 

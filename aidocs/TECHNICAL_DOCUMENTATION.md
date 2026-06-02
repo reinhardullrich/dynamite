@@ -686,7 +686,12 @@ dark-halo parameters, orbit-grid settings, orbit-start arrays, PSF tables,
 boxed-aperture geometry, velocity-histogram settings, bin maps, and output
 paths directly to the C ABI. It does not create `parameters_pot.in`,
 `orbstart.in`, `orblib.in`, `orblibbox.in`, `begin.dat`, or `beginbox.dat`, and
-the direct wrappers disable the `interpolgrid` file cache while they run.
+the active direct path intentionally preserves the legacy text-interface
+precision for `parameters_pot` values and `begin` rows before handing data to
+Fortran. The orbit-start worker runs in the model directory so the generated
+`interpolgrid` cache is shared by the later tube and box shared-library workers.
+This precision/cache behavior is part of the compatibility contract with the
+historical executable-generated LOSVD fixture.
 
 Important initialization inputs:
 

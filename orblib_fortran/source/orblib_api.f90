@@ -31,7 +31,7 @@ contains
                                                 box_rows_written, status) &
                                                 bind(C, name="orblib_api_run_orbitstart_memory")
         use initial_parameters, only: iniparam_from_arrays
-        use interpolpot, only: ip_setup, ip_stop, ip_set_cache_enabled
+        use interpolpot, only: ip_setup, ip_stop
         use orbitstart, only: runorbitstart_memory
         integer(c_int), value, intent(in) :: random_seed, ngauss
         integer(c_int), value, intent(in) :: nener, ni2, ni3, orbit_dithering
@@ -71,14 +71,12 @@ contains
                                   int(dm_profile_type, kind=i4b), &
                                   int(n_dmparam, kind=i4b), dmparam_input)
 
-        call ip_set_cache_enabled(.false.)
         call ip_setup()
         call runorbitstart_memory(int(max_rows, kind=i4b), begin_values, &
                                   begin_noreg, beginbox_values, &
                                   beginbox_noreg, rows_i, box_rows_i, &
                                   status_i)
         call ip_stop()
-        call ip_set_cache_enabled(.true.)
 
         rows_written = int(rows_i, kind=c_int)
         box_rows_written = int(box_rows_i, kind=c_int)
@@ -112,7 +110,7 @@ contains
                                             out_orbclass_path, status) &
                                             bind(C, name="orblib_api_run_orblib_direct")
         use initial_parameters, only: iniparam_from_arrays
-        use interpolpot, only: ip_setup, ip_stop, ip_set_cache_enabled
+        use interpolpot, only: ip_setup, ip_stop
         use high_level, only: setup_direct, run, stob
         integer(c_int), value, intent(in) :: random_seed, ngauss
         integer(c_int), value, intent(in) :: nener, ni2, ni3, orbit_dithering
@@ -182,7 +180,6 @@ contains
                                   int(dm_profile_type, kind=i4b), &
                                   int(n_dmparam, kind=i4b), dmparam_input)
 
-        call ip_set_cache_enabled(.false.)
         call ip_setup()
         call setup_direct(begin_values, begin_noreg, int(begin_rows, kind=i4b), &
                           orbital_periods, int(sampling, kind=i4b), &
@@ -200,7 +197,6 @@ contains
         call run()
         call stob()
         call ip_stop()
-        call ip_set_cache_enabled(.true.)
     end subroutine orblib_api_run_orblib_direct
 
     subroutine c_string_to_fortran(c_string, fortran_string, status)

@@ -148,3 +148,22 @@ This file is append-only. Add new entries at the bottom.
   allows the observed stable aggregate delta from the historical executable
   reference while preserving the grid, shape, nonnegative, mean, quantile, and
   max-difference checks.
+- Fixed the direct shared-library orbit-library numerical parity issue: the
+  orbit-start worker now runs in the model directory so tube and box workers
+  reuse the same generated `interpolgrid`, direct Python inputs preserve the
+  historical `parameters_pot.in` decimal precision, and direct begin rows are
+  internally round-tripped through the legacy `ES30.10` precision without
+  reintroducing Fortran input files. Restored the slow LOSVD fixture aggregate
+  tolerance from `5e-4` to `2e-4`.
+- Added a separate current-backend LOSVD parity fixture at
+  `tests/fixtures/orblib_losvd/data/comparison_losvd_shared_library.npz` and a
+  second opt-in slow Fortran test that compares regenerated direct
+  shared-library output against it with per-element `1e-12` tolerance. The
+  historical executable-generated fixture test remains separate and keeps its
+  legacy compatibility tolerance.
+- Documented the direct shared-library precision compatibility problem in
+  `aidocs/fortran_orbit_library_engine.md` and updated
+  `aidocs/TECHNICAL_DOCUMENTATION.md` to reflect the current behavior: legacy
+  `parameters_pot`/`begin` text precision is intentionally preserved and the
+  generated `interpolgrid` cache is shared by orbit-start, tube, and box
+  workers.

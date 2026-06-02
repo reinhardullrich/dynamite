@@ -309,6 +309,8 @@ contains
         integer(kind=i4b), intent(in) :: start_input, number_input
         real(kind=dp), intent(in) :: accuracy_input
         integer(kind=i4b) :: i, ndith3
+        real(kind=dp), dimension(9) :: begin_record
+        character(len=270) :: legacy_begin_line
 
         print *, "  ** Setting up integrator module from direct Python input"
 
@@ -334,15 +336,18 @@ contains
             gI3(i) = modulo((i - 1), nI3) + 1
             gI2(i) = modulo(((i - 1)/nI3), nI2) + 1
             gEner(i) = ((i - 1)/(nI3*nI2)) + 1
-            xini(i) = begin_values(i, 1)
-            yini(i) = begin_values(i, 2)
-            zini(i) = begin_values(i, 3)
-            vxini(i) = begin_values(i, 4)
-            vyini(i) = begin_values(i, 5)
-            vzini(i) = begin_values(i, 6)
-            rcirc(i) = begin_values(i, 7)
-            tcirc(i) = begin_values(i, 8)
-            vcirc(i) = begin_values(i, 9)
+            begin_record(:) = begin_values(i, :)
+            write (legacy_begin_line, fmt="(9ES30.10)") begin_record(:)
+            read (legacy_begin_line, fmt="(9ES30.10)") begin_record(:)
+            xini(i) = begin_record(1)
+            yini(i) = begin_record(2)
+            zini(i) = begin_record(3)
+            vxini(i) = begin_record(4)
+            vyini(i) = begin_record(5)
+            vzini(i) = begin_record(6)
+            rcirc(i) = begin_record(7)
+            tcirc(i) = begin_record(8)
+            vcirc(i) = begin_record(9)
             regurizable(i) = begin_noreg(i)
         end do
 

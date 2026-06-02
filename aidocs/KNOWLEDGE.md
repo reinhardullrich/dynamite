@@ -77,19 +77,24 @@ changes from the original project.
   `orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`; Python
   passes non-bar MGE/orbit/dark-halo settings, orbit starts, PSF tables,
   aperture geometry, histogram settings, binning maps, and output paths as
-  typed arrays/scalars. It no longer creates Fortran `infil/` inputs, no longer
-  calls Fortran entry points that accept input filenames, and disables the
-  internal `interpolgrid` file cache during direct shared-library calls. Binary
-  `datfil/` orbit-library outputs remain the active output contract for the
-  existing Python readers and weight solvers.
+  typed arrays/scalars. It no longer creates Fortran `infil/` inputs and no
+  longer calls Fortran entry points that accept input filenames. The direct
+  backend intentionally preserves legacy text-interface precision for
+  `parameters_pot` values and `begin` rows, and uses the generated
+  `interpolgrid` in the model directory as an internal cache shared by
+  orbit-start, tube, and box workers. Binary `datfil/` orbit-library outputs
+  remain the active output contract for the existing Python readers and weight
+  solvers.
 - `tests/`: local pytest baseline for Fortran replacement work. The default
   suite covers fixture contracts, extracted historical workflow facts, small
   Fortran kernel parity checks, and fast coverage for the direct-input
   orbit-library API facade; opt-in slow tests include a generated
   orbit-library LOSVD output comparison against the self-contained NGC6278
-  fixture in `tests/fixtures/orblib_losvd/`, with fixed direct shared-library
-  inputs and tolerances for small aggregate differences from the historical
-  executable-generated reference.
+  fixture in `tests/fixtures/orblib_losvd/`. The slow LOSVD tests compare one
+  generated direct shared-library output both against the historical
+  executable-generated fixture with legacy compatibility tolerances and against
+  `data/comparison_losvd_shared_library.npz`, a current shared-library fixture
+  with tight per-element `1e-12` tolerance.
 - `docs/`: upstream Sphinx documentation.
 - `archive/dev_tests/`: archived upstream development tests, notebooks, sample
   configurations, and historical fixtures kept for human reference.

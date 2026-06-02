@@ -227,7 +227,11 @@ class SharedLibraryFortranOrbitBackend:
 
         self._require_library()
         if self.isolate_fortran_calls:
-            return _call_orbitstart_memory_in_worker(self.library_path, orbit_library)
+            return _call_orbitstart_memory_in_worker(
+                self.library_path,
+                orbit_library,
+                Path(orbit_library.mod_dir),
+            )
         return _call_orbitstart_memory_function(self.library_path, orbit_library)
 
     def _run_orbit_library_part_direct(
@@ -804,12 +808,13 @@ def _content_lines(path: Path) -> list[str]:
 def _call_orbitstart_memory_in_worker(
     library_path: Path,
     orbit_library: Any,
+    cwd: Path,
 ) -> OrbitStartMemoryResult:
     context = mp.get_context()
     result_queue = context.Queue()
     process = context.Process(
         target=_orbitstart_memory_worker,
-        args=(str(library_path), orbit_library, result_queue),
+        args=(str(library_path), orbit_library, str(cwd), result_queue),
     )
     process.start()
     process.join()
@@ -832,9 +837,11 @@ def _call_orbitstart_memory_in_worker(
 def _orbitstart_memory_worker(
     library_path: str,
     orbit_library: Any,
+    cwd: str,
     result_queue: Any,
 ) -> None:
     try:
+        os.chdir(cwd)
         result = _call_orbitstart_memory_function(
             Path(library_path),
             orbit_library,
@@ -997,7 +1004,7 @@ def _orbitstart_memory_inputs(orbit_library: Any) -> dict[str, Any]:
         * int(settings["nI3"])
         * orbit_dithering**3
     )
-    return {
+    inputs = {
         "random_seed": int(settings["random_seed"]),
         "ngauss": len(mge_data),
         "surf_pc": np.ascontiguousarray(mge_data["I"], dtype=np.float64),
@@ -1025,6 +1032,35 @@ def _orbitstart_memory_inputs(orbit_library: Any) -> dict[str, Any]:
         "dmparam": np.ascontiguousarray(dmparam, dtype=np.float64),
         "max_rows": max_rows,
     }
+    return _legacy_parameter_pot_precision(inputs)
+
+
+def _legacy_parameter_pot_precision(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Match the precision of the historical ``parameters_pot.in`` writer."""
+
+    quantized = dict(inputs)
+    quantized["surf_pc"] = _fixed_decimal_array(quantized["surf_pc"], 2)
+    quantized["sigobs_arcsec"] = _fixed_decimal_array(
+        quantized["sigobs_arcsec"],
+        5,
+    )
+    quantized["qobs"] = _fixed_decimal_array(quantized["qobs"], 5)
+    quantized["psi_obs"] = _fixed_decimal_array(quantized["psi_obs"], 2)
+    quantized["theta"] = _fixed_decimal_scalar(quantized["theta"], 9)
+    quantized["phi"] = _fixed_decimal_scalar(quantized["phi"], 9)
+    quantized["psi"] = _fixed_decimal_scalar(quantized["psi"], 9)
+    return quantized
+
+
+def _fixed_decimal_scalar(value: Any, decimals: int) -> float:
+    return float(f"{float(value):.{decimals}f}")
+
+
+def _fixed_decimal_array(values: np.ndarray, decimals: int) -> np.ndarray:
+    return np.ascontiguousarray(
+        [float(f"{float(value):.{decimals}f}") for value in values],
+        dtype=np.float64,
+    )
 
 
 def run_orbit_library(

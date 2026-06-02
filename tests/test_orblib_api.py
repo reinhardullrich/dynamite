@@ -271,6 +271,30 @@ def test_orbitstart_memory_inputs_extract_structured_payload(tmp_path, monkeypat
     assert not (Path(model.directory_noml) / "infil" / "orbstart.in").exists()
 
 
+def test_legacy_parameter_pot_precision_matches_historical_writer():
+    inputs = {
+        "surf_pc": np.array([1.234, 9.876], dtype=np.float64),
+        "sigobs_arcsec": np.array([1.234567, 9.876543], dtype=np.float64),
+        "qobs": np.array([0.987654, 0.123456], dtype=np.float64),
+        "psi_obs": np.array([12.345, -67.895], dtype=np.float64),
+        "theta": 82.44430885929485,
+        "phi": 84.24511087677352,
+        "psi": 90.02148153970481,
+        "unchanged": "value",
+    }
+
+    quantized = orblib_api._legacy_parameter_pot_precision(inputs)
+
+    assert quantized["surf_pc"].tolist() == [1.23, 9.88]
+    assert quantized["sigobs_arcsec"].tolist() == [1.23457, 9.87654]
+    assert quantized["qobs"].tolist() == [0.98765, 0.12346]
+    assert quantized["psi_obs"].tolist() == [12.35, -67.89]
+    assert quantized["theta"] == 82.444308859
+    assert quantized["phi"] == 84.245110877
+    assert quantized["psi"] == 90.02148154
+    assert quantized["unchanged"] == "value"
+
+
 def test_direct_orblib_inputs_extract_structured_payload(tmp_path, monkeypatch):
     workspace = copy_orblib_fixture_workspace(tmp_path)
     _model, orbit_library = make_fixture_orbit_library(workspace, monkeypatch)

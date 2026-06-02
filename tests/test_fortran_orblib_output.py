@@ -94,12 +94,37 @@ def assert_losvd_matches_reference(actual, reference_path):
     np.testing.assert_allclose(
         np.sum(actual.y),
         np.sum(expected_y),
-        rtol=5e-4,
+        rtol=2e-4,
         atol=1e-8,
     )
     assert np.mean(abs_diff) <= 5e-6
     assert np.quantile(abs_diff, 0.999) <= 2e-4
     assert np.max(abs_diff) <= 3e-3
+
+
+def assert_losvd_matches_shared_library_reference(actual, reference_path):
+    reference = np.load(reference_path)
+    expected_xedg = reference["xedg"]
+    expected_y = reference["y"]
+
+    np.testing.assert_array_equal(actual.xedg, expected_xedg)
+    assert actual.y.shape == expected_y.shape
+    assert np.all(np.isfinite(actual.y))
+    assert np.all(actual.y >= 0.0)
+    np.testing.assert_allclose(actual.y, expected_y, rtol=1e-12, atol=1e-12)
+
+
+@pytest.fixture(scope="module")
+def generated_shared_library_losvd(tmp_path_factory):
+    workspace = copy_orblib_fixture_workspace(
+        tmp_path_factory.mktemp("orblib_losvd_generated"),
+    )
+    set_orbit_random_seed(workspace / "user_test_config.yaml", seed=4242)
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        actual = generate_losvd_histogram(workspace, monkeypatch)
+
+    return actual, workspace
 
 
 def test_configuration_rejects_archived_legacy_weight_solver(tmp_path, monkeypatch):
@@ -123,15 +148,27 @@ def test_configuration_rejects_archived_legacy_weight_solver(tmp_path, monkeypat
 
 @pytest.mark.slow
 @pytest.mark.orblib_fortran
-def test_fortran_orblib_losvd_output_matches_reference_fixture(tmp_path, monkeypatch):
-    workspace = copy_orblib_fixture_workspace(tmp_path)
-    set_orbit_random_seed(workspace / "user_test_config.yaml", seed=4242)
-
-    actual = generate_losvd_histogram(workspace, monkeypatch)
+def test_fortran_orblib_losvd_output_matches_reference_fixture(
+    generated_shared_library_losvd,
+):
+    actual, workspace = generated_shared_library_losvd
 
     output_dir = workspace / "NGC6278_output"
     assert output_dir.is_dir()
     assert_losvd_matches_reference(
         actual,
         workspace / "data" / "comparison_losvd.npz",
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.orblib_fortran
+def test_fortran_orblib_losvd_output_matches_shared_library_fixture(
+    generated_shared_library_losvd,
+):
+    actual, workspace = generated_shared_library_losvd
+
+    assert_losvd_matches_shared_library_reference(
+        actual,
+        workspace / "data" / "comparison_losvd_shared_library.npz",
     )
