@@ -75,6 +75,7 @@ orblib_cpp_api_elliptic_legendre
 orblib_cpp_api_triaxial_mge_setup
 orblib_cpp_api_triaxial_mge_evaluate
 orblib_cpp_api_potential_stack_evaluate
+orblib_cpp_api_interpolated_potential_evaluate
 orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
@@ -111,8 +112,13 @@ Current branch status:
   NFW, Hernquist, and triaxial cored logarithmic. The combined potential-stack
   ABI helper is tested against independent Python/SciPy calculations of the
   Fortran formulas.
+- The in-memory `interpolpotent.f90` acceleration interpolation math is ported
+  as `dynamite::orblib_cpp::InterpolatedPotential`, including the radius range
+  formulas, spherical-octant grid, log-acceleration storage, trilinear
+  interpolation, and direct fallback outside the grid. The legacy
+  `interpolgrid` disk-cache read/write behavior is not implemented yet.
 - The orbit-specific C++ engine is still not implemented yet:
-  gNFW profile 5, interpolation-grid behavior, orbit-start generation,
+  gNFW profile 5, interpolation-grid disk caching, orbit-start generation,
   one-orbit integration/classification, projection, PSF, aperture mapping,
   LOSVD binning, qgrid accumulation, and binary output writing still remain.
 
@@ -248,9 +254,10 @@ mixed with the first C++ parity port.
 5. In progress: port potential and acceleration evaluation. Done so far:
    elliptic setup helpers, non-bar triaxial MGE setup/deprojection, stellar
    triaxial MGE potential/acceleration evaluation, Plummer-style black-hole
-   contribution, and dark-halo profiles 0 through 3. Still required:
-   gNFW profile 5, interpolation grid behavior, orbit RHS wiring, and
-   Fortran-value parity tests for the full orbit RHS/potential stack.
+   contribution, dark-halo profiles 0 through 3, and in-memory acceleration
+   interpolation-grid math. Still required: gNFW profile 5, legacy
+   interpolation-grid disk caching if C++ parity requires it, orbit RHS wiring,
+   and Fortran-value parity tests for the full orbit RHS/potential stack.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.

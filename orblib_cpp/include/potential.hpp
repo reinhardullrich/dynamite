@@ -32,6 +32,16 @@ bool evaluate_dark_halo(
     double& accel_z
 ) noexcept;
 
+bool evaluate_dark_halo_acceleration(
+    const DarkHaloSetup& halo,
+    double x,
+    double y,
+    double z,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept;
+
 bool evaluate_potential_stack(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,
@@ -41,6 +51,19 @@ bool evaluate_potential_stack(
     double y,
     double z,
     double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept;
+
+bool evaluate_potential_stack_acceleration(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    double x,
+    double y,
+    double z,
     double& accel_x,
     double& accel_y,
     double& accel_z

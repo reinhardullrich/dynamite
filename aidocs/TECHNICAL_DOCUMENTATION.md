@@ -803,6 +803,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_triaxial_mge_setup`
 - `orblib_cpp_api_triaxial_mge_evaluate`
 - `orblib_cpp_api_potential_stack_evaluate`
+- `orblib_cpp_api_interpolated_potential_evaluate`
 - `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
@@ -849,6 +850,18 @@ The first actual ported Fortran kernels are:
   helper `orblib_cpp_api_potential_stack_evaluate` validates the combined
   stellar MGE, black-hole, and supported dark-halo terms against independent
   Python/SciPy calculations of the Fortran formulas.
+- The in-memory acceleration interpolation math from `interpolpotent.f90`,
+  implemented as `dynamite::orblib_cpp::InterpolatedPotential` in
+  `orblib_cpp/include/interpolated_potential.hpp` and
+  `orblib_cpp/source/interpolated_potential.cpp`. It preserves the Fortran
+  radius-bound formulas, spherical-octant grid construction, endpoint angle
+  offsets, log-acceleration storage, trilinear interpolation, and direct
+  acceleration fallback outside the grid. The current C++ slice does not yet
+  implement the legacy `interpolgrid` disk-cache read/write contract. The
+  test-only C ABI helper `orblib_cpp_api_interpolated_potential_evaluate`
+  validates metadata, direct potential, interpolated acceleration, and fallback
+  counters against an independent Python implementation of the Fortran grid
+  formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

@@ -178,6 +178,71 @@ bool evaluate_dark_halo(
     }
 }
 
+bool evaluate_dark_halo_acceleration(
+    const DarkHaloSetup& halo,
+    double x,
+    double y,
+    double z,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    accel_x = 0.0;
+    accel_y = 0.0;
+    accel_z = 0.0;
+    const double radius_squared = x * x + y * y + z * z;
+    const double radius = std::sqrt(radius_squared);
+
+    switch (halo.profile_type) {
+    case 0:
+        return true;
+    case 1: {
+        if (radius <= 0.0 || halo.rc <= 0.0) {
+            return false;
+        }
+        const double ratio = radius / halo.rc;
+        const double log_term = stable_log1p(ratio);
+        const double enclosed_term = log_term - ratio / (1.0 + ratio);
+        const double potential_scale =
+            4.0 * kPi * kGravConstKm * halo.rhoc * halo.rc * halo.rc * halo.rc;
+        const double accel_scale = -potential_scale / radius_squared * enclosed_term / radius;
+        accel_x = x * accel_scale;
+        accel_y = y * accel_scale;
+        accel_z = z * accel_scale;
+        return true;
+    }
+    case 2: {
+        if (radius <= 0.0 || halo.rc <= 0.0) {
+            return false;
+        }
+        const double acceleration_r =
+            -2.0 * kPi * kGravConstKm * halo.rhoc * halo.rc /
+            ((1.0 + radius / halo.rc) * (1.0 + radius / halo.rc));
+        accel_x = x / radius * acceleration_r;
+        accel_y = y / radius * acceleration_r;
+        accel_z = z / radius * acceleration_r;
+        return true;
+    }
+    case 3: {
+        const double vc_squared = halo.params[0];
+        const double core_radius_squared = halo.params[1];
+        const double p_squared = halo.params[2];
+        const double q_squared = halo.params[3];
+        if (core_radius_squared <= 0.0 || p_squared <= 0.0 || q_squared <= 0.0) {
+            return false;
+        }
+        const double denominator =
+            core_radius_squared + x * x + y * y / p_squared + z * z / q_squared;
+        accel_x = -vc_squared * x / denominator;
+        accel_y = -vc_squared * (y / p_squared) / denominator;
+        accel_z = -vc_squared * (z / q_squared) / denominator;
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
 bool evaluate_potential_stack(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,
@@ -219,6 +284,51 @@ bool evaluate_potential_stack(
         return false;
     }
     potential += term_potential;
+    accel_x += term_ax;
+    accel_y += term_ay;
+    accel_z += term_az;
+    return true;
+}
+
+bool evaluate_potential_stack_acceleration(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    double x,
+    double y,
+    double z,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    double potential = 0.0;
+    if (!evaluate_triaxial_mge(mge, x, y, z, potential, accel_x, accel_y, accel_z)) {
+        return false;
+    }
+
+    double term_potential = 0.0;
+    double term_ax = 0.0;
+    double term_ay = 0.0;
+    double term_az = 0.0;
+    evaluate_black_hole(
+        black_hole_mass,
+        black_hole_softening_km,
+        x,
+        y,
+        z,
+        term_potential,
+        term_ax,
+        term_ay,
+        term_az
+    );
+    accel_x += term_ax;
+    accel_y += term_ay;
+    accel_z += term_az;
+
+    if (!evaluate_dark_halo_acceleration(halo, x, y, z, term_ax, term_ay, term_az)) {
+        return false;
+    }
     accel_x += term_ax;
     accel_y += term_ay;
     accel_z += term_az;

@@ -92,13 +92,16 @@ changes from the original project.
   `orblib_cpp/include/potential.hpp` and `orblib_cpp/source/potential.cpp` for
   the current C++ potential stack: stellar triaxial MGE potential/acceleration,
   the Plummer-style black-hole term, and dark-halo profiles 0 through 3
-  (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). gNFW profile 5
+  (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). It also includes
+  `orblib_cpp/include/interpolated_potential.hpp` and
+  `orblib_cpp/source/interpolated_potential.cpp` for an in-memory port of
+  `interpolpotent.f90`'s acceleration interpolation math. gNFW profile 5
   remains unported because it depends on the beta-function stack. `Ran1` is
   tested against the existing Python/Fortran reference sequence; DOP853 is
   tested through the shared library on harmonic-oscillator final-state and
-  dense-output samples; elliptic integrals are tested against SciPy; MGE setup
-  and potential-stack evaluation are tested against independent NumPy/SciPy
-  implementations of the Fortran formulas.
+  dense-output samples; elliptic integrals are tested against SciPy; MGE setup,
+  potential-stack evaluation, and interpolation-grid evaluation are tested
+  against independent NumPy/SciPy implementations of the Fortran formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -176,7 +179,7 @@ source files.
   numerical oracle. Correctness is the first rule; among correct versions,
   optimize aggressively for speed, allocation behavior, RHS/acceleration
   throughput, cache locality, and reproducible parallel execution. The current
-  current implementation slices build a C++ shared library and wire
+  implementation slices build a C++ shared library and wire
   `cpp_shared_library` into Python with a hard not-implemented status for
   generation calls. The first actual ported Fortran kernels are `ran1_nr.f`,
   implemented as a no-hot-loop-allocation C++ `Ran1` class with ABI test helper
@@ -188,9 +191,11 @@ source files.
   MGE setup formulas, plus stellar triaxial MGE potential/acceleration
   evaluation across the inner approximation, mid-radius quadrature, and
   far-field point-mass approximation. The branch now also ports the
-  Plummer-style black-hole term and dark-halo profiles 0 through 3. The gNFW
-  profile 5 beta-function path, interpolation-grid behavior, and orbit RHS
-  wiring are the next unported potential-stack dependencies.
+  Plummer-style black-hole term, dark-halo profiles 0 through 3, and the
+  in-memory acceleration interpolation-grid math from `interpolpotent.f90`.
+  The legacy `interpolgrid` disk-cache contract, gNFW profile 5 beta-function
+  path, and orbit RHS wiring are the next unported potential-stack
+  dependencies.
 
 ## Separated Workspaces
 

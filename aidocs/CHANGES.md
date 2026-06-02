@@ -236,3 +236,15 @@ This file is append-only. Add new entries at the bottom.
   dark-halo terms against independent Python/SciPy calculations of the Fortran
   formulas. gNFW profile 5 remains unported pending the beta-function helper
   stack.
+- Ported the in-memory acceleration interpolation math from
+  `interpolpotent.f90` to C++ as
+  `dynamite::orblib_cpp::InterpolatedPotential` in
+  `orblib_cpp/include/interpolated_potential.hpp` and
+  `orblib_cpp/source/interpolated_potential.cpp`. The implementation preserves
+  the Fortran radius range formulas, spherical-octant grid construction,
+  endpoint angle offsets, log-acceleration storage, trilinear interpolation,
+  and direct acceleration fallback outside the interpolation range. Added
+  test-only ABI helper `orblib_cpp_api_interpolated_potential_evaluate` and
+  opt-in pytest coverage against an independent Python implementation of the
+  Fortran grid formulas. The legacy `interpolgrid` disk-cache read/write
+  behavior remains unported.

@@ -47,6 +47,10 @@ Current coverage:
 - C++ combined potential-stack validation for the Plummer-style black-hole
   term and supported dark-halo profiles 0 through 3 against independent
   Python/SciPy calculations of the Fortran formulas;
+- C++ in-memory acceleration interpolation-grid validation against an
+  independent Python implementation of the Fortran `interpolpotent.f90`
+  metadata, log-acceleration grid, trilinear interpolation, and direct-fallback
+  formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

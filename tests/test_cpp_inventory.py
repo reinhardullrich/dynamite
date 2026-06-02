@@ -14,11 +14,13 @@ CPP_SOURCES = [
     "Makefile",
     "include/dop853.hpp",
     "include/elliptic_integrals.hpp",
+    "include/interpolated_potential.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
     "include/triaxial_mge.hpp",
     "source/dop853.cpp",
     "source/elliptic_integrals.cpp",
+    "source/interpolated_potential.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
     "source/ran1.cpp",
@@ -200,6 +202,7 @@ def _expected_triaxial_mge_setup(
     ) / (pintr**2 - qintr**2)
     return {
         "conversion_factor": conversion_factor,
+        "sigobs_km": sigobs_km,
         "pintr": pintr,
         "qintr": qintr,
         "sigintr_km": sigintr_km,
@@ -460,6 +463,163 @@ def _expected_potential_stack_evaluation(
     )
     halo_potential, halo_acceleration = _expected_dark_halo_evaluation(halo, points)
     return potentials + halo_potential, accelerations + halo_acceleration
+
+
+def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
+    rmin2 = (np.min(setup["sigobs_km"]) / 10.0) ** 2
+    rmax2 = (np.max(setup["sigintr_km"]) * 6.0) ** 2
+    rmin2 = min((10.0**rlogmin * 0.01) ** 2, rmin2)
+    rmax2 = max((10.0**rlogmax * 1.05) ** 2, rmax2 * 2.0)
+    rlog_min = np.log10(np.sqrt(rmin2))
+    rlog_max = np.log10(np.sqrt(rmax2))
+    return {
+        "theta_step": (0.5 * np.pi) / (n_theta - 1),
+        "phi_step": (0.5 * np.pi) / (n_phi - 1),
+        "rlog_step": (rlog_max - rlog_min) / (n_radius - 1),
+        "rlog_min": rlog_min,
+        "rmin2": rmin2,
+        "rmax2": rmax2,
+    }
+
+
+def _expected_interpolated_potential_evaluation(
+    setup,
+    points,
+    black_hole_mass,
+    black_hole_softening_arcsec,
+    dark_halo_profile_type,
+    dark_halo_parameters,
+    rlogmin,
+    rlogmax,
+    n_radius,
+    n_theta,
+    n_phi,
+):
+    metadata = _expected_interpolation_metadata(
+        setup,
+        rlogmin,
+        rlogmax,
+        n_radius,
+        n_theta,
+        n_phi,
+    )
+    log_tiny = np.log(np.finfo(np.float64).tiny)
+    tiny = np.finfo(np.float64).tiny
+    grid = np.full((3, n_phi, n_theta, n_radius), log_tiny, dtype=np.float64)
+    grid_points = []
+    grid_indices = []
+    for radius_index in range(n_radius):
+        radius = 10.0 ** (
+            metadata["rlog_min"] + radius_index * metadata["rlog_step"]
+        )
+        for theta_index in range(n_theta):
+            theta = theta_index * metadata["theta_step"]
+            if theta_index == 0:
+                theta = 0.5 * metadata["theta_step"]
+            if theta_index == n_theta - 1:
+                theta = (n_theta - 1.1) * metadata["theta_step"]
+            sin_theta = np.sin(theta)
+            z = radius * np.cos(theta)
+            for phi_index in range(n_phi):
+                phi = phi_index * metadata["phi_step"]
+                if phi_index == 0:
+                    phi = 0.5 * metadata["phi_step"]
+                if phi_index == n_phi - 1:
+                    phi = (n_phi - 1.1) * metadata["phi_step"]
+                x = radius * sin_theta * np.cos(phi)
+                y = radius * sin_theta * np.sin(phi)
+                grid_points.append([x, y, z])
+                grid_indices.append((phi_index, theta_index, radius_index, x, y, z))
+
+    _, grid_acceleration = _expected_potential_stack_evaluation(
+        setup,
+        np.asarray(grid_points, dtype=np.float64),
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    for acceleration, (phi_index, theta_index, radius_index, x, y, z) in zip(
+        grid_acceleration,
+        grid_indices,
+    ):
+        if -acceleration[0] > tiny * x:
+            grid[0, phi_index, theta_index, radius_index] = np.log(-acceleration[0] / x)
+        if -acceleration[1] > tiny * y:
+            grid[1, phi_index, theta_index, radius_index] = np.log(-acceleration[1] / y)
+        if -acceleration[2] > tiny * z:
+            grid[2, phi_index, theta_index, radius_index] = np.log(-acceleration[2] / z)
+
+    direct_potential, direct_acceleration = _expected_potential_stack_evaluation(
+        setup,
+        points,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    interpolated_acceleration = direct_acceleration.copy()
+    inner_fallback_count = 0
+    outer_fallback_count = 0
+    for index, point in enumerate(points):
+        x, y, z = point
+        radius_squared = np.dot(point, point)
+        if radius_squared <= metadata["rmin2"] or radius_squared >= metadata["rmax2"]:
+            if radius_squared < metadata["rmin2"]:
+                inner_fallback_count += 1
+            if radius_squared > metadata["rmax2"]:
+                outer_fallback_count += 1
+            continue
+
+        theta = np.arctan2(np.sqrt(x * x + y * y), abs(z))
+        phi = np.arctan2(abs(y), abs(x))
+        radius_log = 0.5 * np.log10(radius_squared)
+        theta_scaled = theta / metadata["theta_step"]
+        phi_scaled = phi / metadata["phi_step"]
+        radius_scaled = (radius_log - metadata["rlog_min"]) / metadata["rlog_step"]
+        theta_index = int(np.floor(theta_scaled))
+        phi_index = int(np.floor(phi_scaled))
+        radius_index = int(np.floor(radius_scaled))
+        if (
+            theta_index < 0
+            or phi_index < 0
+            or radius_index < 0
+            or theta_index + 1 >= n_theta
+            or phi_index + 1 >= n_phi
+            or radius_index + 1 >= n_radius
+        ):
+            continue
+
+        tf = theta_scaled - np.floor(theta_scaled)
+        pf = phi_scaled - np.floor(phi_scaled)
+        rf = radius_scaled - np.floor(radius_scaled)
+        acc_log = (
+            (1.0 - pf) * (1.0 - tf) * (1.0 - rf)
+            * grid[:, phi_index, theta_index, radius_index]
+            + (1.0 - pf) * (1.0 - tf) * rf
+            * grid[:, phi_index, theta_index, radius_index + 1]
+            + (1.0 - pf) * tf * rf
+            * grid[:, phi_index, theta_index + 1, radius_index + 1]
+            + (1.0 - pf) * tf * (1.0 - rf)
+            * grid[:, phi_index, theta_index + 1, radius_index]
+            + pf * (1.0 - tf) * (1.0 - rf)
+            * grid[:, phi_index + 1, theta_index, radius_index]
+            + pf * (1.0 - tf) * rf
+            * grid[:, phi_index + 1, theta_index, radius_index + 1]
+            + pf * tf * rf
+            * grid[:, phi_index + 1, theta_index + 1, radius_index + 1]
+            + pf * tf * (1.0 - rf)
+            * grid[:, phi_index + 1, theta_index + 1, radius_index]
+        )
+        interpolated_acceleration[index] = -point * np.exp(acc_log)
+
+    return (
+        direct_potential,
+        interpolated_acceleration,
+        metadata,
+        inner_fallback_count,
+        outer_fallback_count,
+    )
 
 
 @pytest.mark.orblib_cpp
@@ -831,6 +991,190 @@ def test_orblib_cpp_potential_stack_matches_black_hole_and_supported_dark_halos(
         actual_acceleration,
         expected_acceleration,
         rtol=2e-10,
+        atol=0.0,
+    )
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_interpolated_potential_matches_fortran_grid_formula():
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = 18.0
+    rlogmax = 19.0
+
+    def spherical_point(radius, theta_value, phi_value):
+        return [
+            radius * np.sin(theta_value) * np.cos(phi_value),
+            -radius * np.sin(theta_value) * np.sin(phi_value),
+            radius * np.cos(theta_value),
+        ]
+
+    points = np.ascontiguousarray(
+        [
+            spherical_point(1.0e17, 0.7, 0.35),
+            spherical_point(1.0e13, 0.8, 0.4),
+            spherical_point(3.0e19, 0.9, 0.5),
+        ],
+        dtype=np.float64,
+    )
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    (
+        expected_potential,
+        expected_acceleration,
+        expected_metadata,
+        expected_inner_fallback_count,
+        expected_outer_fallback_count,
+    ) = _expected_interpolated_potential_evaluation(
+        expected_setup,
+        points,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+        rlogmin,
+        rlogmax,
+        n_radius,
+        n_theta,
+        n_phi,
+    )
+    point_x = np.ascontiguousarray(points[:, 0], dtype=np.float64)
+    point_y = np.ascontiguousarray(points[:, 1], dtype=np.float64)
+    point_z = np.ascontiguousarray(points[:, 2], dtype=np.float64)
+    potential = np.empty(points.shape[0], dtype=np.float64)
+    accel_x = np.empty(points.shape[0], dtype=np.float64)
+    accel_y = np.empty(points.shape[0], dtype=np.float64)
+    accel_z = np.empty(points.shape[0], dtype=np.float64)
+    theta_step = ctypes.c_double(np.nan)
+    phi_step = ctypes.c_double(np.nan)
+    rlog_step = ctypes.c_double(np.nan)
+    rlog_min = ctypes.c_double(np.nan)
+    rmin2 = ctypes.c_double(np.nan)
+    rmax2 = ctypes.c_double(np.nan)
+    inner_fallback_count = ctypes.c_int(-1)
+    outer_fallback_count = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_interpolated_potential_evaluate
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_int(points.shape[0]),
+        point_x.ctypes.data_as(double_p),
+        point_y.ctypes.data_as(double_p),
+        point_z.ctypes.data_as(double_p),
+        potential.ctypes.data_as(double_p),
+        accel_x.ctypes.data_as(double_p),
+        accel_y.ctypes.data_as(double_p),
+        accel_z.ctypes.data_as(double_p),
+        ctypes.byref(theta_step),
+        ctypes.byref(phi_step),
+        ctypes.byref(rlog_step),
+        ctypes.byref(rlog_min),
+        ctypes.byref(rmin2),
+        ctypes.byref(rmax2),
+        ctypes.byref(inner_fallback_count),
+        ctypes.byref(outer_fallback_count),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert inner_fallback_count.value == expected_inner_fallback_count
+    assert outer_fallback_count.value == expected_outer_fallback_count
+    np.testing.assert_allclose(theta_step.value, expected_metadata["theta_step"], rtol=0.0, atol=1e-15)
+    np.testing.assert_allclose(phi_step.value, expected_metadata["phi_step"], rtol=0.0, atol=1e-15)
+    np.testing.assert_allclose(rlog_step.value, expected_metadata["rlog_step"], rtol=0.0, atol=1e-15)
+    np.testing.assert_allclose(rlog_min.value, expected_metadata["rlog_min"], rtol=0.0, atol=1e-15)
+    np.testing.assert_allclose(rmin2.value, expected_metadata["rmin2"], rtol=2e-15, atol=0.0)
+    np.testing.assert_allclose(rmax2.value, expected_metadata["rmax2"], rtol=2e-15, atol=0.0)
+    np.testing.assert_allclose(potential, expected_potential, rtol=2e-12, atol=0.0)
+    np.testing.assert_allclose(
+        np.column_stack([accel_x, accel_y, accel_z]),
+        expected_acceleration,
+        rtol=2e-12,
         atol=0.0,
     )
 
