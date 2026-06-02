@@ -82,9 +82,10 @@ Current coverage:
 - C++ formatted orbclass output validation against the current Python
   `reshape(..., order='F')` reader contract;
 - C++ orbit-start `calc_startpos()` and `findReq()` kernel validation against
-  independent Python mirrors of the Fortran formulas, plus unregularized-grid
-  tube-start radius/noreg schedule, and box-start record validation against
-  Python mirrors of the Fortran loop order, angular grid, and flag rules;
+  independent Python mirrors of the Fortran formulas, plus unregularized-grid,
+  tube-start radius/noreg schedule, and box-start record/array validation
+  against Python mirrors of the Fortran loop order, angular grid, and flag
+  rules;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

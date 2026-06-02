@@ -1,6 +1,7 @@
 #include "orbit_start.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cmath>
 
 namespace dynamite::orblib_cpp {
@@ -186,6 +187,61 @@ bool calculate_box_start_record(
     record[6] = circular_radius;
     record[7] = circular_period;
     record[8] = circular_velocity;
+    return true;
+}
+
+bool build_box_start_records(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* energies,
+    const double* circular_periods,
+    const double* circular_radii,
+    const double* circular_velocities,
+    double* records,
+    int* noreg_flags,
+    int* iterations
+) noexcept {
+    if (energy_count <= 0 || i2_count <= 0 || i3_count <= 0 || energies == nullptr ||
+        circular_periods == nullptr || circular_radii == nullptr ||
+        circular_velocities == nullptr || records == nullptr || noreg_flags == nullptr ||
+        iterations == nullptr) {
+        return false;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        for (int i2 = 0; i2 < i2_count; ++i2) {
+            for (int i3 = 0; i3 < i3_count; ++i3) {
+                const int record_index = (energy * i2_count + i2) * i3_count + i3;
+                int record_iterations = 0;
+                if (!calculate_box_start_record(
+                        mge,
+                        halo,
+                        black_hole_mass,
+                        black_hole_softening_km,
+                        circular_radii[energy],
+                        energies[energy],
+                        i2,
+                        i3,
+                        i2_count,
+                        i3_count,
+                        circular_radii[energy],
+                        circular_periods[energy],
+                        circular_velocities[energy],
+                        records + static_cast<std::size_t>(record_index) * 9U,
+                        record_iterations
+                    )) {
+                    return false;
+                }
+                noreg_flags[record_index] = 0;
+                iterations[record_index] = record_iterations;
+            }
+        }
+    }
     return true;
 }
 

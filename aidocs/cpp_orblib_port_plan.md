@@ -220,8 +220,13 @@ Current branch status:
   `Pi/2*(j-0.5)/count` angle formula, represented as `index+0.5` for
   zero-based C++ indices, plus Cartesian placement, zero velocity fields,
   circular-orbit metadata fields, and bisection iteration count.
+- The full `make_boxstartpoints()` loop is ported as
+  `build_box_start_records()`, producing flattened
+  `[energy, nI2, nI3, 9]` records in Fortran loop order and all-zero noreg
+  flags, with ABI tests for output order, per-cell bisection iteration counts,
+  and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start boundary search/full begin-state
+  interpolation-grid disk caching, orbit-start boundary search/tube begin-state
   generation, full orbit-engine wiring, and full-output orchestration still
   remain.
 

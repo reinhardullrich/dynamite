@@ -68,4 +68,21 @@ bool calculate_box_start_record(
     int& iterations
 ) noexcept;
 
+bool build_box_start_records(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* energies,
+    const double* circular_periods,
+    const double* circular_radii,
+    const double* circular_velocities,
+    double* records,
+    int* noreg_flags,
+    int* iterations
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

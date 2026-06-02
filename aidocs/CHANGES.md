@@ -443,3 +443,14 @@ This file is append-only. Add new entries at the bottom.
   `maxval(irregular(:)) .eq. i`; because `irregular` is a 0/1 flag vector,
   this flags energy index 1 whenever any irregular energy exists. The C++
   port intentionally preserves this behavior for current parity.
+- Ported the full `make_boxstartpoints()` loop into C++ as
+  `dynamite::orblib_cpp::build_box_start_records` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_box_start_records` with opt-in pytest coverage
+  for flattened `[energy, nI2, nI3, 9]` record order, all-zero noreg flags,
+  per-cell `findReq()` bisection iteration counts, and per-energy circular
+  radius/period/velocity metadata propagation. Remaining C++ gaps now include
+  interpolation-grid disk caching if required for parity, orbit-start boundary
+  search/tube begin-array generation, full orbit-engine wiring, and full-output
+  orchestration.
