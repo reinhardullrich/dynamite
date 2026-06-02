@@ -5,6 +5,7 @@
 #include "orbit_classification.hpp"
 #include "orbit_histogram.hpp"
 #include "orbit_integrator.hpp"
+#include "orbit_output.hpp"
 #include "orbit_projection.hpp"
 #include "orbit_psf.hpp"
 #include "orbit_qgrid.hpp"
@@ -24,6 +25,7 @@ namespace {
 constexpr int kAbiVersion = 1;
 constexpr int kStatusOk = 0;
 constexpr int kStatusInvalidArgument = -1;
+constexpr int kStatusIoError = -2;
 constexpr int kStatusNotImplemented = -100;
 constexpr int kStatusException = -101;
 
@@ -1484,6 +1486,61 @@ extern "C" void orblib_cpp_api_dop853_harmonic(
             return;
         }
         set_status(status, result.status);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_write_qgrid_file(
+    const char* output_path,
+    int orbit_count,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    int dithering,
+    int not_regularizable_count,
+    int radius_bin_count,
+    int theta_bin_count,
+    int phi_bin_count,
+    const double* radius_boundaries,
+    const double* theta_boundaries,
+    const double* phi_boundaries,
+    const int* orbit_types,
+    const double* qgrids,
+    int* status
+) noexcept {
+    if (output_path == nullptr || orbit_count <= 0 || energy_count <= 0 ||
+        i2_count <= 0 || i3_count <= 0 || dithering <= 0 ||
+        not_regularizable_count < 0 || radius_bin_count <= 0 ||
+        theta_bin_count <= 0 || phi_bin_count <= 0 || radius_boundaries == nullptr ||
+        theta_boundaries == nullptr || phi_boundaries == nullptr ||
+        orbit_types == nullptr || qgrids == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::write_qgrid_file(
+                output_path,
+                orbit_count,
+                energy_count,
+                i2_count,
+                i3_count,
+                dithering,
+                not_regularizable_count,
+                radius_bin_count,
+                theta_bin_count,
+                phi_bin_count,
+                radius_boundaries,
+                theta_boundaries,
+                phi_boundaries,
+                orbit_types,
+                qgrids
+            )) {
+            set_status(status, kStatusIoError);
+            return;
+        }
+        set_status(status, kStatusOk);
     } catch (...) {
         set_status(status, kStatusException);
     }

@@ -817,6 +817,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_qgrid_boundaries`
 - `orblib_cpp_api_accumulate_qgrid`
 - `orblib_cpp_api_normalize_qgrid`
+- `orblib_cpp_api_write_qgrid_file`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -976,8 +977,17 @@ The first actual ported Fortran kernels are:
   channel mapping, per-cell moment normalization, and global light/type
   normalization. Test-only C ABI helpers `orblib_cpp_api_qgrid_boundaries`,
   `orblib_cpp_api_accumulate_qgrid`, and `orblib_cpp_api_normalize_qgrid`
-  validate the memory-side qgrid math. Actual binary qgrid file serialization
-  and full orbit-engine wiring remain unported.
+  validate the memory-side qgrid math.
+- Qgrid Fortran-record binary serialization, implemented as
+  `dynamite::orblib_cpp::write_qgrid_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. It writes the same record order used
+  by `integrator_setup_write()`, `qgrid_setup_write()`,
+  `integrator_write()`, and `qgrid_write()` for the split
+  `*_qgrid.dat` output files. The test-only C ABI helper
+  `orblib_cpp_api_write_qgrid_file` validates the generated file through
+  SciPy `FortranFile`. LOSVD/pops/orbclass serialization and full orbit-engine
+  wiring remain unported.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

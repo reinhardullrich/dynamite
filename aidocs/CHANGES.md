@@ -364,3 +364,14 @@ This file is append-only. Add new entries at the bottom.
   accumulation, orbit-type channels, and qgrid normalization. Remaining C++
   gaps now include interpolation-grid disk caching if required for parity,
   orbit-start generation, full orbit-engine wiring, and binary output writing.
+- Ported qgrid Fortran-record binary serialization into C++ as
+  `dynamite::orblib_cpp::write_qgrid_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_write_qgrid_file` and opt-in pytest coverage that writes a
+  split `*_qgrid.dat`-style file and reads it back with SciPy `FortranFile`,
+  validating the integrator header, qgrid header, boundary records, per-orbit
+  headers, orbit-type arrays, and qgrid payload order. Remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, orbit-start
+  generation, full orbit-engine wiring, and LOSVD/pops/orbclass output
+  writing.

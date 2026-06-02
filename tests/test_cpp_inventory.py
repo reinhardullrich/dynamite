@@ -3,6 +3,7 @@ import ctypes
 import numpy as np
 import pytest
 import scipy.integrate
+import scipy.io
 import scipy.special
 
 from conftest import ORBLIB_CPP_DIR, ORBLIB_CPP_SHARED_LIBRARY
@@ -19,6 +20,7 @@ CPP_SOURCES = [
     "include/orbit_classification.hpp",
     "include/orbit_histogram.hpp",
     "include/orbit_integrator.hpp",
+    "include/orbit_output.hpp",
     "include/orbit_projection.hpp",
     "include/orbit_psf.hpp",
     "include/orbit_qgrid.hpp",
@@ -33,6 +35,7 @@ CPP_SOURCES = [
     "source/orbit_classification.cpp",
     "source/orbit_histogram.cpp",
     "source/orbit_integrator.cpp",
+    "source/orbit_output.cpp",
     "source/orbit_projection.cpp",
     "source/orbit_psf.cpp",
     "source/orbit_qgrid.cpp",
@@ -2438,6 +2441,103 @@ def test_orblib_cpp_accumulates_qgrid_like_fortran(orbit_type, omega):
 
     assert status.value == 0
     np.testing.assert_allclose(qgrid, expected_normalized, rtol=0.0, atol=1e-14)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_writes_qgrid_file_readable_by_scipy_fortranfile(tmp_path):
+    orbit_count = 2
+    energy_count = 1
+    i2_count = 1
+    i3_count = 2
+    dithering = 2
+    dither_count = dithering**3
+    not_regularizable_count = 3
+    n_radius = 2
+    n_theta = 2
+    n_phi = 3
+    radius = np.ascontiguousarray([0.0, 1.5, 12.0], dtype=np.float64)
+    theta = np.ascontiguousarray([0.0, 0.25 * np.pi, 0.5 * np.pi], dtype=np.float64)
+    phi = np.ascontiguousarray([0.0, 0.2, 0.7, 0.5 * np.pi], dtype=np.float64)
+    orbit_types = np.ascontiguousarray(
+        np.arange(1, orbit_count * dither_count + 1, dtype=np.int32),
+    )
+    values_per_orbit = 16 * n_phi * n_theta * n_radius
+    qgrids = np.ascontiguousarray(
+        np.arange(orbit_count * values_per_orbit, dtype=np.float64) / 11.0,
+    )
+    output_path = tmp_path / "orblib_qgrid.dat"
+
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function = library.orblib_cpp_api_write_qgrid_file
+    function.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        int_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        str(output_path).encode(),
+        ctypes.c_int(orbit_count),
+        ctypes.c_int(energy_count),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_int(dithering),
+        ctypes.c_int(not_regularizable_count),
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        radius.ctypes.data_as(double_p),
+        theta.ctypes.data_as(double_p),
+        phi.ctypes.data_as(double_p),
+        orbit_types.ctypes.data_as(int_p),
+        qgrids.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    reader = scipy.io.FortranFile(output_path, "r")
+    try:
+        np.testing.assert_array_equal(
+            reader.read_ints(np.int32),
+            np.array([orbit_count, energy_count, i2_count, i3_count, dithering], dtype=np.int32),
+        )
+        np.testing.assert_array_equal(
+            reader.read_ints(np.int32),
+            np.array([16, n_phi, n_theta, n_radius], dtype=np.int32),
+        )
+        np.testing.assert_array_equal(reader.read_reals(float), radius)
+        np.testing.assert_array_equal(reader.read_reals(float), theta)
+        np.testing.assert_array_equal(reader.read_reals(float), phi)
+        expected_orbit_headers = [
+            np.array([1, 1, 1, 1, not_regularizable_count], dtype=np.int32),
+            np.array([2, 1, 1, 2, not_regularizable_count], dtype=np.int32),
+        ]
+        for orbit_index, expected_header in enumerate(expected_orbit_headers):
+            np.testing.assert_array_equal(reader.read_ints(np.int32), expected_header)
+            begin = orbit_index * dither_count
+            end = begin + dither_count
+            np.testing.assert_array_equal(reader.read_ints(np.int32), orbit_types[begin:end])
+            qgrid_begin = orbit_index * values_per_orbit
+            qgrid_end = qgrid_begin + values_per_orbit
+            np.testing.assert_array_equal(reader.read_reals(float), qgrids[qgrid_begin:qgrid_end])
+    finally:
+        reader.close()
 
 
 @pytest.mark.orblib_cpp
