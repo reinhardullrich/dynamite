@@ -50,4 +50,22 @@ bool compute_tube_start_schedule(
     int* noreg_flags
 ) noexcept;
 
+bool calculate_box_start_record(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    double request_radius,
+    double energy,
+    int i2_index,
+    int i3_index,
+    int i2_count,
+    int i3_count,
+    double circular_radius,
+    double circular_period,
+    double circular_velocity,
+    double* record,
+    int& iterations
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

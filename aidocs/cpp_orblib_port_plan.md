@@ -214,6 +214,12 @@ Current branch status:
   with ABI tests for the reverse `nI2` propagation scan, irregular-energy
   boundary replacement, nearly closed-boundary radius formula, and the exact
   Fortran `maxval(irregular) == i` flag condition.
+- The per-record `make_boxstartpoints()` angular-grid and record construction
+  path is ported as `calculate_box_start_record()`, reusing
+  `find_equivalent_radius()` and testing the Fortran one-based
+  `Pi/2*(j-0.5)/count` angle formula, represented as `index+0.5` for
+  zero-based C++ indices, plus Cartesian placement, zero velocity fields,
+  circular-orbit metadata fields, and bisection iteration count.
 - The orbit-specific C++ engine is still not implemented yet:
   interpolation-grid disk caching, orbit-start boundary search/full begin-state
   generation, full orbit-engine wiring, and full-output orchestration still

@@ -5,6 +5,12 @@
 
 namespace dynamite::orblib_cpp {
 
+namespace {
+
+constexpr double kPi = 3.141592653589793238462643383279502884;
+
+}  // namespace
+
 bool calculate_orbit_start_state(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,
@@ -122,6 +128,65 @@ bool find_equivalent_radius(
     }
     iterations = max_iterations;
     return false;
+}
+
+bool calculate_box_start_record(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    double request_radius,
+    double energy,
+    int i2_index,
+    int i3_index,
+    int i2_count,
+    int i3_count,
+    double circular_radius,
+    double circular_period,
+    double circular_velocity,
+    double* record,
+    int& iterations
+) noexcept {
+    iterations = 0;
+    if (record == nullptr || request_radius <= 0.0 || energy == 0.0 ||
+        i2_index < 0 || i3_index < 0 || i2_count <= 0 || i3_count <= 0 ||
+        i2_index >= i2_count || i3_index >= i3_count ||
+        !std::isfinite(request_radius) || !std::isfinite(energy) ||
+        !std::isfinite(circular_radius) || !std::isfinite(circular_period) ||
+        !std::isfinite(circular_velocity)) {
+        return false;
+    }
+
+    const double theta =
+        0.5 * kPi * (static_cast<double>(i2_index) + 0.5) / static_cast<double>(i2_count);
+    const double phi =
+        0.5 * kPi * (static_cast<double>(i3_index) + 0.5) / static_cast<double>(i3_count);
+    double radius = 0.0;
+    if (!find_equivalent_radius(
+            mge,
+            halo,
+            black_hole_mass,
+            black_hole_softening_km,
+            request_radius,
+            energy,
+            theta,
+            phi,
+            radius,
+            iterations
+        )) {
+        return false;
+    }
+
+    record[0] = radius * std::sin(theta) * std::cos(phi);
+    record[1] = radius * std::sin(theta) * std::sin(phi);
+    record[2] = radius * std::cos(theta);
+    record[3] = 0.0;
+    record[4] = 0.0;
+    record[5] = 0.0;
+    record[6] = circular_radius;
+    record[7] = circular_period;
+    record[8] = circular_velocity;
+    return true;
 }
 
 bool compute_unregularized_orbit_grid(

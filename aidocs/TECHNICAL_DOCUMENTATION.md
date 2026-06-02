@@ -1030,8 +1030,12 @@ The first actual ported Fortran kernels are:
   `dynamite::orblib_cpp::compute_unregularized_orbit_grid` and
   `dynamite::orblib_cpp::compute_tube_start_schedule`; ABI tests validate the
   reverse `nI2` propagation scan, irregular-energy boundary replacement, and
-  nearly closed-boundary sampling formula. The boundary-search routines and
-  full begin/beginbox state-array generation are not ported yet.
+  nearly closed-boundary sampling formula. `make_boxstartpoints()`'s
+  per-record angular-grid and Cartesian record construction is ported as
+  `dynamite::orblib_cpp::calculate_box_start_record`, reusing
+  `find_equivalent_radius()` and preserving the zero-velocity and
+  circular-orbit metadata fields. The boundary-search routines and full
+  begin/beginbox state-array generation are not ported yet.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

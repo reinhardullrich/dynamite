@@ -1665,6 +1665,107 @@ extern "C" void orblib_cpp_api_orbitstart_find_equivalent_radius(
     }
 }
 
+extern "C" void orblib_cpp_api_orbitstart_box_start_record(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    double request_radius,
+    double energy,
+    int i2_index,
+    int i3_index,
+    int i2_count,
+    int i3_count,
+    double circular_radius,
+    double circular_period,
+    double circular_velocity,
+    double* record,
+    int* iterations,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        request_radius <= 0.0 || i2_index < 0 || i3_index < 0 || i2_count <= 0 ||
+        i3_count <= 0 || i2_index >= i2_count || i3_index >= i3_count ||
+        record == nullptr || iterations == nullptr || !std::isfinite(request_radius) ||
+        !std::isfinite(energy) || !std::isfinite(circular_radius) ||
+        !std::isfinite(circular_period) || !std::isfinite(circular_velocity)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        int result_iterations = 0;
+        if (!dynamite::orblib_cpp::calculate_box_start_record(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_arcsec * mge.conversion_factor,
+                request_radius,
+                energy,
+                i2_index,
+                i3_index,
+                i2_count,
+                i3_count,
+                circular_radius,
+                circular_period,
+                circular_velocity,
+                record,
+                result_iterations
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        *iterations = result_iterations;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_orbitstart_unregularized_grid(
     int energy_count,
     int i2_count,

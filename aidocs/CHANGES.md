@@ -425,3 +425,14 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, full
   orbit-start boundary search/state-array generation, and full orbit-engine
   wiring.
+- Ported the per-record box-start path from `make_boxstartpoints()` into C++
+  as `dynamite::orblib_cpp::calculate_box_start_record` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_box_start_record` with opt-in pytest coverage for
+  the Fortran one-based `Pi/2*(j-0.5)/count` angular grid represented as
+  `index+0.5` for zero-based C++ indices, `findReq()` bisection reuse,
+  Cartesian x/y/z placement, zero velocity columns, circular-orbit metadata
+  columns, and bisection iteration count. Remaining C++ gaps now include
+  interpolation-grid disk caching if required for parity, full orbit-start
+  boundary search/state-array generation, and full orbit-engine wiring.

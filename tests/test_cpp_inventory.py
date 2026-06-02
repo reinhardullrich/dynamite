@@ -3386,6 +3386,167 @@ def test_orblib_cpp_orbitstart_finds_equivalent_radius_like_fortran():
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_box_record_matches_fortran_grid_formula():
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    request_radius = 1.0e13
+    target_radius = 0.73 * request_radius
+    i2_count = 5
+    i3_count = 4
+    i2_index = 2
+    i3_index = 1
+    circular_radius = request_radius
+    circular_period = 6.25e5
+    circular_velocity = 217.5
+    start_theta = 0.5 * np.pi * (i2_index + 0.5) / i2_count
+    start_phi = 0.5 * np.pi * (i3_index + 0.5) / i3_count
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+
+    def potential_at_radius(radius_value):
+        radius_point = np.array(
+            [
+                [
+                    radius_value * np.sin(start_theta) * np.cos(start_phi),
+                    radius_value * np.sin(start_theta) * np.sin(start_phi),
+                    radius_value * np.cos(start_theta),
+                ],
+            ],
+            dtype=np.float64,
+        )
+        radius_potential, _ = _expected_potential_stack_evaluation(
+            expected_setup,
+            radius_point,
+            black_hole_mass,
+            black_hole_softening_arcsec,
+            dark_halo_profile_type,
+            dark_halo_parameters,
+        )
+        return radius_potential[0]
+
+    energy = potential_at_radius(target_radius)
+    min_radius = 0.01 * request_radius
+    max_radius = 1.1 * request_radius
+    expected_radius = np.nan
+    expected_iterations = -1
+    for iteration in range(60001):
+        expected_radius = 0.5 * (min_radius + max_radius)
+        midpoint_potential = potential_at_radius(expected_radius)
+        if abs((energy - midpoint_potential) / energy) < 1.0e-7:
+            expected_iterations = iteration
+            break
+        if midpoint_potential > energy:
+            min_radius = expected_radius
+        else:
+            max_radius = expected_radius
+    assert expected_iterations > 0
+    expected_record = np.array(
+        [
+            expected_radius * np.sin(start_theta) * np.cos(start_phi),
+            expected_radius * np.sin(start_theta) * np.sin(start_phi),
+            expected_radius * np.cos(start_theta),
+            0.0,
+            0.0,
+            0.0,
+            circular_radius,
+            circular_period,
+            circular_velocity,
+        ],
+        dtype=np.float64,
+    )
+
+    record = np.empty(9, dtype=np.float64)
+    iterations = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function = library.orblib_cpp_api_orbitstart_box_start_record
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_double(request_radius),
+        ctypes.c_double(energy),
+        ctypes.c_int(i2_index),
+        ctypes.c_int(i3_index),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_double(circular_radius),
+        ctypes.c_double(circular_period),
+        ctypes.c_double(circular_velocity),
+        record.ctypes.data_as(double_p),
+        ctypes.byref(iterations),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert iterations.value == expected_iterations
+    np.testing.assert_allclose(record, expected_record, rtol=0.0, atol=2e-3)
+
+
+@pytest.mark.orblib_cpp
 def test_orblib_cpp_orbitstart_unregularized_grid_matches_fortran_loop_order():
     outer_boundaries = np.ascontiguousarray(
         [
