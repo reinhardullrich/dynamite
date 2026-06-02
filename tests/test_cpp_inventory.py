@@ -2,6 +2,7 @@ import ctypes
 
 import numpy as np
 import pytest
+import scipy.integrate
 import scipy.special
 
 from conftest import ORBLIB_CPP_DIR, ORBLIB_CPP_SHARED_LIBRARY
@@ -180,6 +181,20 @@ def _expected_triaxial_mge_setup(
     v0 = 4.0 * np.pi * GRAV_CONST_KM * sigintr_km**2 * pintr * qintr * density
     triaxiality = (1.0 - pintr**2) / (1.0 - qintr**2)
     total_mass = 2.0 * np.pi * np.sum(surf_km * qobs * sigobs_km**2)
+    amplitude = np.arccos(qintr)
+    modulus = np.sqrt((1.0 - pintr**2) / (1.0 - qintr**2))
+    elliptic_f = scipy.special.ellipkinc(amplitude, modulus**2)
+    elliptic_e = scipy.special.ellipeinc(amplitude, modulus**2)
+    a1 = (elliptic_f - elliptic_e) / (1.0 - pintr**2)
+    a2 = (
+        (1.0 - qintr**2) * elliptic_e
+        - (pintr**2 - qintr**2) * elliptic_f
+        - (qintr / pintr) * (1.0 - pintr**2) * np.sqrt(1.0 - qintr**2)
+    ) / ((1.0 - pintr**2) * (pintr**2 - qintr**2))
+    a3 = (
+        (pintr / qintr) * np.sqrt(1.0 - qintr**2)
+        - elliptic_e
+    ) / (pintr**2 - qintr**2)
     return {
         "pintr": pintr,
         "qintr": qintr,
@@ -188,7 +203,132 @@ def _expected_triaxial_mge_setup(
         "v0": v0,
         "triaxiality": triaxiality,
         "total_mass": total_mass,
+        "elliptic_f": elliptic_f,
+        "a1": a1,
+        "a2": a2,
+        "a3": a3,
     }
+
+
+def _expected_one_gaussian_mge_evaluation(setup, index, point):
+    x, y, z = point
+    radius_squared = x * x + y * y + z * z
+    sigma = setup["sigintr_km"][index]
+    p = setup["pintr"][index]
+    q = setup["qintr"][index]
+    v0 = setup["v0"][index]
+
+    if radius_squared < (1.0e-4 * sigma) ** 2:
+        p2 = p * p
+        q2 = q * q
+        x2 = x * x
+        y2 = y * y
+        z2 = z * z
+        sigma2 = sigma * sigma
+        sigma4 = sigma2 * sigma2
+        a1 = setup["a1"][index]
+        a2 = setup["a2"][index]
+        a3 = setup["a3"][index]
+        a12 = -(a1 - a2) / (1.0 - p2)
+        a23 = -(a2 - a3) / (p2 - q2)
+        a31 = -(a3 - a1) / (q2 - 1.0)
+        a11 = (1.0 / 3.0) * (2.0 - a12 - a31)
+        a22 = (1.0 / 3.0) * (2.0 / p2 - a23 - a12)
+        a33 = (1.0 / 3.0) * (2.0 / q2 - a31 - a23)
+        scale = v0 / np.sqrt(1.0 - q2)
+        o1 = -0.5 / sigma2 * (a1 * x2 + a2 * y2 + a3 * z2)
+        o2 = 0.125 / sigma4 * (
+            a11 * x2 * x2 + a22 * y2 * y2 + a33 * z2 * z2
+            + 2.0 * a12 * x2 * y2
+            + 2.0 * a23 * y2 * z2
+            + 2.0 * a31 * z2 * x2
+        )
+        potential = scale * (setup["elliptic_f"][index] + o1 + o2)
+        accel = np.array(
+            [
+                -scale * x / sigma2 * (
+                    a1 - 0.5 / sigma2 * (a11 * x2 + a12 * y2 + a31 * z2)
+                ),
+                -scale * y / sigma2 * (
+                    a2 - 0.5 / sigma2 * (a12 * x2 + a22 * y2 + a23 * z2)
+                ),
+                -scale * z / sigma2 * (
+                    a3 - 0.5 / sigma2 * (a31 * x2 + a23 * y2 + a33 * z2)
+                ),
+            ],
+        )
+        return potential, accel
+
+    if radius_squared >= (300.0 * sigma) ** 2:
+        radius = np.sqrt(radius_squared)
+        scale = np.sqrt(np.pi / 2.0) * sigma * v0
+        potential = scale / radius
+        accel = np.array(point) * (-scale / radius_squared**1.5)
+        return potential, accel
+
+    sigma2 = sigma * sigma
+    p_factor = 1.0 - p * p
+    q_factor = 1.0 - q * q
+
+    def common(t):
+        d = 1.0 - p_factor * t * t
+        e = 1.0 - q_factor * t * t
+        exponent = np.exp(
+            -t * t / (2.0 * sigma2)
+            * (x * x + y * y / d + z * z / e)
+        )
+        return d, e, exponent
+
+    def integrate(function):
+        return scipy.integrate.quad(
+            function,
+            0.0,
+            1.0,
+            epsabs=0.0,
+            epsrel=1.0e-11,
+            limit=100,
+        )[0]
+
+    potential = v0 * integrate(
+        lambda t: common(t)[2] / np.sqrt(common(t)[0] * common(t)[1]),
+    )
+    accel_x = v0 * integrate(
+        lambda t: -x / sigma2 * t * t * common(t)[2] / np.sqrt(common(t)[0] * common(t)[1]),
+    )
+    accel_y = v0 * integrate(
+        lambda t: (
+            -y / sigma2 * t * t / common(t)[0]
+            * common(t)[2]
+            / np.sqrt(common(t)[0] * common(t)[1])
+        ),
+    )
+    accel_z = v0 * integrate(
+        lambda t: (
+            -z / sigma2 * t * t / common(t)[1]
+            * common(t)[2]
+            / np.sqrt(common(t)[0] * common(t)[1])
+        ),
+    )
+    return potential, np.array([accel_x, accel_y, accel_z])
+
+
+def _expected_triaxial_mge_evaluation(setup, points):
+    potentials = []
+    accelerations = []
+    for point in points:
+        point_potential = 0.0
+        point_acceleration = np.zeros(3)
+        for index in range(setup["pintr"].size):
+            potential, acceleration = _expected_one_gaussian_mge_evaluation(
+                setup,
+                index,
+                point,
+            )
+            point_potential += potential
+            point_acceleration += acceleration
+        potentials.append(point_potential)
+        accelerations.append(point_acceleration)
+    return np.array(potentials), np.array(accelerations)
 
 
 @pytest.mark.orblib_cpp
@@ -296,6 +436,122 @@ def test_orblib_cpp_triaxial_mge_setup_matches_fortran_formulas():
         atol=2e-12,
     )
     np.testing.assert_allclose(total_mass.value, expected["total_mass"], rtol=2e-14, atol=0.0)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_triaxial_mge_evaluator_matches_formula_branches():
+    surf_pc = np.array(
+        [26819.14, 2456.39, 456.8, 645.49, 14.73, 122.85, 1.0],
+        dtype=np.float64,
+    )
+    sigobs_arcsec = np.array(
+        [0.49416, 2.04299, 2.44313, 6.5305, 17.41488, 21.84711, 21.84711],
+        dtype=np.float64,
+    )
+    qobs = np.array(
+        [0.89541, 0.79093, 0.9999, 0.55097, 0.9999, 0.55097, 0.55097],
+        dtype=np.float64,
+    )
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    points = np.ascontiguousarray(
+        [
+            [1.0e8, -2.0e8, 3.0e8],
+            [3.0e15, 2.0e15, -1.0e15],
+            [5.0e20, -2.0e20, 1.0e20],
+        ],
+        dtype=np.float64,
+    )
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    expected_potential, expected_acceleration = _expected_triaxial_mge_evaluation(
+        expected_setup,
+        points,
+    )
+    point_x = np.ascontiguousarray(points[:, 0], dtype=np.float64)
+    point_y = np.ascontiguousarray(points[:, 1], dtype=np.float64)
+    point_z = np.ascontiguousarray(points[:, 2], dtype=np.float64)
+
+    potential = np.empty(points.shape[0], dtype=np.float64)
+    accel_x = np.empty(points.shape[0], dtype=np.float64)
+    accel_y = np.empty(points.shape[0], dtype=np.float64)
+    accel_z = np.empty(points.shape[0], dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_triaxial_mge_evaluate
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_int(points.shape[0]),
+        point_x.ctypes.data_as(double_p),
+        point_y.ctypes.data_as(double_p),
+        point_z.ctypes.data_as(double_p),
+        potential.ctypes.data_as(double_p),
+        accel_x.ctypes.data_as(double_p),
+        accel_y.ctypes.data_as(double_p),
+        accel_z.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    actual_acceleration = np.column_stack([accel_x, accel_y, accel_z])
+    np.testing.assert_allclose(
+        potential,
+        expected_potential,
+        rtol=2e-10,
+        atol=0.0,
+    )
+    np.testing.assert_allclose(
+        actual_acceleration,
+        expected_acceleration,
+        rtol=2e-10,
+        atol=0.0,
+    )
 
 
 @pytest.mark.orblib_cpp

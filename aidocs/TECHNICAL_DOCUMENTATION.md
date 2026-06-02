@@ -801,6 +801,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_ran1_sequence`
 - `orblib_cpp_api_elliptic_legendre`
 - `orblib_cpp_api_triaxial_mge_setup`
+- `orblib_cpp_api_triaxial_mge_evaluate`
 - `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
@@ -829,6 +830,14 @@ The first actual ported Fortran kernels are:
   sigma, density, `V0`, triaxiality, and total mass. The C ABI helper
   `orblib_cpp_api_triaxial_mge_setup` is test-only and validates this setup
   against the Fortran formulas.
+- The stellar triaxial MGE potential/acceleration evaluator from
+  `tp_potent()` and `tp_accel()`. The current C++ evaluator covers the same
+  per-Gaussian inner approximation, mid-radius integral, and far-field
+  point-mass approximation, using a local adaptive Simpson integrator for the
+  mid-radius path. The test-only C ABI helper
+  `orblib_cpp_api_triaxial_mge_evaluate` validates representative points from
+  all three regimes against independent Python/SciPy calculations of the
+  Fortran formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

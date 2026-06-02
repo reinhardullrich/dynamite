@@ -187,6 +187,76 @@ extern "C" void orblib_cpp_api_triaxial_mge_setup(
     }
 }
 
+extern "C" void orblib_cpp_api_triaxial_mge_evaluate(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    int point_count,
+    const double* point_x,
+    const double* point_y,
+    const double* point_z,
+    double* potential,
+    double* accel_x,
+    double* accel_y,
+    double* accel_z,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || point_count < 0 ||
+        (point_count > 0 &&
+         (point_x == nullptr || point_y == nullptr || point_z == nullptr || potential == nullptr ||
+          accel_x == nullptr || accel_y == nullptr || accel_z == nullptr))) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup setup;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                setup
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        for (int i = 0; i < point_count; ++i) {
+            if (!dynamite::orblib_cpp::evaluate_triaxial_mge(
+                    setup,
+                    point_x[i],
+                    point_y[i],
+                    point_z[i],
+                    potential[i],
+                    accel_x[i],
+                    accel_y[i],
+                    accel_z[i]
+                )) {
+                set_status(status, kStatusInvalidArgument);
+                return;
+            }
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_dop853_harmonic(
     double x_start,
     double y0_start,

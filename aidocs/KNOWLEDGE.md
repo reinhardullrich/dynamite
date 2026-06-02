@@ -179,8 +179,11 @@ source files.
   evaluation, Fortran-style result counters, and ABI test helper
   `orblib_cpp_api_dop853_harmonic`. The current branch also has C++ support for
   `numerics/ellipint.f90` and the non-bar `tp_setup()`/`iniparam_from_arrays()`
-  MGE setup formulas; the hot potential/acceleration evaluator is the next
-  unported dependency.
+  MGE setup formulas, plus stellar triaxial MGE potential/acceleration
+  evaluation across the inner approximation, mid-radius quadrature, and
+  far-field point-mass approximation. Black-hole/dark-halo terms,
+  interpolation-grid behavior, and orbit RHS wiring are the next unported
+  potential-stack dependencies.
 
 ## Separated Workspaces
 

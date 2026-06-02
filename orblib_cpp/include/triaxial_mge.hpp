@@ -36,4 +36,15 @@ bool setup_triaxial_mge_from_observed(
     TriaxialMgeSetup& setup
 ) noexcept;
 
+bool evaluate_triaxial_mge(
+    const TriaxialMgeSetup& setup,
+    double x,
+    double y,
+    double z,
+    double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

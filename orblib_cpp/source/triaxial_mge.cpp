@@ -2,6 +2,7 @@
 
 #include "elliptic_integrals.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace dynamite::orblib_cpp {
@@ -11,6 +12,8 @@ constexpr double kPi = 3.141592653589793238462643383279502884197;
 constexpr double kTwoPi = 6.283185307179586476925286766559005768394;
 constexpr double kGravConstKm = 6.67428e-11 * 1.98892e30 / 1.0e9;
 constexpr double kParsecKm = 1.4959787068e8 * (648.0e3 / kPi);
+constexpr double kInnerApprox = 0.0001;
+constexpr double kOuterApprox = 300.0;
 
 double degrees_to_radians(double value) noexcept {
     return value * (kPi / 180.0);
@@ -31,6 +34,204 @@ void resize_setup(TriaxialMgeSetup& setup, int ngauss) {
     setup.a2.assign(size, 0.0);
     setup.a3.assign(size, 0.0);
     setup.elliptic_f.assign(size, 0.0);
+}
+
+template <typename F>
+double simpson(double a, double b, double fa, double fm, double fb) noexcept {
+    return (b - a) * (fa + 4.0 * fm + fb) / 6.0;
+}
+
+template <typename F>
+double adaptive_simpson(
+    const F& function,
+    double a,
+    double b,
+    double fa,
+    double fm,
+    double fb,
+    double whole,
+    double tolerance,
+    int depth
+) noexcept {
+    const double center = 0.5 * (a + b);
+    const double left_mid = 0.5 * (a + center);
+    const double right_mid = 0.5 * (center + b);
+    const double f_left_mid = function(left_mid);
+    const double f_right_mid = function(right_mid);
+    const double left = simpson<F>(a, center, fa, f_left_mid, fm);
+    const double right = simpson<F>(center, b, fm, f_right_mid, fb);
+    const double delta = left + right - whole;
+    if (depth <= 0 || std::abs(delta) <= 15.0 * tolerance) {
+        return left + right + delta / 15.0;
+    }
+    return adaptive_simpson(
+               function,
+               a,
+               center,
+               fa,
+               f_left_mid,
+               fm,
+               left,
+               0.5 * tolerance,
+               depth - 1
+           ) +
+           adaptive_simpson(
+               function,
+               center,
+               b,
+               fm,
+               f_right_mid,
+               fb,
+               right,
+               0.5 * tolerance,
+               depth - 1
+           );
+}
+
+template <typename F>
+double integrate_unit_interval(const F& function) noexcept {
+    const double a = 0.0;
+    const double b = 1.0;
+    const double mid = 0.5;
+    const double fa = function(a);
+    const double fm = function(mid);
+    const double fb = function(b);
+    const double whole = simpson<F>(a, b, fa, fm, fb);
+    const double tolerance = std::max(1.0e-30, std::abs(whole) * 1.0e-12);
+    return adaptive_simpson(function, a, b, fa, fm, fb, whole, tolerance, 40);
+}
+
+void gaussian_inner_potential_acceleration(
+    const TriaxialMgeSetup& setup,
+    std::size_t index,
+    double x,
+    double y,
+    double z,
+    double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    const double p = setup.pintr[index];
+    const double q = setup.qintr[index];
+    const double sigma = setup.sigintr_km[index];
+    const double sigma2 = sigma * sigma;
+    const double sigma4 = sigma2 * sigma2;
+    const double p2 = p * p;
+    const double q2 = q * q;
+    const double x2 = x * x;
+    const double y2 = y * y;
+    const double z2 = z * z;
+    const double a1 = setup.a1[index];
+    const double a2 = setup.a2[index];
+    const double a3 = setup.a3[index];
+
+    const double a12 = -(a1 - a2) / (1.0 - p2);
+    const double a23 = -(a2 - a3) / (p2 - q2);
+    const double a31 = -(a3 - a1) / (q2 - 1.0);
+    const double a11 = (1.0 / 3.0) * (2.0 - a12 - a31);
+    const double a22 = (1.0 / 3.0) * (2.0 / p2 - a23 - a12);
+    const double a33 = (1.0 / 3.0) * (2.0 / q2 - a31 - a23);
+    const double scale = setup.v0[index] / std::sqrt(1.0 - q2);
+
+    const double o1 = -0.5 / sigma2 * (a1 * x2 + a2 * y2 + a3 * z2);
+    const double o2 = 0.125 / sigma4 *
+                      (a11 * x2 * x2 + a22 * y2 * y2 + a33 * z2 * z2 +
+                       2.0 * a12 * x2 * y2 + 2.0 * a23 * y2 * z2 + 2.0 * a31 * z2 * x2);
+    potential = scale * (setup.elliptic_f[index] + o1 + o2);
+
+    accel_x = -scale * x / sigma2 *
+              (a1 - 0.5 / sigma2 * (a11 * x2 + a12 * y2 + a31 * z2));
+    accel_y = -scale * y / sigma2 *
+              (a2 - 0.5 / sigma2 * (a12 * x2 + a22 * y2 + a23 * z2));
+    accel_z = -scale * z / sigma2 *
+              (a3 - 0.5 / sigma2 * (a31 * x2 + a23 * y2 + a33 * z2));
+}
+
+void gaussian_mid_potential_acceleration(
+    const TriaxialMgeSetup& setup,
+    std::size_t index,
+    double x,
+    double y,
+    double z,
+    double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    const double p = setup.pintr[index];
+    const double q = setup.qintr[index];
+    const double sigma = setup.sigintr_km[index];
+    const double sigma2 = sigma * sigma;
+    const double p_factor = 1.0 - p * p;
+    const double q_factor = 1.0 - q * q;
+    const double x2 = x * x;
+    const double y2 = y * y;
+    const double z2 = z * z;
+    const auto common = [&](double t, double& d, double& e, double& exponent) noexcept {
+        const double t2 = t * t;
+        d = 1.0 - p_factor * t2;
+        e = 1.0 - q_factor * t2;
+        exponent = std::exp(-t2 / (2.0 * sigma2) * (x2 + y2 / d + z2 / e));
+    };
+
+    const double potential_integral = integrate_unit_interval([&](double t) noexcept {
+        double d = 0.0;
+        double e = 0.0;
+        double exponent = 0.0;
+        common(t, d, e, exponent);
+        return exponent / std::sqrt(d * e);
+    });
+    const double ax_integral = integrate_unit_interval([&](double t) noexcept {
+        double d = 0.0;
+        double e = 0.0;
+        double exponent = 0.0;
+        const double t2 = t * t;
+        common(t, d, e, exponent);
+        return -x / sigma2 * t2 * exponent / std::sqrt(d * e);
+    });
+    const double ay_integral = integrate_unit_interval([&](double t) noexcept {
+        double d = 0.0;
+        double e = 0.0;
+        double exponent = 0.0;
+        const double t2 = t * t;
+        common(t, d, e, exponent);
+        return -y / sigma2 * t2 / d * exponent / std::sqrt(d * e);
+    });
+    const double az_integral = integrate_unit_interval([&](double t) noexcept {
+        double d = 0.0;
+        double e = 0.0;
+        double exponent = 0.0;
+        const double t2 = t * t;
+        common(t, d, e, exponent);
+        return -z / sigma2 * t2 / e * exponent / std::sqrt(d * e);
+    });
+
+    potential = setup.v0[index] * potential_integral;
+    accel_x = setup.v0[index] * ax_integral;
+    accel_y = setup.v0[index] * ay_integral;
+    accel_z = setup.v0[index] * az_integral;
+}
+
+void gaussian_outer_potential_acceleration(
+    const TriaxialMgeSetup& setup,
+    std::size_t index,
+    double x,
+    double y,
+    double z,
+    double radius_squared,
+    double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    const double radius = std::sqrt(radius_squared);
+    const double scale = std::sqrt(kPi / 2.0) * setup.sigintr_km[index] * setup.v0[index];
+    potential = scale / radius;
+    const double accel_scale = -scale / (radius_squared * radius);
+    accel_x = x * accel_scale;
+    accel_y = y * accel_scale;
+    accel_z = z * accel_scale;
 }
 
 }  // namespace
@@ -157,6 +358,85 @@ bool setup_triaxial_mge_from_observed(
         setup.a2[idx] = a2;
         setup.a3[idx] = a3;
         setup.elliptic_f[idx] = value_f;
+    }
+
+    return true;
+}
+
+bool evaluate_triaxial_mge(
+    const TriaxialMgeSetup& setup,
+    double x,
+    double y,
+    double z,
+    double& potential,
+    double& accel_x,
+    double& accel_y,
+    double& accel_z
+) noexcept {
+    const std::size_t ngauss = setup.sigintr_km.size();
+    if (ngauss == 0 || setup.pintr.size() != ngauss || setup.qintr.size() != ngauss ||
+        setup.v0.size() != ngauss || setup.a1.size() != ngauss || setup.a2.size() != ngauss ||
+        setup.a3.size() != ngauss || setup.elliptic_f.size() != ngauss) {
+        return false;
+    }
+
+    potential = 0.0;
+    accel_x = 0.0;
+    accel_y = 0.0;
+    accel_z = 0.0;
+    const double radius_squared = x * x + y * y + z * z;
+
+    for (std::size_t i = 0; i < ngauss; ++i) {
+        const double sigma = setup.sigintr_km[i];
+        double one_potential = 0.0;
+        double one_ax = 0.0;
+        double one_ay = 0.0;
+        double one_az = 0.0;
+        const double inner_limit = kInnerApprox * sigma;
+        const double outer_limit = kOuterApprox * sigma;
+        if (radius_squared < inner_limit * inner_limit) {
+            gaussian_inner_potential_acceleration(
+                setup,
+                i,
+                x,
+                y,
+                z,
+                one_potential,
+                one_ax,
+                one_ay,
+                one_az
+            );
+        } else if (radius_squared < outer_limit * outer_limit) {
+            gaussian_mid_potential_acceleration(
+                setup,
+                i,
+                x,
+                y,
+                z,
+                one_potential,
+                one_ax,
+                one_ay,
+                one_az
+            );
+        } else {
+            gaussian_outer_potential_acceleration(
+                setup,
+                i,
+                x,
+                y,
+                z,
+                radius_squared,
+                one_potential,
+                one_ax,
+                one_ay,
+                one_az
+            );
+        }
+
+        potential += one_potential;
+        accel_x += one_ax;
+        accel_y += one_ay;
+        accel_z += one_az;
     }
 
     return true;

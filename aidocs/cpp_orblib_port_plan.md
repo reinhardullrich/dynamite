@@ -100,10 +100,15 @@ Current branch status:
   stage is ported as `dynamite::orblib_cpp::TriaxialMgeSetup` and tested
   against an independent NumPy implementation of the Fortran formulas on the
   NGC6278 fixture MGE.
+- Stellar triaxial MGE potential/acceleration evaluation is ported for the
+  inner approximation, mid-radius quadrature, and outer point-mass branches,
+  and is tested against independent Python/SciPy calculations of the Fortran
+  formulas.
 - The orbit-specific C++ engine is still not implemented yet:
-  potential/acceleration evaluation, orbit-start generation, one-orbit
-  integration/classification, projection, PSF, aperture mapping, LOSVD binning,
-  qgrid accumulation, and binary output writing still remain.
+  black-hole/dark-halo terms, interpolation-grid behavior, orbit-start
+  generation, one-orbit integration/classification, projection, PSF, aperture
+  mapping, LOSVD binning, qgrid accumulation, and binary output writing still
+  remain.
 
 ## DOP853 Policy
 
@@ -235,10 +240,10 @@ mixed with the first C++ parity port.
    harmonic-oscillator ODE fixture. Orbit-specific use still needs the C++
    RHS/potential code from step 5.
 5. In progress: port potential and acceleration evaluation. Done so far:
-   elliptic setup helpers and non-bar triaxial MGE setup/deprojection. Still
-   required: quadrature-backed MGE potential/acceleration, black-hole and
-   dark-halo terms, interpolation grid behavior, and Fortran-value parity
-   tests.
+   elliptic setup helpers, non-bar triaxial MGE setup/deprojection, and stellar
+   triaxial MGE potential/acceleration evaluation. Still required:
+   black-hole/dark-halo terms, interpolation grid behavior, orbit RHS wiring,
+   and Fortran-value parity tests for the full potential stack.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.

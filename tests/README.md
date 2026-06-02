@@ -42,6 +42,8 @@ Current coverage:
   through the experimental shared library;
 - C++ elliptic-integral validation against SciPy and C++ non-bar triaxial MGE
   setup/deprojection validation against the Fortran formulas;
+- C++ stellar triaxial MGE potential/acceleration validation across inner,
+  mid-radius quadrature, and far-field branches;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

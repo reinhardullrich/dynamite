@@ -220,3 +220,10 @@ This file is append-only. Add new entries at the bottom.
   `orblib_cpp_api_elliptic_legendre` and
   `orblib_cpp_api_triaxial_mge_setup`, with opt-in pytest coverage against
   SciPy elliptic integrals and the Fortran MGE setup formulas.
+- Ported the stellar triaxial MGE potential/acceleration evaluator from
+  `tp_potent()`/`tp_accel()` into `orblib_cpp/source/triaxial_mge.cpp`,
+  covering the inner approximation, adaptive mid-radius quadrature, and outer
+  point-mass branches. Added test-only ABI helper
+  `orblib_cpp_api_triaxial_mge_evaluate` and opt-in pytest coverage comparing
+  representative branch points against independent Python/SciPy calculations
+  of the Fortran formulas.
