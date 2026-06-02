@@ -282,3 +282,13 @@ This file is append-only. Add new entries at the bottom.
   interpolation-grid disk caching if required for parity, orbit-start
   generation, classification, projection/PSF/aperture mapping, LOSVD/qgrid
   accumulation, and binary output writing.
+- Ported the Fortran `integrator_find_orbtype()` orbit classification and
+  moment formulas into C++ as `dynamite::orblib_cpp::classify_orbit_samples`
+  in `orblib_cpp/include/orbit_classification.hpp` and
+  `orblib_cpp/source/orbit_classification.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_classify_orbit_samples` and opt-in pytest coverage for all
+  five orbit type outcomes plus the five `moments` and three `moments2` values
+  against a Python mirror of the Fortran formulas. The remaining C++
+  orbit-library gaps are now interpolation-grid disk caching if required for
+  parity, orbit-start generation, projection/PSF/aperture mapping,
+  LOSVD/qgrid accumulation, and binary output writing.

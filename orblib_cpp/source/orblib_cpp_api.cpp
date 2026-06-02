@@ -1,6 +1,7 @@
 #include "dop853.hpp"
 #include "elliptic_integrals.hpp"
 #include "interpolated_potential.hpp"
+#include "orbit_classification.hpp"
 #include "orbit_integrator.hpp"
 #include "orbit_rhs.hpp"
 #include "potential.hpp"
@@ -625,6 +626,56 @@ extern "C" void orblib_cpp_api_orbit_rhs_evaluate(
 
         *inner_fallback_count = interpolated.inner_fallback_count();
         *outer_fallback_count = interpolated.outer_fallback_count();
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_classify_orbit_samples(
+    int sample_count,
+    const double* sample_state_x,
+    const double* sample_state_y,
+    const double* sample_state_z,
+    const double* sample_state_vx,
+    const double* sample_state_vy,
+    const double* sample_state_vz,
+    int* orbit_type,
+    double* moments,
+    double* moments2,
+    int* status
+) noexcept {
+    if (sample_count <= 0 || sample_state_x == nullptr || sample_state_y == nullptr ||
+        sample_state_z == nullptr || sample_state_vx == nullptr || sample_state_vy == nullptr ||
+        sample_state_vz == nullptr || orbit_type == nullptr || moments == nullptr ||
+        moments2 == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::OrbitClassificationResult result;
+        if (!dynamite::orblib_cpp::classify_orbit_samples(
+                sample_count,
+                sample_state_x,
+                sample_state_y,
+                sample_state_z,
+                sample_state_vx,
+                sample_state_vy,
+                sample_state_vz,
+                result
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        *orbit_type = result.type;
+        for (int i = 0; i < 5; ++i) {
+            moments[i] = result.moments[i];
+        }
+        for (int i = 0; i < 3; ++i) {
+            moments2[i] = result.moments2[i];
+        }
         set_status(status, kStatusOk);
     } catch (...) {
         set_status(status, kStatusException);

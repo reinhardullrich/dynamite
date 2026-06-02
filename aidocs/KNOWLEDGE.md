@@ -92,8 +92,8 @@ changes from the original project.
   `orblib_cpp/include/potential.hpp` and `orblib_cpp/source/potential.cpp` for
   the current C++ potential stack: stellar triaxial MGE potential/acceleration,
   the Plummer-style black-hole term, and dark-halo profiles 0 through 3 plus 5
-  (`no halo`, NFW, Hernquist, triaxial cored logarithmic, and gNFW). It also includes
-  `orblib_cpp/include/interpolated_potential.hpp` and
+  (`no halo`, NFW, Hernquist, triaxial cored logarithmic, and gNFW). It also
+  includes `orblib_cpp/include/interpolated_potential.hpp` and
   `orblib_cpp/source/interpolated_potential.cpp` for an in-memory port of
   `interpolpotent.f90`'s acceleration interpolation math. The C++ orbit RHS
   formula lives in `orblib_cpp/include/orbit_rhs.hpp` and
@@ -102,14 +102,17 @@ changes from the original project.
   `orblib_cpp/include/orbit_integrator.hpp` and
   `orblib_cpp/source/orbit_integrator.cpp` wire the C++ DOP853 solver to that
   orbit RHS for single-orbit final-state integration and prescribed
-  dense-output sample extraction.
+  dense-output sample extraction. `orblib_cpp/include/orbit_classification.hpp`
+  and `orblib_cpp/source/orbit_classification.cpp` port the Fortran
+  angular-momentum sign-crossing orbit classification and moment formulas.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
   SciPy; MGE setup, potential-stack evaluation, interpolation-grid evaluation,
   orbit RHS evaluation, single-orbit DOP853 final-state integration, and
   single-orbit dense-output sampling are tested against independent
-  NumPy/SciPy implementations of the Fortran formulas.
+  NumPy/SciPy implementations of the Fortran formulas. Orbit classification is
+  tested against a Python mirror of the Fortran type and moment formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -204,10 +207,11 @@ source files.
   interpolation-grid math from `interpolpotent.f90`,
   plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
   barred-frame integration, and a single-orbit DOP853 final-state integration
-  helper with prescribed dense-output sample extraction using that RHS.
-  The legacy `interpolgrid` disk-cache contract, orbit classification,
-  projection/PSF/aperture mapping, LOSVD/qgrid accumulation, and binary output
-  writing are the next unported dependencies.
+  helper with prescribed dense-output sample extraction using that RHS, plus
+  the orbit classification and moment formulas. The legacy `interpolgrid`
+  disk-cache contract, orbit-start generation, projection/PSF/aperture
+  mapping, LOSVD/qgrid accumulation, and binary output writing are the next
+  unported dependencies.
 
 ## Separated Workspaces
 

@@ -805,6 +805,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_potential_stack_evaluate`
 - `orblib_cpp_api_interpolated_potential_evaluate`
 - `orblib_cpp_api_orbit_rhs_evaluate`
+- `orblib_cpp_api_classify_orbit_samples`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -878,8 +879,8 @@ The first actual ported Fortran kernels are:
   as `dynamite::orblib_cpp::integrate_orbit_final_state` in
   `orblib_cpp/include/orbit_integrator.hpp` and
   `orblib_cpp/source/orbit_integrator.cpp`. This is not the full orbit-library
-  integrator yet: it does not perform orbit classification, projection, LOSVD
-  binning, qgrid accumulation, or output writing. The test-only C ABI helper
+  integrator yet: it does not perform projection, LOSVD binning, qgrid
+  accumulation, or output writing. The test-only C ABI helper
   `orblib_cpp_api_integrate_orbit_final_state` validates the DOP853/RHS wiring
   against SciPy DOP853 on an independent softened black-hole RHS.
 - Prescribed dense-output sample extraction for a single orbit, implemented as
@@ -890,6 +891,16 @@ The first actual ported Fortran kernels are:
   `orblib_cpp_api_integrate_orbit_samples` validates final state and sampled
   states against SciPy DOP853 dense output on the same independent softened
   black-hole RHS.
+- Orbit classification and moment calculation from
+  `integrator_find_orbtype()` in `orblib_f_new_mirror.f90`, implemented as
+  `dynamite::orblib_cpp::classify_orbit_samples` in
+  `orblib_cpp/include/orbit_classification.hpp` and
+  `orblib_cpp/source/orbit_classification.cpp`. It preserves the Fortran
+  angular-momentum sign-crossing type rules for X tubes, Y tubes, Z tubes,
+  boxes, and stochastic orbits, plus the five `moments` values and three
+  cylindrical velocity-dispersion `moments2` values. The test-only C ABI helper
+  `orblib_cpp_api_classify_orbit_samples` validates all five orbit type
+  outcomes and moment arrays against a Python mirror of the Fortran formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

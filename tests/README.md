@@ -58,6 +58,8 @@ Current coverage:
   DOP853 on an independent softened black-hole RHS;
 - C++ single-orbit dense-output sample validation against SciPy DOP853 dense
   output on the same independent softened black-hole RHS;
+- C++ orbit classification and moment validation against a Python mirror of
+  the Fortran `integrator_find_orbtype()` formulas for all five orbit classes;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

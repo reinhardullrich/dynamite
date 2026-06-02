@@ -15,6 +15,7 @@ CPP_SOURCES = [
     "include/dop853.hpp",
     "include/elliptic_integrals.hpp",
     "include/interpolated_potential.hpp",
+    "include/orbit_classification.hpp",
     "include/orbit_integrator.hpp",
     "include/orbit_rhs.hpp",
     "include/potential.hpp",
@@ -23,6 +24,7 @@ CPP_SOURCES = [
     "source/dop853.cpp",
     "source/elliptic_integrals.cpp",
     "source/interpolated_potential.cpp",
+    "source/orbit_classification.cpp",
     "source/orbit_integrator.cpp",
     "source/orbit_rhs.cpp",
     "source/orblib_cpp_api.cpp",
@@ -613,6 +615,65 @@ def _expected_potential_stack_evaluation(
     )
     halo_potential, halo_acceleration = _expected_dark_halo_evaluation(halo, points)
     return potentials + halo_potential, accelerations + halo_acceleration
+
+
+def _expected_orbit_classification(samples):
+    samples = np.asarray(samples, dtype=np.float64)
+    positions = samples[:, :3]
+    velocities = samples[:, 3:]
+
+    lx = positions[:, 1] * velocities[:, 2] - positions[:, 2] * velocities[:, 1]
+    ly = positions[:, 2] * velocities[:, 0] - positions[:, 0] * velocities[:, 2]
+    lz = positions[:, 0] * velocities[:, 1] - positions[:, 1] * velocities[:, 0]
+    lxc = np.max(lx) * np.min(lx)
+    lyc = np.max(ly) * np.min(ly)
+    lzc = np.max(lz) * np.min(lz)
+
+    orbit_type = 5
+    if lxc > 0.0 and lyc < 0.0 and lzc < 0.0:
+        orbit_type = 1
+    if lxc < 0.0 and lyc > 0.0 and lzc < 0.0:
+        orbit_type = 2
+    if lxc < 0.0 and lyc < 0.0 and lzc > 0.0:
+        orbit_type = 3
+    if lxc < 0.0 and lyc < 0.0 and lzc < 0.0:
+        orbit_type = 4
+
+    moments = np.empty(5, dtype=np.float64)
+    moments[0] = np.sum(lx) / samples.shape[0]
+    moments[1] = np.sum(ly) / samples.shape[0]
+    moments[2] = np.sum(lz) / samples.shape[0]
+    moments[3] = np.sum(np.sqrt(np.sum(positions**2, axis=1))) / samples.shape[0]
+    moments[4] = (
+        np.sum(
+            np.sum(velocities**2, axis=1)
+            + 2.0
+            * (
+                velocities[:, 0] * velocities[:, 1]
+                + velocities[:, 1] * velocities[:, 2]
+                + velocities[:, 2] * velocities[:, 0]
+            ),
+        )
+        / samples.shape[0]
+    )
+
+    cylindrical_radius = np.sqrt(positions[:, 0] ** 2 + positions[:, 1] ** 2)
+    vr = (
+        positions[:, 0] * velocities[:, 0] + positions[:, 1] * velocities[:, 1]
+    ) / cylindrical_radius
+    vt = (
+        positions[:, 0] * velocities[:, 1] + positions[:, 1] * velocities[:, 0]
+    ) / cylindrical_radius
+    vz = velocities[:, 2]
+    moments2 = np.array(
+        [
+            np.sqrt(np.sum((vr - np.sum(vr) / samples.shape[0]) ** 2) / samples.shape[0]),
+            np.sqrt(np.sum((vt - np.sum(vt) / samples.shape[0]) ** 2) / samples.shape[0]),
+            np.sqrt(np.sum((vz - np.sum(vz) / samples.shape[0]) ** 2) / samples.shape[0]),
+        ],
+        dtype=np.float64,
+    )
+    return orbit_type, moments, moments2
 
 
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
@@ -1542,6 +1603,146 @@ def test_orblib_cpp_orbit_rhs_matches_fortran_derivs_formula(omega):
         rtol=2e-12,
         atol=0.0,
     )
+
+
+def _synthetic_classification_samples(kind):
+    t = np.linspace(0.11, 2.0 * np.pi + 0.11, 97, endpoint=False, dtype=np.float64)
+    radius = 3.0
+    epsilon = 0.4
+    if kind == 1:
+        positions = np.column_stack(
+            [
+                epsilon * np.sin(2.0 * t),
+                radius * np.cos(t),
+                radius * np.sin(t),
+            ],
+        )
+        velocities = np.column_stack(
+            [
+                2.0 * epsilon * np.cos(2.0 * t),
+                -radius * np.sin(t),
+                radius * np.cos(t),
+            ],
+        )
+    elif kind == 2:
+        positions = np.column_stack(
+            [
+                radius * np.cos(t),
+                epsilon * np.sin(2.0 * t),
+                radius * np.sin(t),
+            ],
+        )
+        velocities = np.column_stack(
+            [
+                -radius * np.sin(t),
+                2.0 * epsilon * np.cos(2.0 * t),
+                radius * np.cos(t),
+            ],
+        )
+    elif kind == 3:
+        positions = np.column_stack(
+            [
+                radius * np.cos(t),
+                radius * np.sin(t),
+                epsilon * np.sin(2.0 * t),
+            ],
+        )
+        velocities = np.column_stack(
+            [
+                -radius * np.sin(t),
+                radius * np.cos(t),
+                2.0 * epsilon * np.cos(2.0 * t),
+            ],
+        )
+    elif kind == 4:
+        positions = np.column_stack(
+            [
+                np.cos(t),
+                np.cos(1.7 * t + 0.3),
+                np.cos(2.3 * t + 0.8),
+            ],
+        )
+        velocities = np.column_stack(
+            [
+                -np.sin(t),
+                -1.7 * np.sin(1.7 * t + 0.3),
+                -2.3 * np.sin(2.3 * t + 0.8),
+            ],
+        )
+    elif kind == 5:
+        positions = np.column_stack(
+            [
+                radius * np.cos(t),
+                radius * np.sin(t),
+                radius * np.cos(t),
+            ],
+        )
+        velocities = np.column_stack(
+            [
+                -radius * np.sin(t),
+                radius * np.cos(t),
+                -radius * np.sin(t),
+            ],
+        )
+    else:
+        raise ValueError(kind)
+    return np.ascontiguousarray(np.column_stack([positions, velocities]), dtype=np.float64)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize("expected_kind", [1, 2, 3, 4, 5])
+def test_orblib_cpp_classifies_orbit_samples_like_fortran(expected_kind):
+    samples = _synthetic_classification_samples(expected_kind)
+    expected_type, expected_moments, expected_moments2 = _expected_orbit_classification(
+        samples,
+    )
+    assert expected_type == expected_kind
+
+    state_x = np.ascontiguousarray(samples[:, 0], dtype=np.float64)
+    state_y = np.ascontiguousarray(samples[:, 1], dtype=np.float64)
+    state_z = np.ascontiguousarray(samples[:, 2], dtype=np.float64)
+    state_vx = np.ascontiguousarray(samples[:, 3], dtype=np.float64)
+    state_vy = np.ascontiguousarray(samples[:, 4], dtype=np.float64)
+    state_vz = np.ascontiguousarray(samples[:, 5], dtype=np.float64)
+    moments = np.empty(5, dtype=np.float64)
+    moments2 = np.empty(3, dtype=np.float64)
+    orbit_type = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_classify_orbit_samples
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(samples.shape[0]),
+        state_x.ctypes.data_as(double_p),
+        state_y.ctypes.data_as(double_p),
+        state_z.ctypes.data_as(double_p),
+        state_vx.ctypes.data_as(double_p),
+        state_vy.ctypes.data_as(double_p),
+        state_vz.ctypes.data_as(double_p),
+        ctypes.byref(orbit_type),
+        moments.ctypes.data_as(double_p),
+        moments2.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert orbit_type.value == expected_kind
+    np.testing.assert_allclose(moments, expected_moments, rtol=2e-14, atol=1e-14)
+    np.testing.assert_allclose(moments2, expected_moments2, rtol=2e-14, atol=1e-14)
 
 
 @pytest.mark.orblib_cpp
