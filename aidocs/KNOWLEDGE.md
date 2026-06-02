@@ -76,10 +76,17 @@ changes from the original project.
   the shared library to ignored `orblib_fortran/build/lib/`. Legacy
   `triaxmass*` mass-helper sources are archived and are not part of the active
   build.
+- `orblib_cpp/`: experimental C++ orbit-library backend on the
+  `fortran-to-cpp` branch. The current first slice builds
+  `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, and exposes
+  generation entry-point stubs that return status `-100` until the C++ orbit
+  engine is ported.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
-  typed request/result objects, `run_orbit_library()`, and the active
-  `fortran_shared_library` backend. The backend calls
-  `orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`; Python
+  typed request/result objects, `run_orbit_library()`, the active
+  `fortran_shared_library` backend, and the experimental `cpp_shared_library`
+  backend. The Fortran backend calls
+  `orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`; the C++
+  backend calls `orblib_cpp/build/lib/liborblib_cpp.so`. Python
   passes non-bar MGE/orbit/dark-halo settings, orbit starts, PSF tables,
   aperture geometry, histogram settings, binning maps, and output paths as
   typed arrays/scalars. It no longer creates Fortran `infil/` inputs and no
@@ -150,7 +157,10 @@ source files.
   must use the current Fortran shared-library backend and fixtures as the
   numerical oracle. Correctness is the first rule; among correct versions,
   optimize aggressively for speed, allocation behavior, RHS/acceleration
-  throughput, cache locality, and reproducible parallel execution.
+  throughput, cache locality, and reproducible parallel execution. The current
+  first implementation slice builds a C++ shared library and wires
+  `cpp_shared_library` into Python with a hard not-implemented status for
+  generation calls.
 
 ## Separated Workspaces
 
@@ -204,6 +214,9 @@ Current local audit environment:
   `make all`, `make nogal`, and `make shared` build
   `orblib_fortran/build/lib/liborblib_fortran.so`; temporary object/module
   directories may exist during compilation but are generated artifacts.
+- `orblib_cpp/Makefile` builds the experimental C++ shared library with
+  `make -C orblib_cpp shared`; generated C++ build output lives under ignored
+  `orblib_cpp/build/`.
 - Use `MPLCONFIGDIR=/tmp/dynamite-mplconfig` for local/headless Matplotlib
   commands to avoid config-cache warnings.
 - For future fresh setup, `uv` is acceptable and likely faster, but the current

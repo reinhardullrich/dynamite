@@ -188,3 +188,11 @@ This file is append-only. Add new entries at the bottom.
   aggressive optimization only after parity, no avoidable hot-path allocations,
   DOP853 dense-output preservation, RHS/acceleration optimization, existing
   Fortran fixtures as acceptance tests, and stage-split benchmark requirements.
+- Added the first experimental C++ orbit-library backend slice: `orblib_cpp/`
+  now builds `build/lib/liborblib_cpp.so` with ABI version `1`, exports
+  C-compatible orbit-start and orbit-library entry-point stubs that return
+  not-implemented status `-100`, and `dynamite/orblib_api.py` accepts backend
+  name `cpp_shared_library` while keeping `fortran_shared_library` as the
+  default. Added focused pytest coverage for C++ source inventory, ABI version,
+  read-only backend behavior, missing-library failure, and explicit
+  not-implemented generation status.

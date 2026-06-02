@@ -783,6 +783,35 @@ untested `orbgen`/`partgen` utilities are archived under
 `archive/legacy_orbgen_partgen/`. They are not part of the active
 `orblib_fortran` build.
 
+## C++ Backend Experiment
+
+The `fortran-to-cpp` branch adds an experimental C++ orbit-library backend
+skeleton under `orblib_cpp/`. It is not the active default backend.
+
+The shared-library target is built with:
+
+```bash
+make -C orblib_cpp shared
+```
+
+It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
+`1` and includes:
+
+- `orblib_cpp_api_abi_version`
+- `orblib_cpp_api_run_orbitstart_memory`
+- `orblib_cpp_api_run_orblib_direct`
+
+The Python API facade accepts backend name `cpp_shared_library`. Read-only
+requests with `generate_if_missing=False` can use the same existing Python
+orbit-library readers as the Fortran backend. Generation calls currently enter
+the C++ shared library and return status `-100`, meaning the C++ orbit engine is
+not implemented yet. This is intentional: the first slice establishes the
+compiled ABI, build target, Python selection path, and hard failure boundary
+without silently falling back to Fortran.
+
+The default backend remains `fortran_shared_library` until the C++ backend
+matches the Fortran-derived fixtures and passes the planned parity tests.
+
 ## Weight Solving
 
 `weight_solvers.WeightSolver` is the base class. The active implementation is:

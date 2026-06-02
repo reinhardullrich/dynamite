@@ -1,8 +1,8 @@
-# DYNAMITE Orblib Fortran And API Tests
+# DYNAMITE Orblib Backend And API Tests
 
 This test tree is the local correctness baseline for the active orblib Fortran
-shared-library backend, the Python direct-input API facade, and any future
-replacement work.
+shared-library backend, the experimental C++ backend, the Python direct-input
+API facade, and future replacement work.
 
 Default run:
 
@@ -21,6 +21,8 @@ make -C orblib_fortran shared
 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests/test_fortran_inventory.py
 DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests/test_fortran_orblib_output.py
 DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests
+make -C orblib_cpp shared
+DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_inventory.py tests/test_orblib_api.py -m orblib_cpp
 ```
 
 Current coverage:
@@ -33,6 +35,9 @@ Current coverage:
   several reference NNLS cases;
 - fast unit coverage for the Python-facing direct-input shared-library
   orbit-library API facade;
+- inventory and ABI coverage for the experimental C++ shared-library backend;
+- validation that the experimental C++ generation entry points fail with the
+  explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library
   payload extraction, plus opt-in coverage for the non-bar direct-input
   shared-library orbit-start ABI;

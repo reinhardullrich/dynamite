@@ -29,6 +29,9 @@ orblib_fortran/triaxmass_bar
 orblib_fortran/triaxmassbin
 orblib_fortran/triaxmassbin_bar
 
+# Orblib C++ files #
+orblib_cpp/build/
+
 # Archived Dynamite dev_tests generated outputs #
 archive/dev_tests/NGC6278_output/*
 archive/dev_tests/bartest_output

@@ -13,8 +13,9 @@ with open("README.md", "r") as fh:
 with open("requirements.txt", "r") as fp:
     required = fp.read().splitlines()
 
-orblib_fortran = [
+orblib_shared_libraries = [
     "../orblib_fortran/build/lib/liborblib_fortran.so",
+    "../orblib_cpp/build/lib/liborblib_cpp.so",
 ]
 
 setuptools.setup(
@@ -39,7 +40,7 @@ setuptools.setup(
     # use the already parsed requirements from requirements.txt
     install_requires=required,
     package_data={
-        "dynamite": orblib_fortran
+        "dynamite": orblib_shared_libraries
     },
     # extra requirements for testing
     extras_require={

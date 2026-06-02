@@ -1,9 +1,9 @@
-"""Python-facing API for the Fortran orbit-library backend.
+"""Python-facing API for compiled orbit-library backends.
 
 This module is the stable Python boundary for orbit-library generation.  Python
 passes model, orbit-start, PSF, aperture, and binning data directly to the
-Fortran shared library; the active backend does not generate Fortran input
-files.
+compiled shared-library backend; the active backend does not generate Fortran
+input files.
 """
 
 from __future__ import annotations
@@ -26,8 +26,10 @@ from dynamite import physical_system as physys
 from dynamite import orblib as legacy_orblib
 
 
-BackendName = Literal["fortran_shared_library"]
+BackendName = Literal["fortran_shared_library", "cpp_shared_library"]
 SHARED_LIBRARY_ABI_VERSION = 2
+CPP_SHARED_LIBRARY_ABI_VERSION = 1
+CPP_STATUS_NOT_IMPLEMENTED = -100
 
 
 def _default_shared_library_path() -> Path:
@@ -37,6 +39,16 @@ def _default_shared_library_path() -> Path:
         / "build"
         / "lib"
         / "liborblib_fortran.so"
+    )
+
+
+def _default_cpp_shared_library_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[1]
+        / "orblib_cpp"
+        / "build"
+        / "lib"
+        / "liborblib_cpp.so"
     )
 
 
@@ -56,8 +68,10 @@ class OrbitLibraryRequest:
         shared-library backend does not create or read Fortran ``infil/``
         inputs.
     backend
-        Backend implementation to use.  ``fortran_shared_library`` calls the
+        Backend implementation to use. ``fortran_shared_library`` calls the
         shared object built by ``make -C orblib_fortran shared``.
+        ``cpp_shared_library`` is the experimental C++ port backend built by
+        ``make -C orblib_cpp shared``.
     generate_if_missing
         If True, generate the orbit library when the model output files are
         missing.  If False, only read existing outputs.
@@ -326,11 +340,54 @@ class SharedLibraryFortranOrbitBackend:
             )
 
 
+class SharedLibraryCppOrbitBackend:
+    """Experimental backend using the C++ shared library port."""
+
+    name: BackendName = "cpp_shared_library"
+
+    def __init__(self, library_path: Path | None = None):
+        self.library_path = Path(library_path or _default_cpp_shared_library_path())
+
+    def run(self, request: OrbitLibraryRequest) -> OrbitLibraryResult:
+        orbit_library = _make_legacy_orbit_library(request)
+        if request.generate_if_missing:
+            self.generate_orbit_library(orbit_library)
+        return _collect_legacy_outputs(orbit_library, request, self.name)
+
+    def generate_orbit_library(self, orbit_library: Any) -> None:
+        if orbit_library.LegacyWeightSolver:
+            raise NotImplementedError(
+                "LegacyWeightSolver is archived and no longer supported by "
+                "the active orbit-library API. Use NNLS instead."
+            )
+        self.run_orbitstart_memory(orbit_library)
+
+    def run_orbitstart_memory(self, orbit_library: Any) -> OrbitStartMemoryResult:
+        self._require_library()
+        return _call_orbitstart_memory_function(
+            self.library_path,
+            orbit_library,
+            abi_function_name="orblib_cpp_api_abi_version",
+            expected_abi_version=CPP_SHARED_LIBRARY_ABI_VERSION,
+            backend_label="C++",
+            orbitstart_function_name="orblib_cpp_api_run_orbitstart_memory",
+        )
+
+    def _require_library(self) -> None:
+        if not self.library_path.is_file():
+            raise FileNotFoundError(
+                f"C++ shared library not found: {self.library_path}. "
+                "Build it with `make -C orblib_cpp shared`."
+            )
+
+
 def get_backend(name: BackendName) -> OrbitLibraryBackend:
     """Return the requested orbit-library backend."""
 
     if name == "fortran_shared_library":
         return SharedLibraryFortranOrbitBackend()
+    if name == "cpp_shared_library":
+        return SharedLibraryCppOrbitBackend()
     raise ValueError(f"Unknown orbit-library backend: {name!r}.")
 
 
@@ -410,16 +467,22 @@ def _working_directory(path: Path):
         os.chdir(current)
 
 
-def _load_checked_shared_library(library_path: Path) -> ctypes.CDLL:
+def _load_checked_shared_library(
+    library_path: Path,
+    *,
+    abi_function_name: str = "orblib_api_abi_version",
+    expected_abi_version: int = SHARED_LIBRARY_ABI_VERSION,
+    backend_label: str = "Fortran",
+) -> ctypes.CDLL:
     library = ctypes.CDLL(str(library_path))
-    abi_version = library.orblib_api_abi_version
+    abi_version = getattr(library, abi_function_name)
     abi_version.argtypes = []
     abi_version.restype = ctypes.c_int
     version = abi_version()
-    if version != SHARED_LIBRARY_ABI_VERSION:
+    if version != expected_abi_version:
         raise RuntimeError(
-            f"Unsupported Fortran shared-library ABI version {version}; "
-            f"expected {SHARED_LIBRARY_ABI_VERSION}."
+            f"Unsupported {backend_label} shared-library ABI version {version}; "
+            f"expected {expected_abi_version}."
         )
     return library
 
@@ -498,6 +561,11 @@ def _call_orblib_direct_function(
     fileroot: str,
     begin_values: np.ndarray,
     begin_noreg: np.ndarray,
+    *,
+    abi_function_name: str = "orblib_api_abi_version",
+    expected_abi_version: int = SHARED_LIBRARY_ABI_VERSION,
+    backend_label: str = "Fortran",
+    orblib_function_name: str = "orblib_api_run_orblib_direct",
 ) -> None:
     begin_values_f = np.asfortranarray(begin_values, dtype=np.float64)
     begin_noreg_i = np.ascontiguousarray(begin_noreg, dtype=np.int32)
@@ -506,8 +574,13 @@ def _call_orblib_direct_function(
     if begin_values_f.shape[0] != begin_noreg_i.shape[0]:
         raise ValueError("Direct orbit-start values and noreg flags differ.")
 
-    library = _load_checked_shared_library(library_path)
-    function = library.orblib_api_run_orblib_direct
+    library = _load_checked_shared_library(
+        library_path,
+        abi_function_name=abi_function_name,
+        expected_abi_version=expected_abi_version,
+        backend_label=backend_label,
+    )
+    function = getattr(library, orblib_function_name)
     double_p = ctypes.POINTER(ctypes.c_double)
     int_p = ctypes.POINTER(ctypes.c_int)
     function.argtypes = [
@@ -636,7 +709,7 @@ def _call_orblib_direct_function(
     )
     if status.value != 0:
         raise RuntimeError(
-            "orblib_api_run_orblib_direct failed with status "
+            f"{orblib_function_name} failed with status "
             f"{status.value} for {fileroot}."
         )
 
@@ -855,10 +928,20 @@ def _orbitstart_memory_worker(
 def _call_orbitstart_memory_function(
     library_path: Path,
     orbit_library: Any,
+    *,
+    abi_function_name: str = "orblib_api_abi_version",
+    expected_abi_version: int = SHARED_LIBRARY_ABI_VERSION,
+    backend_label: str = "Fortran",
+    orbitstart_function_name: str = "orblib_api_run_orbitstart_memory",
 ) -> OrbitStartMemoryResult:
     inputs = _orbitstart_memory_inputs(orbit_library)
-    library = _load_checked_shared_library(library_path)
-    function = library.orblib_api_run_orbitstart_memory
+    library = _load_checked_shared_library(
+        library_path,
+        abi_function_name=abi_function_name,
+        expected_abi_version=expected_abi_version,
+        backend_label=backend_label,
+    )
+    function = getattr(library, orbitstart_function_name)
     double_p = ctypes.POINTER(ctypes.c_double)
     int_p = ctypes.POINTER(ctypes.c_int)
     function.argtypes = [
@@ -944,7 +1027,7 @@ def _call_orbitstart_memory_function(
     )
     if status.value != 0:
         raise RuntimeError(
-            "orblib_api_run_orbitstart_memory failed with status "
+            f"{orbitstart_function_name} failed with status "
             f"{status.value}."
         )
 

@@ -222,6 +222,54 @@ def test_shared_library_backend_can_read_existing_outputs_without_library(
     assert legacy.calls == [("read_losvd_histograms", False)]
 
 
+def test_cpp_backend_can_read_existing_outputs_without_library(monkeypatch):
+    reset_fake_legacy()
+    monkeypatch.setattr(
+        orblib_api.legacy_orblib,
+        "LegacyOrbitLibrary",
+        FakeLegacyOrbitLibrary,
+    )
+    request = orblib_api.OrbitLibraryRequest(
+        config=SimpleNamespace(name="config"),
+        parset={},
+        mod_dir=Path("/tmp/model"),
+        backend="cpp_shared_library",
+        generate_if_missing=False,
+    )
+    backend = orblib_api.SharedLibraryCppOrbitBackend(
+        library_path=Path("/does/not/exist.so"),
+    )
+
+    result = orblib_api.run_orbit_library(request, backend=backend)
+
+    assert result.backend == "cpp_shared_library"
+    assert result.n_orbs == 2
+    legacy = FakeLegacyOrbitLibrary.instances[0]
+    assert legacy.calls == [("read_losvd_histograms", False)]
+
+
+def test_cpp_library_backend_requires_compiled_library(monkeypatch, tmp_path):
+    reset_fake_legacy()
+    monkeypatch.setattr(
+        orblib_api.legacy_orblib,
+        "LegacyOrbitLibrary",
+        FakeLegacyOrbitLibrary,
+    )
+    request = orblib_api.OrbitLibraryRequest(
+        config=SimpleNamespace(name="config"),
+        parset={},
+        mod_dir=tmp_path / "model",
+        backend="cpp_shared_library",
+        include_losvd_histograms=False,
+    )
+    backend = orblib_api.SharedLibraryCppOrbitBackend(
+        library_path=tmp_path / "missing.so",
+    )
+
+    with pytest.raises(FileNotFoundError, match="make -C orblib_cpp shared"):
+        orblib_api.run_orbit_library(request, backend=backend)
+
+
 def test_model_run_orblib_api_uses_public_request(monkeypatch):
     captured = {}
 
@@ -324,6 +372,23 @@ def test_direct_orblib_inputs_extract_structured_payload(tmp_path, monkeypatch):
     assert inputs["max_bin_size"] == 3016
     assert inputs["bin_size"].tolist() == [3016]
     assert inputs["bin_order"].shape == (3016, 1)
+
+
+@pytest.mark.orblib_cpp
+def test_cpp_orbitstart_backend_reports_not_implemented_status(
+    tmp_path,
+    monkeypatch,
+):
+    workspace = copy_orblib_fixture_workspace(tmp_path)
+    _model, orbit_library = make_fixture_orbit_library(workspace, monkeypatch)
+
+    backend = orblib_api.SharedLibraryCppOrbitBackend()
+
+    with pytest.raises(
+        RuntimeError,
+        match="orblib_cpp_api_run_orbitstart_memory failed with status -100",
+    ):
+        backend.run_orbitstart_memory(orbit_library)
 
 
 @pytest.mark.slow

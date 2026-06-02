@@ -11,6 +11,10 @@ ORBLIB_FORTRAN_DIR = REPO_ROOT / "orblib_fortran"
 ORBLIB_FORTRAN_SHARED_LIBRARY = (
     ORBLIB_FORTRAN_DIR / "build" / "lib" / "liborblib_fortran.so"
 )
+ORBLIB_CPP_DIR = REPO_ROOT / "orblib_cpp"
+ORBLIB_CPP_SHARED_LIBRARY = (
+    ORBLIB_CPP_DIR / "build" / "lib" / "liborblib_cpp.so"
+)
 ARCHIVED_NNLS_FORTRAN_DIR = (
     REPO_ROOT / "archive" / "legacy_nnls_fortran" / "legacy_fortran"
 )
@@ -29,6 +33,12 @@ def pytest_collection_modifyitems(config, items):
             "the built orblib Fortran shared library"
         )
     )
+    skip_orblib_cpp = pytest.mark.skip(
+        reason=(
+            "set DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 to run tests requiring "
+            "the built orblib C++ shared library"
+        )
+    )
     for item in items:
         if "slow" in item.keywords and os.environ.get("DYNAMITE_RUN_SLOW_TESTS") != "1":
             item.add_marker(skip_slow)
@@ -37,6 +47,11 @@ def pytest_collection_modifyitems(config, items):
             and os.environ.get("DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS") != "1"
         ):
             item.add_marker(skip_orblib_fortran)
+        if (
+            "orblib_cpp" in item.keywords
+            and os.environ.get("DYNAMITE_RUN_ORBLIB_CPP_TESTS") != "1"
+        ):
+            item.add_marker(skip_orblib_cpp)
 
 
 def require_gfortran():
