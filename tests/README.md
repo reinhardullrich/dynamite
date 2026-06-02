@@ -54,6 +54,8 @@ Current coverage:
 - C++ orbit RHS validation for the non-rotating and barred-frame `Omega`
   branches against independent Python calculations of the Fortran `derivs`
   formulas;
+- C++ single-orbit final-state DOP853 integration validation against SciPy
+  DOP853 on an independent softened black-hole RHS;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

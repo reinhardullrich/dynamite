@@ -77,6 +77,7 @@ orblib_cpp_api_triaxial_mge_evaluate
 orblib_cpp_api_potential_stack_evaluate
 orblib_cpp_api_interpolated_potential_evaluate
 orblib_cpp_api_orbit_rhs_evaluate
+orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
@@ -122,9 +123,14 @@ Current branch status:
   `dynamite::orblib_cpp::evaluate_orbit_rhs`, including both the non-rotating
   derivative assignment and the barred-frame `Omega` terms. It is tested
   against independent Python calculations of the Fortran formulas.
+- Single-orbit final-state DOP853 integration using the orbit RHS is ported as
+  `dynamite::orblib_cpp::integrate_orbit_final_state` and tested against SciPy
+  DOP853 on an independent softened black-hole RHS. Dense-output sampling,
+  classification, projection, histograms, qgrid accumulation, and output
+  writing are not part of this helper.
 - The orbit-specific C++ engine is still not implemented yet:
   gNFW profile 5, interpolation-grid disk caching, orbit-start generation,
-  one-orbit integration/classification, projection, PSF, aperture mapping,
+  dense-output orbit classification, projection, PSF, aperture mapping,
   LOSVD binning, qgrid accumulation, and binary output writing still remain.
 
 ## DOP853 Policy
@@ -253,17 +259,18 @@ mixed with the first C++ parity port.
    default backend.
 3. Done: port `ran1_nr.f` and test against the Python/Fortran reference
    sequence.
-4. Done for the standalone solver: port DOP853 and test dense output on a
-   harmonic-oscillator ODE fixture. Orbit-specific use still needs the C++
-   RHS/potential code from step 5.
+4. Done: port DOP853 and test dense output on a harmonic-oscillator ODE
+   fixture. The branch also has a single-orbit final-state integration helper
+   using the C++ orbit RHS.
 5. In progress: port potential and acceleration evaluation. Done so far:
    elliptic setup helpers, non-bar triaxial MGE setup/deprojection, stellar
    triaxial MGE potential/acceleration evaluation, Plummer-style black-hole
    contribution, dark-halo profiles 0 through 3, and in-memory acceleration
-   interpolation-grid math, and the orbit RHS formula. Still required: gNFW
-   profile 5, legacy interpolation-grid disk caching if C++ parity requires
-   it, DOP853 integration using the orbit RHS, and Fortran-value parity tests
-   for full orbit integration.
+   interpolation-grid math, the orbit RHS formula, and single-orbit DOP853
+   final-state integration using that RHS. Still required: gNFW profile 5,
+   legacy interpolation-grid disk caching if C++ parity requires it,
+   dense-output orbit sampling/classification, projection/binning/output
+   wiring, and Fortran-value parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.

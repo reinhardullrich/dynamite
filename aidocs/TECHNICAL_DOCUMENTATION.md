@@ -805,6 +805,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_potential_stack_evaluate`
 - `orblib_cpp_api_interpolated_potential_evaluate`
 - `orblib_cpp_api_orbit_rhs_evaluate`
+- `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
@@ -871,6 +872,15 @@ The first actual ported Fortran kernels are:
   Fortran orbit-library integrator. The test-only C ABI helper
   `orblib_cpp_api_orbit_rhs_evaluate` validates both `Omega == 0` and
   `Omega != 0` against independent Python calculations of the Fortran formulas.
+- Single-orbit final-state DOP853 integration using the orbit RHS, implemented
+  as `dynamite::orblib_cpp::integrate_orbit_final_state` in
+  `orblib_cpp/include/orbit_integrator.hpp` and
+  `orblib_cpp/source/orbit_integrator.cpp`. This is not the full orbit-library
+  integrator yet: it does not perform dense-output sampling, orbit
+  classification, projection, LOSVD binning, qgrid accumulation, or output
+  writing. The test-only C ABI helper
+  `orblib_cpp_api_integrate_orbit_final_state` validates the DOP853/RHS wiring
+  against SciPy DOP853 on an independent softened black-hole RHS.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

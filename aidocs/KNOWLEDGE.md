@@ -99,13 +99,17 @@ changes from the original project.
   formula lives in `orblib_cpp/include/orbit_rhs.hpp` and
   `orblib_cpp/source/orbit_rhs.cpp`, covering both non-rotating and
   barred-frame `Omega` terms from `orblib_f_new_mirror.f90`'s `derivs`.
+  `orblib_cpp/include/orbit_integrator.hpp` and
+  `orblib_cpp/source/orbit_integrator.cpp` wire the C++ DOP853 solver to that
+  orbit RHS for single-orbit final-state integration.
   gNFW profile 5 remains unported because it depends on the beta-function
   stack. `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
   SciPy; MGE setup, potential-stack evaluation, interpolation-grid evaluation,
-  and orbit RHS evaluation are tested against independent NumPy/SciPy
-  implementations of the Fortran formulas.
+  orbit RHS evaluation, and single-orbit DOP853 final-state integration are
+  tested against independent NumPy/SciPy implementations of the Fortran
+  formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -198,10 +202,11 @@ source files.
   Plummer-style black-hole term, dark-halo profiles 0 through 3, and the
   in-memory acceleration interpolation-grid math from `interpolpotent.f90`,
   plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
-  barred-frame integration.
+  barred-frame integration, and a single-orbit DOP853 final-state integration
+  helper using that RHS.
   The legacy `interpolgrid` disk-cache contract, gNFW profile 5 beta-function
-  path, and full DOP853 orbit integration with classification/output are the
-  next unported dependencies.
+  path, orbit classification, projection/PSF/aperture mapping, LOSVD/qgrid
+  accumulation, and binary output writing are the next unported dependencies.
 
 ## Separated Workspaces
 

@@ -256,3 +256,11 @@ This file is append-only. Add new entries at the bottom.
   terms. Added test-only ABI helper `orblib_cpp_api_orbit_rhs_evaluate` and
   opt-in pytest coverage against independent Python calculations of the
   Fortran formulas.
+- Added single-orbit final-state DOP853 integration using the C++ orbit RHS as
+  `dynamite::orblib_cpp::integrate_orbit_final_state` in
+  `orblib_cpp/include/orbit_integrator.hpp` and
+  `orblib_cpp/source/orbit_integrator.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_integrate_orbit_final_state` and opt-in pytest coverage
+  comparing the final state against SciPy DOP853 on an independent softened
+  black-hole RHS. Dense-output orbit sampling, classification, projection,
+  LOSVD/qgrid accumulation, and output writing remain unported.
