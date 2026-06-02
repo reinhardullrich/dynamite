@@ -375,7 +375,30 @@ def test_direct_orblib_inputs_extract_structured_payload(tmp_path, monkeypatch):
 
 
 @pytest.mark.orblib_cpp
-def test_cpp_orbitstart_backend_reports_not_implemented_status(
+def test_cpp_orbitstart_backend_returns_memory_arrays(
+    tmp_path,
+    monkeypatch,
+):
+    workspace = copy_orblib_fixture_workspace(tmp_path)
+    model, orbit_library = make_fixture_orbit_library(workspace, monkeypatch)
+
+    backend = orblib_api.SharedLibraryCppOrbitBackend()
+    result = backend.run_orbitstart_memory(orbit_library)
+
+    assert result.begin_values.shape == (24, 9)
+    assert result.beginbox_values.shape == (24, 9)
+    assert result.begin_noreg.shape == (24,)
+    assert result.beginbox_noreg.shape == (24,)
+    assert np.all(np.isfinite(result.begin_values))
+    assert np.all(np.isfinite(result.beginbox_values))
+    assert not (Path(model.directory_noml) / "infil" / "orbstart.in").exists()
+    assert not (Path(model.directory_noml) / "datfil" / "begin.dat").exists()
+    assert not (Path(model.directory_noml) / "datfil" / "beginbox.dat").exists()
+    assert not (Path(model.directory_noml) / "interpolgrid").exists()
+
+
+@pytest.mark.orblib_cpp
+def test_cpp_full_generation_fails_until_orbit_engine_is_ported(
     tmp_path,
     monkeypatch,
 ):
@@ -385,10 +408,10 @@ def test_cpp_orbitstart_backend_reports_not_implemented_status(
     backend = orblib_api.SharedLibraryCppOrbitBackend()
 
     with pytest.raises(
-        RuntimeError,
-        match="orblib_cpp_api_run_orbitstart_memory failed with status -100",
+        NotImplementedError,
+        match="C\\+\\+ full orbit-library generation is not implemented yet",
     ):
-        backend.run_orbitstart_memory(orbit_library)
+        backend.generate_orbit_library(orbit_library)
 
 
 @pytest.mark.slow

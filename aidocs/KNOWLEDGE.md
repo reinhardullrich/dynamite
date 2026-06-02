@@ -78,9 +78,10 @@ changes from the original project.
   build.
 - `orblib_cpp/`: experimental C++ orbit-library backend on the
   `fortran-to-cpp` branch. The current branch builds
-  `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, and exposes
-  generation entry-point stubs that return status `-100` until the C++ orbit
-  engine is ported. This branch is under a parity freeze: active Fortran
+  `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, implements
+  the C++ orbit-start memory ABI, and keeps full orbit-library generation
+  blocked until the C++ orbit engine orchestration is ported. This branch is
+  under a parity freeze: active Fortran
   behavior and Fortran-derived fixtures are the oracle until full C++ parity is
   proven, even when a Fortran comment or local variable name appears to
   describe different intended behavior. Suspected Fortran bugs are tracked for
@@ -152,8 +153,10 @@ changes from the original project.
   `runorbitstart()` branch logic, outer/middle-boundary search,
   irregular-energy dithering expansion, `noreggrid`, tube begin records,
   rotating-frame retrograde beginbox records, and non-rotating box beginbox
-  records. The production C++ generation entry points are still stubs until
-  this start-array layer is wired into the full orbit engine.
+  records. The production C++ `orblib_cpp_api_run_orbitstart_memory` entry
+  point now returns those arrays through the Python-compatible memory ABI; the
+  full `orblib_cpp_api_run_orblib_direct` orbit-library generator remains
+  unimplemented.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -270,8 +273,10 @@ source files.
   optimize aggressively for speed, allocation behavior, RHS/acceleration
   throughput, cache locality, and reproducible parallel execution. The current
   implementation slices build a C++ shared library and wire
-  `cpp_shared_library` into Python with a hard not-implemented status for
-  generation calls. The first actual ported Fortran kernels are `ran1_nr.f`,
+  `cpp_shared_library` into Python; `run_orbitstart_memory()` now returns C++
+  begin/beginbox arrays, while full generation calls raise a hard
+  `NotImplementedError` because `orblib_cpp_api_run_orblib_direct` is not
+  ported yet. The first actual ported Fortran kernels are `ran1_nr.f`,
   implemented as a no-hot-loop-allocation C++ `Ran1` class with ABI test helper
   `orblib_cpp_api_ran1_sequence`, and `numerics/dop853.f`, implemented as a
   reusable C++ `Dop853` solver with preallocated work arrays, dense-output
@@ -300,10 +305,11 @@ source files.
   tube-orbit DOP853 crossing-width measurement plus `findtube()` tube-radius
   golden-section minimization plus `find_type()` orbit-type probing and
   `find_innerboundary()`/`find_outerboundary()` boundary orchestration, plus
-  memory-side `runorbitstart()` start-array orchestration. The legacy
-  `interpolgrid` disk-cache contract if fixture parity requires it, production
-  C++ generation entry-point wiring, and full orbit-engine wiring are the next
-  unported dependencies. The current start-array coverage includes direct
+  memory-side `runorbitstart()` start-array orchestration and production
+  `orblib_cpp_api_run_orbitstart_memory` wiring. The legacy `interpolgrid`
+  disk-cache contract if fixture parity requires it,
+  `orblib_cpp_api_run_orblib_direct`, and full orbit-engine wiring are the
+  next unported dependencies. The current start-array coverage includes direct
   active Fortran memory-ABI parity for non-rotating begin and beginbox records.
   A known parity
   note is recorded in `aidocs/cpp_orblib_port_plan.md`: Fortran

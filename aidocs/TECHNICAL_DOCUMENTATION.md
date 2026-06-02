@@ -1080,22 +1080,23 @@ The first actual ported Fortran kernels are:
   `dynamite::orblib_cpp::build_orbit_start_arrays`, composing triaxiality
   branch selection, outer/middle-boundary search, irregular-energy dithering
   expansion, `noreggrid`, tube begin records, `Omega != 0` retrograde
-  beginbox records, and `Omega == 0` box beginbox records. The production C++
-  generation entry points are still stubs until this start-array layer is
-  wired into the full orbit engine. An opt-in test now compares the C++
-  start-array helper directly against the active Fortran
+  beginbox records, and `Omega == 0` box beginbox records. The production
+  `orblib_cpp_api_run_orbitstart_memory` entry point now wires this layer into
+  the Python-compatible memory ABI: it expands dithering counts, converts
+  arcsec-log radius settings to km-log radius settings, builds the in-memory
+  interpolation grid, and returns begin/beginbox arrays. An opt-in test now
+  compares this production C++ ABI directly against the active Fortran
   `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube records
-  and `Omega == 0` beginbox box records. That test feeds Fortran arcsec-log
-  radius settings and C++ converted km-log radius settings because those are
-  the two active interfaces.
+  and `Omega == 0` beginbox box records.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python
-orbit-library readers as the Fortran backend. Generation calls currently enter
-the C++ shared library and return status `-100`, meaning the C++ orbit engine is
-not implemented yet. This is intentional: the first slice establishes the
-compiled ABI, build target, Python selection path, and hard failure boundary
-without silently falling back to Fortran.
+orbit-library readers as the Fortran backend. `run_orbitstart_memory()` now
+uses the C++ shared library and returns begin/beginbox arrays. Full generation
+calls still raise a Python `NotImplementedError`, because
+`orblib_cpp_api_run_orblib_direct` and the full orbit-engine orchestration are
+not implemented yet. This is intentional and prevents a partial orbit-start
+implementation from silently masquerading as complete orbit-library generation.
 
 The default backend remains `fortran_shared_library` until the C++ backend
 matches the Fortran-derived fixtures and passes the planned parity tests.

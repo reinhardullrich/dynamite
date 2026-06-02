@@ -355,12 +355,22 @@ class SharedLibraryCppOrbitBackend:
         return _collect_legacy_outputs(orbit_library, request, self.name)
 
     def generate_orbit_library(self, orbit_library: Any) -> None:
+        mod_dir = Path(orbit_library.mod_dir)
+        done_file = mod_dir / "datfil" / "tube_box_done"
+        if done_file.is_file():
+            return
         if orbit_library.LegacyWeightSolver:
             raise NotImplementedError(
                 "LegacyWeightSolver is archived and no longer supported by "
                 "the active orbit-library API. Use NNLS instead."
             )
-        self.run_orbitstart_memory(orbit_library)
+        self._require_library()
+        raise NotImplementedError(
+            "C++ full orbit-library generation is not implemented yet. "
+            "The C++ orbit-start memory API is implemented, but "
+            "orblib_cpp_api_run_orblib_direct still needs the full orbit "
+            "engine orchestration."
+        )
 
     def run_orbitstart_memory(self, orbit_library: Any) -> OrbitStartMemoryResult:
         self._require_library()

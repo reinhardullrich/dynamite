@@ -3190,43 +3190,210 @@ extern "C" void orblib_cpp_api_write_orbit_class_file(
 }
 
 extern "C" void orblib_cpp_api_run_orbitstart_memory(
-    int,
-    int,
-    const double*,
-    const double*,
-    const double*,
-    const double*,
-    double,
-    double,
-    double,
-    double,
-    double,
-    double,
-    double,
-    int,
-    double,
-    double,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    const double*,
-    int,
-    double*,
-    int*,
-    double*,
-    int*,
+    int random_seed,
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int nener,
+    double rlogmin_arcsec,
+    double rlogmax_arcsec,
+    int ni2,
+    int ni3,
+    int orbit_dithering,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int max_rows,
+    double* begin_values,
+    int* begin_noreg,
+    double* beginbox_values,
+    int* beginbox_noreg,
     int* rows_written,
     int* box_rows_written,
     int* status
 ) noexcept {
+    (void)random_seed;
     set_status(rows_written, 0);
     set_status(box_rows_written, 0);
-    set_status(status, kStatusNotImplemented);
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || nener <= 1 || ni2 <= 3 || ni3 <= 0 ||
+        orbit_dithering <= 0 || n_radius < 2 || n_theta < 2 || n_phi < 2 ||
+        rlogmax_arcsec <= rlogmin_arcsec || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        max_rows <= 0 || begin_values == nullptr || begin_noreg == nullptr ||
+        beginbox_values == nullptr || beginbox_noreg == nullptr ||
+        rows_written == nullptr || box_rows_written == nullptr ||
+        !std::isfinite(distance_mpc) || distance_mpc <= 0.0 ||
+        !std::isfinite(theta_degrees) || !std::isfinite(phi_degrees) ||
+        !std::isfinite(psi_view_degrees) || !std::isfinite(upsilon) ||
+        !std::isfinite(black_hole_mass) || !std::isfinite(black_hole_softening_arcsec) ||
+        !std::isfinite(rlogmin_arcsec) || !std::isfinite(rlogmax_arcsec)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            ) || mge.conversion_factor <= 0.0) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        const long long energy_count_ll =
+            static_cast<long long>(nener) * static_cast<long long>(orbit_dithering);
+        const long long i2_count_ll =
+            static_cast<long long>(ni2) * static_cast<long long>(orbit_dithering);
+        const long long i3_count_ll =
+            static_cast<long long>(ni3) * static_cast<long long>(orbit_dithering);
+        if (energy_count_ll > static_cast<long long>(std::numeric_limits<int>::max()) ||
+            i2_count_ll > static_cast<long long>(std::numeric_limits<int>::max()) ||
+            i3_count_ll > static_cast<long long>(std::numeric_limits<int>::max())) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        const int energy_count = static_cast<int>(energy_count_ll);
+        const int i2_count = static_cast<int>(i2_count_ll);
+        const int i3_count = static_cast<int>(i3_count_ll);
+        const long long total_records_ll =
+            energy_count_ll * i2_count_ll * i3_count_ll;
+        if (energy_count <= 1 || i2_count <= 3 || i3_count <= 0 ||
+            total_records_ll <= 0 ||
+            total_records_ll > static_cast<long long>(std::numeric_limits<int>::max())) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        const int total_records = static_cast<int>(total_records_ll);
+        if (max_rows < total_records) {
+            set_status(status, 20);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin_arcsec + std::log10(mge.conversion_factor);
+        config.rlogmax = rlogmax_arcsec + std::log10(mge.conversion_factor);
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        const double black_hole_softening_km =
+            black_hole_softening_arcsec * mge.conversion_factor;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        constexpr double integrator_accuracy = 1.0e-4;
+        constexpr int crossing_capacity = 400;
+        constexpr int type_sample_count = 5000;
+        constexpr double omega = 0.0;
+
+        std::vector<double> circular_radii(static_cast<std::size_t>(energy_count), 0.0);
+        std::vector<double> circular_velocities(static_cast<std::size_t>(energy_count), 0.0);
+        std::vector<double> circular_periods(static_cast<std::size_t>(energy_count), 0.0);
+        std::vector<double> energies(static_cast<std::size_t>(energy_count), 0.0);
+        std::vector<double> theta_values(static_cast<std::size_t>(i2_count), 0.0);
+        const auto boundary_size = static_cast<std::size_t>(energy_count * i2_count);
+        std::vector<double> inner_boundaries(boundary_size, 0.0);
+        std::vector<double> middle_boundaries(boundary_size, 0.0);
+        std::vector<double> outer_boundaries(boundary_size, 0.0);
+        std::vector<int> irregular(static_cast<std::size_t>(energy_count), 0);
+        std::vector<int> inner_orbit_types(boundary_size, 0);
+        std::vector<int> middle_orbit_types(boundary_size, 0);
+        std::vector<int> noreg_grid(boundary_size, 0);
+        std::vector<int> box_iterations(static_cast<std::size_t>(total_records), 0);
+        dynamite::orblib_cpp::OrbitStartOrchestrationDiagnostics diagnostics;
+
+        if (!dynamite::orblib_cpp::build_orbit_start_arrays(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                interpolated,
+                energy_count,
+                i2_count,
+                i3_count,
+                config.rlogmin,
+                config.rlogmax,
+                orbit_dithering,
+                omega,
+                integrator_accuracy,
+                crossing_capacity,
+                type_sample_count,
+                circular_radii.data(),
+                circular_velocities.data(),
+                circular_periods.data(),
+                energies.data(),
+                theta_values.data(),
+                inner_boundaries.data(),
+                middle_boundaries.data(),
+                outer_boundaries.data(),
+                irregular.data(),
+                inner_orbit_types.data(),
+                middle_orbit_types.data(),
+                noreg_grid.data(),
+                begin_values,
+                begin_noreg,
+                beginbox_values,
+                beginbox_noreg,
+                box_iterations.data(),
+                diagnostics
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        *rows_written = diagnostics.begin_record_count;
+        *box_rows_written = diagnostics.beginbox_record_count;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(rows_written, 0);
+        set_status(box_rows_written, 0);
+        set_status(status, kStatusException);
+    }
 }
 
 extern "C" void orblib_cpp_api_run_orblib_direct(

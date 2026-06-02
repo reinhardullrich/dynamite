@@ -327,9 +327,14 @@ Current branch status:
   `orblib_cpp_api_orbitstart_build_start_arrays` validates the composed branch
   selection, diagnostic counters, `noreggrid`, begin records, and retrograde
   beginbox records against Python mirrors of the Fortran startpoint formulas.
-  A separate opt-in parity test compares the same C++ helper against the active
-  Fortran `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube
-  records and `Omega == 0` beginbox box records, using the Fortran hardcoded
+  The production C ABI entry point
+  `orblib_cpp_api_run_orbitstart_memory` now expands dithering counts, converts
+  arcsec-log radius settings to km-log radius settings, builds the in-memory
+  interpolation grid, and returns begin/beginbox arrays through the same memory
+  ABI shape as active Fortran. A separate opt-in parity test compares this
+  production C++ ABI against the active Fortran
+  `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube records
+  and `Omega == 0` beginbox box records, using the Fortran hardcoded
   `findtubeorbitwidth()`/`find_type()` sample counts.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
@@ -343,9 +348,9 @@ Current branch status:
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching if fixture parity requires it, production
-  C++ generation entry-point wiring, full orbit-engine wiring, and full-output
-  orchestration still remain.
+  interpolation-grid disk caching if fixture parity requires it,
+  `orblib_cpp_api_run_orblib_direct`, full orbit-engine wiring, and
+  full-output orchestration still remain.
 
 ## Known Fortran Parity Notes To Revisit
 
@@ -509,18 +514,19 @@ mixed with the first C++ parity port.
    construction and equivalent-radius bisection, tube-width measurement,
    tube-radius golden-section minimization, orbit-type probing, and
    inner/outer boundary search, plus memory-side `runorbitstart()` start-array
-   orchestration. Still required: legacy interpolation-grid disk caching if C++
-   parity requires it, production C++ generation entry-point wiring,
-   full-output orchestration, and Fortran-value parity tests for full orbit
-   integration.
+   orchestration and production C++ orbit-start memory ABI wiring. Still
+   required: legacy interpolation-grid disk caching if C++ parity requires it,
+   `orblib_cpp_api_run_orblib_direct`, full-output orchestration, and
+   Fortran-value parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
    Direct-potential `calc_startpos()`/`findReq()` kernels, tube-width
    measurement, tube-radius minimization, box startpoint records, and tube
    begin/retrograde record arrays plus orbit-type probing and inner/outer
    boundary search are done; full memory-side `runorbitstart()` start-array
-   orchestration is done. Active Fortran memory-ABI parity for non-rotating
-   begin and beginbox records is covered by an opt-in test. Production
-   entry-point wiring and full generated-output parity still remain.
+   orchestration is done. `orblib_cpp_api_run_orbitstart_memory` production
+   wiring is done, and active Fortran memory-ABI parity for non-rotating begin
+   and beginbox records is covered by an opt-in test. Full generated-output
+   parity still remains.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
    standalone classification/moment kernel are done; full one-orbit parity

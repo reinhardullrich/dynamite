@@ -99,10 +99,12 @@ Current coverage:
   post-inner circular metadata recomputation, plus composed start-array
   orchestration validation for triaxial branch selection, `noreggrid`, tube
   begin records, and rotating-frame retrograde beginbox records, plus an
-  opt-in active Fortran memory-ABI parity check for non-rotating begin tube
-  records and `Omega == 0` beginbox box records;
-- validation that the experimental C++ generation entry points fail with the
-  explicit not-implemented status until the orbit engine is ported;
+  opt-in production C++ versus active Fortran memory-ABI parity check for
+  non-rotating begin tube records and `Omega == 0` beginbox box records;
+- validation that the experimental C++ orbit-start memory backend returns
+  Python-readable begin/beginbox arrays through the public facade;
+- validation that full C++ orbit-library generation fails with an explicit
+  `NotImplementedError` until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library
   payload extraction, plus opt-in coverage for the non-bar direct-input
   shared-library orbit-start ABI;

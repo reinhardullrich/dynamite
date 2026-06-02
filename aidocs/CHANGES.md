@@ -578,3 +578,16 @@ This file is append-only. Add new entries at the bottom.
   its `interpolgrid` cache is not created in the repository root. Updated
   canonical knowledge, C++ port documentation, technical documentation, and
   test documentation.
+- Wired the production C++ orbit-start memory ABI
+  `orblib_cpp_api_run_orbitstart_memory` to the ported start-array
+  orchestration. The entry point now expands dithering counts, converts the
+  Fortran-compatible arcsec-log radius settings to km-log radius settings,
+  builds the in-memory interpolation grid, and returns begin/beginbox arrays
+  plus noreg flags through the same buffer contract as the active Fortran ABI.
+  Updated the C++/Fortran parity test to compare this production C++ entry
+  point directly against active Fortran. Updated the Python C++ backend so
+  `run_orbitstart_memory()` returns arrays, while full orbit-library generation
+  raises an explicit `NotImplementedError` until
+  `orblib_cpp_api_run_orblib_direct` and the full orbit engine are ported.
+  Updated canonical knowledge, the C++ port plan, technical documentation, and
+  test documentation.
