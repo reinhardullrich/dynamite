@@ -534,3 +534,16 @@ This file is append-only. Add new entries at the bottom.
   test documentation; remaining C++ gaps now include interpolation-grid disk
   caching if required for parity, mid-boundary orbit-start search/runtime
   orchestration, full orbit-engine wiring, and full-output orchestration.
+- Ported the deterministic pre-boundary `runorbitstart()` grid setup into C++
+  as `dynamite::orblib_cpp::prepare_orbit_start_grid` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_prepare_grid` with opt-in pytest coverage for
+  logarithmic circular radii, circular energies/periods, `theta` grid setup,
+  `findReq()` outer boundaries, inner-boundary dispatch, post-inner circular
+  metadata recomputation, and diagnostic probe counters. Updated canonical
+  knowledge, C++ port documentation, technical documentation, and test
+  documentation; remaining C++ gaps now include interpolation-grid disk
+  caching if required for parity, mid-boundary orbit-start search, final
+  start-array orchestration, full orbit-engine wiring, and full-output
+  orchestration.

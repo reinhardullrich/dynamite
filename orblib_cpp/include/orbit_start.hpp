@@ -29,6 +29,37 @@ bool find_equivalent_radius(
     int& iterations
 ) noexcept;
 
+struct OrbitStartGridDiagnostics {
+    int equivalent_radius_iterations = 0;
+    int inner_width_evaluations = 0;
+    int inner_type_function_evaluations = 0;
+};
+
+bool prepare_orbit_start_grid(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    double rlogmin,
+    double rlogmax,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* outer_boundaries,
+    double* inner_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    OrbitStartGridDiagnostics& diagnostics
+) noexcept;
+
 bool compute_unregularized_orbit_grid(
     int energy_count,
     int i2_count,

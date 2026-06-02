@@ -384,6 +384,164 @@ bool find_equivalent_radius(
     return false;
 }
 
+bool prepare_orbit_start_grid(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    double rlogmin,
+    double rlogmax,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* outer_boundaries,
+    double* inner_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    OrbitStartGridDiagnostics& diagnostics
+) noexcept {
+    diagnostics = OrbitStartGridDiagnostics{};
+    if (energy_count <= 1 || i2_count <= 3 || rlogmax <= rlogmin ||
+        integrator_accuracy <= 0.0 || crossing_capacity <= 0 || type_sample_count <= 0 ||
+        circular_radii == nullptr || circular_velocities == nullptr ||
+        circular_periods == nullptr || energies == nullptr || theta_values == nullptr ||
+        outer_boundaries == nullptr || inner_boundaries == nullptr || irregular == nullptr ||
+        inner_orbit_types == nullptr || !std::isfinite(rlogmin) || !std::isfinite(rlogmax)) {
+        return false;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        const double fraction =
+            static_cast<double>(energy) / static_cast<double>(energy_count - 1);
+        const double log_radius = rlogmin + (rlogmax - rlogmin) * fraction;
+        circular_radii[energy] = std::pow(10.0, log_radius);
+        if (!std::isfinite(circular_radii[energy]) || circular_radii[energy] <= 0.0) {
+            return false;
+        }
+
+        constexpr double half_radius_scale = 0.5;
+        double accel_x = 0.0;
+        double accel_y = 0.0;
+        double accel_z = 0.0;
+        if (!potential.evaluate_acceleration(
+                circular_radii[energy] * half_radius_scale,
+                0.0,
+                0.0,
+                accel_x,
+                accel_y,
+                accel_z
+            )) {
+            return false;
+        }
+        circular_velocities[energy] =
+            std::sqrt(circular_radii[energy] * half_radius_scale * std::abs(accel_x));
+        if (!std::isfinite(circular_velocities[energy]) || circular_velocities[energy] <= 0.0) {
+            return false;
+        }
+        circular_periods[energy] =
+            2.0 * kPi * circular_radii[energy] * half_radius_scale / circular_velocities[energy];
+        if (!std::isfinite(circular_periods[energy]) || circular_periods[energy] <= 0.0) {
+            return false;
+        }
+        if (!potential.evaluate_potential(circular_radii[energy], 0.0, 0.0, energies[energy]) ||
+            !std::isfinite(energies[energy]) || energies[energy] == 0.0) {
+            return false;
+        }
+    }
+
+    for (int i2 = 0; i2 < i2_count; ++i2) {
+        theta_values[i2] = 0.5 * kPi * (static_cast<double>(i2) + 0.5) /
+            static_cast<double>(i2_count);
+        if (!std::isfinite(theta_values[i2])) {
+            return false;
+        }
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        for (int i2 = 0; i2 < i2_count; ++i2) {
+            const int index = energy * i2_count + i2;
+            int iterations = 0;
+            if (!find_equivalent_radius(
+                    mge,
+                    halo,
+                    black_hole_mass,
+                    black_hole_softening_km,
+                    circular_radii[energy],
+                    energies[energy],
+                    theta_values[i2],
+                    0.0,
+                    outer_boundaries[index],
+                    iterations
+                )) {
+                return false;
+            }
+            diagnostics.equivalent_radius_iterations += iterations;
+        }
+    }
+
+    if (!find_inner_boundaries(
+            potential,
+            energy_count,
+            i2_count,
+            outer_boundaries,
+            energies,
+            circular_periods,
+            theta_values,
+            integrator_accuracy,
+            crossing_capacity,
+            type_sample_count,
+            inner_boundaries,
+            irregular,
+            inner_orbit_types,
+            diagnostics.inner_width_evaluations,
+            diagnostics.inner_type_function_evaluations
+        )) {
+        return false;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        const double short_axis_inner =
+            inner_boundaries[energy * i2_count + i2_count - 1];
+        const double radius_scale = short_axis_inner / circular_radii[energy];
+        if (!std::isfinite(radius_scale) || radius_scale <= 0.0) {
+            return false;
+        }
+        double accel_x = 0.0;
+        double accel_y = 0.0;
+        double accel_z = 0.0;
+        if (!potential.evaluate_acceleration(
+                circular_radii[energy] * radius_scale,
+                0.0,
+                0.0,
+                accel_x,
+                accel_y,
+                accel_z
+            )) {
+            return false;
+        }
+        circular_velocities[energy] =
+            std::sqrt(circular_radii[energy] * radius_scale * std::abs(accel_x));
+        if (!std::isfinite(circular_velocities[energy]) || circular_velocities[energy] <= 0.0) {
+            return false;
+        }
+        circular_periods[energy] =
+            2.0 * kPi * circular_radii[energy] * radius_scale / circular_velocities[energy];
+        if (!std::isfinite(circular_periods[energy]) || circular_periods[energy] <= 0.0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool calculate_box_start_record(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,

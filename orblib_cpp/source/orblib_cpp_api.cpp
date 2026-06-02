@@ -2436,6 +2436,150 @@ extern "C" void orblib_cpp_api_orbitstart_find_type(
     }
 }
 
+extern "C" void orblib_cpp_api_orbitstart_prepare_grid(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    double rlogmin,
+    double rlogmax,
+    int energy_count,
+    int i2_count,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* circular_radii,
+    double* circular_velocities,
+    double* circular_periods,
+    double* energies,
+    double* theta_values,
+    double* outer_boundaries,
+    double* inner_boundaries,
+    int* irregular,
+    int* inner_orbit_types,
+    int* equivalent_radius_iterations,
+    int* inner_width_evaluations,
+    int* inner_type_function_evaluations,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        n_radius < 2 || n_theta < 2 || n_phi < 2 || rlogmax <= rlogmin ||
+        energy_count <= 1 || i2_count <= 3 || integrator_accuracy <= 0.0 ||
+        crossing_capacity <= 0 || type_sample_count <= 0 || circular_radii == nullptr ||
+        circular_velocities == nullptr || circular_periods == nullptr || energies == nullptr ||
+        theta_values == nullptr || outer_boundaries == nullptr || inner_boundaries == nullptr ||
+        irregular == nullptr || inner_orbit_types == nullptr ||
+        equivalent_radius_iterations == nullptr || inner_width_evaluations == nullptr ||
+        inner_type_function_evaluations == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin;
+        config.rlogmax = rlogmax;
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        const double black_hole_softening_km = black_hole_softening_arcsec * mge.conversion_factor;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::OrbitStartGridDiagnostics diagnostics;
+        if (!dynamite::orblib_cpp::prepare_orbit_start_grid(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_km,
+                interpolated,
+                energy_count,
+                i2_count,
+                rlogmin,
+                rlogmax,
+                integrator_accuracy,
+                crossing_capacity,
+                type_sample_count,
+                circular_radii,
+                circular_velocities,
+                circular_periods,
+                energies,
+                theta_values,
+                outer_boundaries,
+                inner_boundaries,
+                irregular,
+                inner_orbit_types,
+                diagnostics
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        *equivalent_radius_iterations = diagnostics.equivalent_radius_iterations;
+        *inner_width_evaluations = diagnostics.inner_width_evaluations;
+        *inner_type_function_evaluations = diagnostics.inner_type_function_evaluations;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_orbitstart_inner_boundaries(
     int ngauss,
     const double* surf_pc,

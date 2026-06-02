@@ -271,6 +271,14 @@ Current branch status:
   plane-1 `findtube()` refinement scan. ABI tests compare middle boundaries,
   mutated irregular flags, orbit types, and probe counters against a Python
   mirror using the already-tested C++ tube/type probe ABI helpers.
+- The deterministic pre-boundary grid setup from `runorbitstart()` is ported
+  as `prepare_orbit_start_grid()`. It computes logarithmic circular radii,
+  initial circular energies/periods, the `theta` grid, `findReq()` outer
+  boundaries, calls the already-ported inner-boundary search, and then
+  recomputes circular velocities/periods from the short-axis inner boundary.
+  The C ABI helper `orblib_cpp_api_orbitstart_prepare_grid` tests the composed
+  output against analytic black-hole setup formulas plus the lower-level
+  inner-boundary ABI as the expensive probe oracle.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
   `find_equivalent_radius()` and testing the Fortran one-based
@@ -283,8 +291,8 @@ Current branch status:
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, mid-boundary orbit-start search, runtime
-  orbit-start orchestration, full orbit-engine wiring, and full-output
+  interpolation-grid disk caching, mid-boundary orbit-start search, final
+  start-array orchestration, full orbit-engine wiring, and full-output
   orchestration still remain.
 
 ## Known Fortran Parity Notes To Revisit

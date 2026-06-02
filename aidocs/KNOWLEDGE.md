@@ -138,7 +138,11 @@ changes from the original project.
   `findtubeorbitwidth()`, plus the `findtube()` golden-section tube-radius
   minimization, `find_type()` orbit-type probing, and the `find_innerboundary()`
   inner short-axis tube boundary search loop plus `find_outerboundary()`
-  outer long-axis tube boundary search loop.
+  outer long-axis tube boundary search loop. It also ports the pre-boundary
+  `runorbitstart()` grid-preparation layer as `prepare_orbit_start_grid()`,
+  covering logarithmic circular radii, initial circular energies/periods,
+  angular-grid setup, `findReq()` outer boundaries, inner-boundary dispatch,
+  and post-inner circular metadata recomputation.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -168,7 +172,9 @@ changes from the original project.
   against independent Python mirrors of the Fortran formulas, angular grid,
   loop order, sampling fractions, flag propagation, crossing bisection,
   bisection stopping rule, golden-section tube-radius search, and `find_type()`
-  sampling classifier.
+  sampling classifier. The composed orbit-start grid-preparation helper is
+  tested against analytic black-hole setup formulas plus the lower-level
+  inner-boundary ABI as the expensive probe oracle.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
