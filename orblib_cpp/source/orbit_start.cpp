@@ -332,4 +332,109 @@ bool compute_tube_start_schedule(
     return true;
 }
 
+bool build_tube_start_records(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* middle_boundaries,
+    const double* outer_boundaries,
+    const int* irregular,
+    const int* noreg_grid,
+    const double* theta_values,
+    const double* energies,
+    const double* circular_periods,
+    const double* circular_radii,
+    const double* circular_velocities,
+    double* records,
+    int* noreg_flags,
+    bool include_retrograde,
+    double* retrograde_records,
+    int* retrograde_noreg_flags
+) noexcept {
+    if (energy_count <= 0 || i2_count <= 0 || i3_count <= 0 || inner_boundaries == nullptr ||
+        middle_boundaries == nullptr || outer_boundaries == nullptr || irregular == nullptr ||
+        noreg_grid == nullptr || theta_values == nullptr || energies == nullptr ||
+        circular_periods == nullptr || circular_radii == nullptr ||
+        circular_velocities == nullptr || records == nullptr || noreg_flags == nullptr ||
+        (include_retrograde && (retrograde_records == nullptr || retrograde_noreg_flags == nullptr))) {
+        return false;
+    }
+
+    const double denominator = static_cast<double>(i3_count) - 0.8;
+    if (denominator == 0.0) {
+        return false;
+    }
+    const int max_irregular = *std::max_element(irregular, irregular + energy_count);
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        if (!std::isfinite(energies[energy]) || !std::isfinite(circular_periods[energy]) ||
+            !std::isfinite(circular_radii[energy]) || !std::isfinite(circular_velocities[energy])) {
+            return false;
+        }
+        for (int i2 = 0; i2 < i2_count; ++i2) {
+            if (!std::isfinite(theta_values[i2])) {
+                return false;
+            }
+            const int boundary_index = energy * i2_count + i2;
+            double inner = inner_boundaries[boundary_index];
+            double middle = middle_boundaries[boundary_index];
+            const double outer = outer_boundaries[boundary_index];
+            if (!std::isfinite(inner) || !std::isfinite(middle) || !std::isfinite(outer)) {
+                return false;
+            }
+            if (irregular[energy] == 1) {
+                inner = 0.0;
+                middle = outer;
+            }
+            for (int i3 = 0; i3 < i3_count; ++i3) {
+                const double fraction = (static_cast<double>(i3 + 1) - 0.9) / denominator;
+                const double start_radius = inner + (middle - inner) * fraction;
+                const int record_index = (energy * i2_count + i2) * i3_count + i3;
+                double* record = records + static_cast<std::size_t>(record_index) * 9U;
+
+                if (!calculate_orbit_start_state(
+                        mge,
+                        halo,
+                        black_hole_mass,
+                        black_hole_softening_km,
+                        start_radius,
+                        theta_values[i2],
+                        energies[energy],
+                        record
+                    )) {
+                    return false;
+                }
+                record[6] = circular_radii[energy];
+                record[7] = circular_periods[energy];
+                record[8] = circular_velocities[energy];
+
+                int noreg = 0;
+                if (i3 == i3_count - 1 && noreg_grid[boundary_index] == 1) {
+                    noreg = 1;
+                }
+                if (max_irregular == energy + 1) {
+                    noreg = 1;
+                }
+                noreg_flags[record_index] = noreg;
+
+                if (include_retrograde) {
+                    double* retrograde_record =
+                        retrograde_records + static_cast<std::size_t>(record_index) * 9U;
+                    for (int component = 0; component < 9; ++component) {
+                        retrograde_record[component] = record[component];
+                    }
+                    retrograde_record[4] = -retrograde_record[4];
+                    retrograde_noreg_flags[record_index] = noreg;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 }  // namespace dynamite::orblib_cpp

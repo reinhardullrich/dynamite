@@ -130,9 +130,10 @@ changes from the original project.
   `orblib_cpp/include/orbit_start.hpp` and
   `orblib_cpp/source/orbit_start.cpp` port the direct-potential orbit-start
   kernels `calc_startpos()` and `findReq()` from `orbitstart_f.f90`, plus
-  the unregularized-grid and tube-start radius/noreg scheduling loops from
-  `find_unregorbits()` and `make_startpoints()`, and the per-record plus
-  flattened-array angular-grid construction from `make_boxstartpoints()`.
+  the unregularized-grid, tube-start radius/noreg scheduling, begin-record,
+  and retrograde beginbox loops from `find_unregorbits()` and
+  `make_startpoints()`, and the per-record plus flattened-array angular-grid
+  construction from `make_boxstartpoints()`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -158,9 +159,10 @@ changes from the original project.
   Population-mass binary output is tested through SciPy `FortranFile`, and
   orbclass text output is tested against the current Python reshape contract.
   Orbit-start `calc_startpos()`, `findReq()`, unregularized-grid, tube-start
-  schedule, and box-start record/array kernels are tested against independent
-  Python mirrors of the Fortran formulas, angular grid, loop order, sampling
-  fractions, flag propagation, and bisection stopping rule.
+  schedule/record/retrograde, and box-start record/array kernels are tested
+  against independent Python mirrors of the Fortran formulas, angular grid,
+  loop order, sampling fractions, flag propagation, and bisection stopping
+  rule.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -264,11 +266,11 @@ source files.
   serialization, population-mass binary file serialization, and formatted
   orbclass output writing, plus direct-potential orbit-start state
   construction, equivalent-radius bisection, unregularized-grid construction,
-  tube-start radius/noreg scheduling, and box-start single-record and
-  flattened-array construction. The legacy `interpolgrid` disk-cache
-  contract, full orbit-start boundary search/tube begin-array generation, and
-  full orbit-engine wiring are the next unported dependencies. A known parity
-  note is recorded
+  tube-start radius/noreg scheduling plus begin/retrograde record-array
+  construction, and box-start single-record and flattened-array construction.
+  The legacy `interpolgrid` disk-cache contract, full orbit-start boundary
+  search, runtime orbit-start orchestration, and full orbit-engine wiring are
+  the next unported dependencies. A known parity note is recorded
   in `aidocs/cpp_orblib_port_plan.md`: Fortran `make_startpoints()` comments
   describe a "last irregular energy" noreg rule, but the code uses
   `maxval(irregular(:)) .eq. i`, which flags energy index 1 when any

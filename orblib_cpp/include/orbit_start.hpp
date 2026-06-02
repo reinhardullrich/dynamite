@@ -50,6 +50,31 @@ bool compute_tube_start_schedule(
     int* noreg_flags
 ) noexcept;
 
+bool build_tube_start_records(
+    const TriaxialMgeSetup& mge,
+    const DarkHaloSetup& halo,
+    double black_hole_mass,
+    double black_hole_softening_km,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* middle_boundaries,
+    const double* outer_boundaries,
+    const int* irregular,
+    const int* noreg_grid,
+    const double* theta_values,
+    const double* energies,
+    const double* circular_periods,
+    const double* circular_radii,
+    const double* circular_velocities,
+    double* records,
+    int* noreg_flags,
+    bool include_retrograde,
+    double* retrograde_records,
+    int* retrograde_noreg_flags
+) noexcept;
+
 bool calculate_box_start_record(
     const TriaxialMgeSetup& mge,
     const DarkHaloSetup& halo,

@@ -214,6 +214,13 @@ Current branch status:
   with ABI tests for the reverse `nI2` propagation scan, irregular-energy
   boundary replacement, nearly closed-boundary radius formula, and the exact
   Fortran `maxval(irregular) == i` flag condition.
+- The full tube-start record loop from `make_startpoints()` is ported as
+  `build_tube_start_records()`, reusing `calculate_orbit_start_state()` to
+  produce flattened `[energy, nI2, nI3, 9]` begin records, noreg flags, and
+  optional `Omega != 0` retrograde beginbox records with negated `vy`. ABI
+  tests cover Fortran loop order, irregular-energy boundary replacement,
+  nearly closed-boundary radius sampling, exact noreg flag propagation, and
+  retrograde flag/value parity.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
   `find_equivalent_radius()` and testing the Fortran one-based
@@ -226,8 +233,8 @@ Current branch status:
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start boundary search/tube begin-state
-  generation, full orbit-engine wiring, and full-output orchestration still
+  interpolation-grid disk caching, orbit-start boundary search/runtime
+  orchestration, full orbit-engine wiring, and full-output orchestration still
   remain.
 
 ## Known Fortran Parity Notes To Revisit

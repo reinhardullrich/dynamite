@@ -454,3 +454,15 @@ This file is append-only. Add new entries at the bottom.
   interpolation-grid disk caching if required for parity, orbit-start boundary
   search/tube begin-array generation, full orbit-engine wiring, and full-output
   orchestration.
+- Ported the full tube-start record loop from `make_startpoints()` into C++ as
+  `dynamite::orblib_cpp::build_tube_start_records` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_tube_start_records` with opt-in pytest coverage
+  for flattened `[energy, nI2, nI3, 9]` begin record order, Fortran
+  nearly-closed radius sampling, irregular-energy boundary replacement,
+  preserved `maxval(irregular) == i` noreg flag behavior, circular metadata
+  propagation, and optional `Omega != 0` retrograde beginbox records with
+  negated `vy`. Remaining C++ gaps now include interpolation-grid disk caching
+  if required for parity, orbit-start boundary search/runtime orchestration,
+  full orbit-engine wiring, and full-output orchestration.
