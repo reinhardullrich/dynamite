@@ -77,6 +77,10 @@ Current coverage:
   against a Python mirror of the Fortran `qgrid_*` formulas;
 - C++ qgrid Fortran-record file serialization validation by reading the
   generated file through SciPy `FortranFile`;
+- C++ population-mass Fortran-record file serialization validation through
+  SciPy `FortranFile`;
+- C++ formatted orbclass output validation against the current Python
+  `reshape(..., order='F')` reader contract;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

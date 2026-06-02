@@ -124,9 +124,9 @@ changes from the original project.
   boundary setup, octant-folded moment accumulation, orbit-type channel
   accumulation, and normalization formulas from `qgrid_setup()`,
   `qgrid_store()`, and `qgrid_write()`. `orblib_cpp/include/orbit_output.hpp`
-  and `orblib_cpp/source/orbit_output.cpp` port qgrid and sparse LOSVD
-  Fortran-record binary serialization for files readable by the existing SciPy
-  `FortranFile` Python reader.
+  and `orblib_cpp/source/orbit_output.cpp` port qgrid, sparse LOSVD, and
+  population-mass Fortran-record binary serialization plus formatted orbclass
+  text output for files readable by the existing Python readers.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -149,6 +149,8 @@ changes from the original project.
   sign-table paths. Qgrid binary output is tested by writing a C++ qgrid file
   and reading it through SciPy `FortranFile`; sparse LOSVD binary output is
   tested the same way against the existing Python reader's record order.
+  Population-mass binary output is tested through SciPy `FortranFile`, and
+  orbclass text output is tested against the current Python reshape contract.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -249,9 +251,10 @@ source files.
   histogram accumulation, bin-order collapse, normalization, and sparse
   row-range formulas, plus intrinsic qgrid boundary setup, accumulation, and
   normalization formulas, plus qgrid and sparse LOSVD binary file
-  serialization. The legacy `interpolgrid` disk-cache contract, orbit-start
-  generation, full orbit-engine wiring, and pops/orbclass output writing are
-  the next unported dependencies.
+  serialization, population-mass binary file serialization, and formatted
+  orbclass output writing. The legacy `interpolgrid` disk-cache contract,
+  orbit-start generation, and full orbit-engine wiring are the next unported
+  dependencies.
 
 ## Separated Workspaces
 

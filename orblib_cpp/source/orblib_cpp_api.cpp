@@ -1585,6 +1585,65 @@ extern "C" void orblib_cpp_api_write_losvd_histogram_file(
     }
 }
 
+extern "C" void orblib_cpp_api_write_population_mass_file(
+    const char* output_path,
+    int orbit_count,
+    int population_count,
+    const int* aperture_counts,
+    const double* masses,
+    int* status
+) noexcept {
+    if (output_path == nullptr || orbit_count <= 0 || population_count <= 0 ||
+        aperture_counts == nullptr || masses == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::write_population_mass_file(
+                output_path,
+                orbit_count,
+                population_count,
+                aperture_counts,
+                masses
+            )) {
+            set_status(status, kStatusIoError);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_write_orbit_class_file(
+    const char* output_path,
+    int orbit_count,
+    int dither_count,
+    const double* moments,
+    int* status
+) noexcept {
+    if (output_path == nullptr || orbit_count <= 0 || dither_count <= 0 || moments == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::write_orbit_class_file(
+                output_path,
+                orbit_count,
+                dither_count,
+                moments
+            )) {
+            set_status(status, kStatusIoError);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_run_orbitstart_memory(
     int,
     int,

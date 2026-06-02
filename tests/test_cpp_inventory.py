@@ -3039,6 +3039,97 @@ def test_orblib_cpp_writes_losvd_histogram_file_readable_by_scipy_fortranfile(tm
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_writes_population_mass_file_readable_by_scipy_fortranfile(tmp_path):
+    orbit_count = 3
+    aperture_counts = np.ascontiguousarray([2, 4], dtype=np.int32)
+    population_count = aperture_counts.size
+    total_apertures = int(np.sum(aperture_counts))
+    masses = np.ascontiguousarray(
+        np.arange(1, orbit_count * total_apertures + 1, dtype=np.float64).reshape(
+            orbit_count,
+            total_apertures,
+        ),
+    )
+    output_path = tmp_path / "orblib_pops.dat"
+
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function = library.orblib_cpp_api_write_population_mass_file
+    function.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        int_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        str(output_path).encode(),
+        ctypes.c_int(orbit_count),
+        ctypes.c_int(population_count),
+        aperture_counts.ctypes.data_as(int_p),
+        masses.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    reader = scipy.io.FortranFile(output_path, "r")
+    try:
+        for orbit_index in range(orbit_count):
+            offset = 0
+            for aperture_count in aperture_counts:
+                expected = masses[orbit_index, offset:offset + aperture_count]
+                np.testing.assert_array_equal(reader.read_reals(float), expected)
+                offset += aperture_count
+    finally:
+        reader.close()
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_writes_orbit_class_file_like_fortran_reader(tmp_path):
+    orbit_count = 3
+    dither_count = 4
+    moments = np.ascontiguousarray(
+        np.arange(1, orbit_count * dither_count * 5 + 1, dtype=np.float64),
+    )
+    output_path = tmp_path / "orblib.dat_orbclass.out"
+
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function = library.orblib_cpp_api_write_orbit_class_file
+    function.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        str(output_path).encode(),
+        ctypes.c_int(orbit_count),
+        ctypes.c_int(dither_count),
+        moments.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    tokens = []
+    for line in output_path.read_text().splitlines():
+        tokens.extend(float(value) for value in line.split())
+        assert len(line.split()) <= 25
+    data = np.array(tokens, dtype=np.float64)
+    assert data.size == 5 * dither_count * orbit_count
+    actual = data.reshape((5, dither_count, orbit_count), order="F")
+    expected = moments.reshape((5, dither_count, orbit_count), order="F")
+    np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.orblib_cpp
 @pytest.mark.parametrize("omega", [0.0, 1.5e-16])
 def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
     surf_pc = np.array([0.0], dtype=np.float64)

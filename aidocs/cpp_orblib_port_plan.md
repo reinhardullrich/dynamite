@@ -91,6 +91,8 @@ orblib_cpp_api_accumulate_qgrid
 orblib_cpp_api_normalize_qgrid
 orblib_cpp_api_write_qgrid_file
 orblib_cpp_api_write_losvd_histogram_file
+orblib_cpp_api_write_population_mass_file
+orblib_cpp_api_write_orbit_class_file
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -189,11 +191,18 @@ Current branch status:
 - Qgrid Fortran-record binary serialization is ported in
   `orblib_cpp/source/orbit_output.cpp` as `write_qgrid_file()` and tested by
   writing a C++ `*_qgrid.dat` file that SciPy `FortranFile` reads back with
-  the existing Python reader's record order. Pops/orbclass binary/text output
-  serialization is not ported yet.
+  the existing Python reader's record order.
+- Population projected-mass Fortran-record binary serialization is ported in
+  `orblib_cpp/source/orbit_output.cpp` as `write_population_mass_file()` and
+  tested by reading generated `*_pops.dat` records through SciPy
+  `FortranFile`.
+- Formatted orbit-class output is ported in
+  `orblib_cpp/source/orbit_output.cpp` as `write_orbit_class_file()` and
+  tested against the current Python reader's `reshape(..., order='F')`
+  contract.
 - The orbit-specific C++ engine is still not implemented yet:
   interpolation-grid disk caching, orbit-start generation, full orbit-engine
-  wiring, and pops/orbclass output writing still remain.
+  wiring, and full-output orchestration still remain.
 
 ## DOP853 Policy
 
@@ -336,9 +345,10 @@ mixed with the first C++ parity port.
    histogram accumulation, bin-order collapse, normalization, and sparse
    row-range preparation, plus intrinsic qgrid boundary setup, accumulation,
    and normalization, plus qgrid and LOSVD sparse Fortran-record file
-   serialization. Still required: legacy interpolation-grid disk caching if
-   C++ parity requires it, pops/orbclass output wiring, and Fortran-value
-   parity tests for full orbit integration.
+   serialization, plus population-mass binary serialization and formatted
+   orbclass output writing. Still required: legacy interpolation-grid disk
+   caching if C++ parity requires it, full-output orchestration, and
+   Fortran-value parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
@@ -349,7 +359,8 @@ mixed with the first C++ parity port.
    mapping are done, and the LOSVD velocity-bin plus per-aperture histogram
    accumulation core plus memory-side sparse row preparation are done; qgrid
    memory-side accumulation is done; qgrid and LOSVD sparse file serialization
-   are done; pops/orbclass output writing still remains.
+   are done; population-mass and orbclass output writing are done; full engine
+   orchestration still remains.
 9. Run full generated LOSVD parity against
    `comparison_losvd_shared_library.npz`.
 10. Only after correctness, benchmark and optimize memory layout, branching,

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <limits>
 #include <string>
 
@@ -236,6 +237,90 @@ bool write_losvd_histogram_file(
         }
     }
     return true;
+}
+
+bool write_population_mass_file(
+    const char* path,
+    int orbit_count,
+    int population_count,
+    const int* aperture_counts,
+    const double* masses
+) noexcept {
+    if (path == nullptr || orbit_count <= 0 || population_count <= 0 ||
+        aperture_counts == nullptr || masses == nullptr) {
+        return false;
+    }
+
+    int total_apertures = 0;
+    for (int population = 0; population < population_count; ++population) {
+        if (aperture_counts[population] <= 0) {
+            return false;
+        }
+        if (total_apertures > std::numeric_limits<int>::max() - aperture_counts[population]) {
+            return false;
+        }
+        total_apertures += aperture_counts[population];
+    }
+
+    FortranRecordWriter writer(path);
+    if (!writer.ok()) {
+        return false;
+    }
+
+    for (int orbit = 0; orbit < orbit_count; ++orbit) {
+        const std::size_t orbit_offset =
+            static_cast<std::size_t>(orbit) * static_cast<std::size_t>(total_apertures);
+        int population_offset = 0;
+        for (int population = 0; population < population_count; ++population) {
+            const int aperture_count = aperture_counts[population];
+            if (!writer.write_array(
+                    masses + orbit_offset + static_cast<std::size_t>(population_offset),
+                    static_cast<std::size_t>(aperture_count)
+                )) {
+                return false;
+            }
+            population_offset += aperture_count;
+        }
+    }
+    return true;
+}
+
+bool write_orbit_class_file(
+    const char* path,
+    int orbit_count,
+    int dither_count,
+    const double* moments
+) noexcept {
+    if (path == nullptr || orbit_count <= 0 || dither_count <= 0 || moments == nullptr) {
+        return false;
+    }
+
+    int total_columns = 0;
+    if (!checked_mul_int(orbit_count, dither_count, total_columns)) {
+        return false;
+    }
+
+    std::ofstream stream(std::string(path), std::ios::out | std::ios::trunc);
+    if (!stream.good()) {
+        return false;
+    }
+
+    stream << std::scientific << std::uppercase << std::setprecision(5);
+    constexpr int values_per_line = 25;
+    int line_values = 0;
+    const std::size_t value_count = static_cast<std::size_t>(total_columns) * 5U;
+    for (std::size_t index = 0; index < value_count; ++index) {
+        stream << std::setw(13) << moments[index];
+        ++line_values;
+        if (line_values == values_per_line) {
+            stream << '\n';
+            line_values = 0;
+        }
+    }
+    if (line_values != 0) {
+        stream << '\n';
+    }
+    return stream.good();
 }
 
 }  // namespace dynamite::orblib_cpp

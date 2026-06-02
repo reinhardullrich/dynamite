@@ -31,4 +31,19 @@ bool write_losvd_histogram_file(
     const double* histograms
 ) noexcept;
 
+bool write_population_mass_file(
+    const char* path,
+    int orbit_count,
+    int population_count,
+    const int* aperture_counts,
+    const double* masses
+) noexcept;
+
+bool write_orbit_class_file(
+    const char* path,
+    int orbit_count,
+    int dither_count,
+    const double* moments
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

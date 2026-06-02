@@ -819,6 +819,8 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_normalize_qgrid`
 - `orblib_cpp_api_write_qgrid_file`
 - `orblib_cpp_api_write_losvd_histogram_file`
+- `orblib_cpp_api_write_population_mass_file`
+- `orblib_cpp_api_write_orbit_class_file`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -992,8 +994,23 @@ The first actual ported Fortran kernels are:
   `integrator_write()`, and `qgrid_write()` for the split
   `*_qgrid.dat` output files. The test-only C ABI helper
   `orblib_cpp_api_write_qgrid_file` validates the generated file through
-  SciPy `FortranFile`. Pops/orbclass serialization and full orbit-engine
-  wiring remain unported.
+  SciPy `FortranFile`.
+- Population projected-mass Fortran-record binary serialization, implemented
+  as `dynamite::orblib_cpp::write_population_mass_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. It writes one real-valued record per
+  orbit and population aperture vector, matching the existing Python
+  `*_pops.dat` reader. The test-only C ABI helper
+  `orblib_cpp_api_write_population_mass_file` validates the records through
+  SciPy `FortranFile`.
+- Formatted orbit-class output, implemented as
+  `dynamite::orblib_cpp::write_orbit_class_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. It writes the same moment-major,
+  dither-next, orbit-next token order expected by
+  `read_orbit_property_file_base()`'s `reshape(..., order='F')` path. The
+  test-only C ABI helper `orblib_cpp_api_write_orbit_class_file` validates the
+  generated text file against that Python reader contract.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

@@ -386,3 +386,15 @@ This file is append-only. Add new entries at the bottom.
   records. Remaining C++ gaps now include interpolation-grid disk caching if
   required for parity, orbit-start generation, full orbit-engine wiring, and
   pops/orbclass output writing.
+- Ported population projected-mass and formatted orbit-class output writing
+  into C++ as `dynamite::orblib_cpp::write_population_mass_file` and
+  `dynamite::orblib_cpp::write_orbit_class_file` in
+  `orblib_cpp/include/orbit_output.hpp` and
+  `orblib_cpp/source/orbit_output.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_write_population_mass_file` and
+  `orblib_cpp_api_write_orbit_class_file` with opt-in pytest coverage that
+  validates `*_pops.dat` records through SciPy `FortranFile` and validates
+  `*.dat_orbclass.out` token order against the current Python
+  `reshape(..., order='F')` reader contract. Remaining C++ gaps now include
+  interpolation-grid disk caching if required for parity, orbit-start
+  generation, and full orbit-engine wiring.
