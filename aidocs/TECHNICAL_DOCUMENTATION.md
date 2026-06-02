@@ -798,8 +798,24 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 `1` and includes:
 
 - `orblib_cpp_api_abi_version`
+- `orblib_cpp_api_ran1_sequence`
+- `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
+
+The first actual ported Fortran kernels are:
+
+- `ran1_nr.f`, implemented in C++ as `dynamite::orblib_cpp::Ran1`. The class
+  owns its shuffle table as fixed-size state and allocates no heap memory
+  during `next()`. The C ABI helper `orblib_cpp_api_ran1_sequence` is used by
+  tests to compare the C++ sequence against the existing Python/Fortran
+  reference sequence.
+- `numerics/dop853.f`, implemented in C++ as `dynamite::orblib_cpp::Dop853`.
+  The solver preserves the DOP853 coefficient table, adaptive step controller,
+  dense-output polynomial, status codes, and function/step counters while using
+  reusable work arrays allocated before the integration loop. The C ABI helper
+  `orblib_cpp_api_dop853_harmonic` is a test-only hook that integrates a
+  harmonic oscillator and returns dense samples for Python-side validation.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

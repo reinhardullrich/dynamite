@@ -36,6 +36,10 @@ Current coverage:
 - fast unit coverage for the Python-facing direct-input shared-library
   orbit-library API facade;
 - inventory and ABI coverage for the experimental C++ shared-library backend;
+- C++ `Ran1` random-number kernel parity against the Python/Fortran reference
+  sequence;
+- C++ DOP853 harmonic-oscillator final-state and dense-output validation
+  through the experimental shared library;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

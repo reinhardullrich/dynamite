@@ -80,7 +80,13 @@ changes from the original project.
   `fortran-to-cpp` branch. The current first slice builds
   `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, and exposes
   generation entry-point stubs that return status `-100` until the C++ orbit
-  engine is ported.
+  engine is ported. The first ported numerical kernels are the C++ `Ran1`
+  implementation in `orblib_cpp/include/ran1.hpp` and
+  `orblib_cpp/source/ran1.cpp`, plus a translated DOP853 solver in
+  `orblib_cpp/include/dop853.hpp` and `orblib_cpp/source/dop853.cpp`. `Ran1`
+  is tested against the existing Python/Fortran reference sequence; DOP853 is
+  tested through the shared library on harmonic-oscillator final-state and
+  dense-output samples.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -160,7 +166,12 @@ source files.
   throughput, cache locality, and reproducible parallel execution. The current
   first implementation slice builds a C++ shared library and wires
   `cpp_shared_library` into Python with a hard not-implemented status for
-  generation calls.
+  generation calls. The first actual ported Fortran kernels are `ran1_nr.f`,
+  implemented as a no-hot-loop-allocation C++ `Ran1` class with ABI test helper
+  `orblib_cpp_api_ran1_sequence`, and `numerics/dop853.f`, implemented as a
+  reusable C++ `Dop853` solver with preallocated work arrays, dense-output
+  evaluation, Fortran-style result counters, and ABI test helper
+  `orblib_cpp_api_dop853_harmonic`.
 
 ## Separated Workspaces
 

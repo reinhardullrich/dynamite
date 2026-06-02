@@ -196,3 +196,16 @@ This file is append-only. Add new entries at the bottom.
   default. Added focused pytest coverage for C++ source inventory, ABI version,
   read-only backend behavior, missing-library failure, and explicit
   not-implemented generation status.
+- Ported the first active Fortran numerical kernel to C++: `ran1_nr.f` is now
+  represented by `dynamite::orblib_cpp::Ran1` in `orblib_cpp/include/ran1.hpp`
+  and `orblib_cpp/source/ran1.cpp`. Added C ABI helper
+  `orblib_cpp_api_ran1_sequence` and opt-in pytest coverage comparing the C++
+  sequence against the existing Python/Fortran reference sequence to `1e-15`.
+- Ported the active DOP853 numerical integrator to C++ as
+  `dynamite::orblib_cpp::Dop853` in `orblib_cpp/include/dop853.hpp` and
+  `orblib_cpp/source/dop853.cpp`. The implementation preserves the Fortran
+  coefficient table, adaptive controller, dense-output polynomial, status
+  codes, and step/function counters while using reusable work arrays allocated
+  before the integration loop. Added test-only C ABI helper
+  `orblib_cpp_api_dop853_harmonic` and opt-in pytest coverage validating
+  harmonic-oscillator final state and dense-output samples to `5e-12`.

@@ -46,6 +46,7 @@ The C++ backend must be tested against existing Fortran-derived fixtures:
 Initial C++ tests should add small, deterministic unit fixtures before running
 the full LOSVD workflow:
 
+- `ran1_nr.f` random-number parity;
 - DOP853 integration on simple known ODEs;
 - DOP853 dense-output interpolation at prescribed sample times;
 - potential/acceleration parity for selected MGE and dark-halo inputs;
@@ -69,6 +70,8 @@ style as the current Fortran shared library:
 
 ```text
 orblib_cpp_api_abi_version
+orblib_cpp_api_ran1_sequence
+orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
 ```
@@ -76,6 +79,21 @@ orblib_cpp_api_run_orblib_direct
 Python should gain a separate backend name, for example
 `cpp_shared_library`. The current `fortran_shared_library` backend should stay
 the default until C++ parity and performance are proven.
+
+Current branch status:
+
+- C++ shared-library skeleton, ABI version, and Python backend selection are in
+  place.
+- `ran1_nr.f` is ported as `dynamite::orblib_cpp::Ran1` and tested against the
+  existing Python/Fortran reference sequence.
+- `numerics/dop853.f` is ported as `dynamite::orblib_cpp::Dop853`, including
+  adaptive stepping and dense-output evaluation. The current test fixture
+  validates a harmonic oscillator final state and dense samples through the
+  shared library.
+- The orbit-specific C++ engine is not implemented yet: potential/acceleration
+  evaluation, orbit-start generation, one-orbit integration/classification,
+  projection, PSF, aperture mapping, LOSVD binning, qgrid accumulation, and
+  binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -198,17 +216,21 @@ mixed with the first C++ parity port.
 
 ## Implementation Order
 
-1. Add the C++ backend skeleton, build target, and ABI version function.
-2. Add Python backend selection for `cpp_shared_library` without changing the
+1. Done: add the C++ backend skeleton, build target, and ABI version function.
+2. Done: add Python backend selection for `cpp_shared_library` without changing the
    default backend.
-3. Port or wrap DOP853 and test dense output on small ODE fixtures.
-4. Port potential and acceleration evaluation; test against Fortran values.
-5. Port orbit-start generation; test against current begin/beginbox fixtures.
-6. Port one-orbit integration and classification; test against Fortran.
-7. Port projection, PSF, aperture, histogram, qgrid, and output writing.
-8. Run full generated LOSVD parity against
+3. Done: port `ran1_nr.f` and test against the Python/Fortran reference
+   sequence.
+4. Done for the standalone solver: port DOP853 and test dense output on a
+   harmonic-oscillator ODE fixture. Orbit-specific use still needs the C++
+   RHS/potential code from step 5.
+5. Port potential and acceleration evaluation; test against Fortran values.
+6. Port orbit-start generation; test against current begin/beginbox fixtures.
+7. Port one-orbit integration and classification; test against Fortran.
+8. Port projection, PSF, aperture, histogram, qgrid, and output writing.
+9. Run full generated LOSVD parity against
    `comparison_losvd_shared_library.npz`.
-9. Only after correctness, benchmark and optimize memory layout, branching,
+10. Only after correctness, benchmark and optimize memory layout, branching,
    allocation, parallelism, and compiler flags.
 
 ## Benchmark Policy
