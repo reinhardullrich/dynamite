@@ -91,8 +91,8 @@ changes from the original project.
   `orblib_cpp/source/triaxial_mge.cpp`. It also includes
   `orblib_cpp/include/potential.hpp` and `orblib_cpp/source/potential.cpp` for
   the current C++ potential stack: stellar triaxial MGE potential/acceleration,
-  the Plummer-style black-hole term, and dark-halo profiles 0 through 3
-  (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). It also includes
+  the Plummer-style black-hole term, and dark-halo profiles 0 through 3 plus 5
+  (`no halo`, NFW, Hernquist, triaxial cored logarithmic, and gNFW). It also includes
   `orblib_cpp/include/interpolated_potential.hpp` and
   `orblib_cpp/source/interpolated_potential.cpp` for an in-memory port of
   `interpolpotent.f90`'s acceleration interpolation math. The C++ orbit RHS
@@ -103,8 +103,7 @@ changes from the original project.
   `orblib_cpp/source/orbit_integrator.cpp` wire the C++ DOP853 solver to that
   orbit RHS for single-orbit final-state integration and prescribed
   dense-output sample extraction.
-  gNFW profile 5 remains unported because it depends on the beta-function
-  stack. `Ran1` is tested against the existing Python/Fortran reference
+  `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
   SciPy; MGE setup, potential-stack evaluation, interpolation-grid evaluation,
@@ -200,14 +199,15 @@ source files.
   MGE setup formulas, plus stellar triaxial MGE potential/acceleration
   evaluation across the inner approximation, mid-radius quadrature, and
   far-field point-mass approximation. The branch now also ports the
-  Plummer-style black-hole term, dark-halo profiles 0 through 3, and the
-  in-memory acceleration interpolation-grid math from `interpolpotent.f90`,
+  Plummer-style black-hole term, dark-halo profiles 0 through 3 plus profile 5
+  gNFW with its beta-function helper stack, and the in-memory acceleration
+  interpolation-grid math from `interpolpotent.f90`,
   plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
   barred-frame integration, and a single-orbit DOP853 final-state integration
   helper with prescribed dense-output sample extraction using that RHS.
-  The legacy `interpolgrid` disk-cache contract, gNFW profile 5 beta-function
-  path, orbit classification, projection/PSF/aperture mapping, LOSVD/qgrid
-  accumulation, and binary output writing are the next unported dependencies.
+  The legacy `interpolgrid` disk-cache contract, orbit classification,
+  projection/PSF/aperture mapping, LOSVD/qgrid accumulation, and binary output
+  writing are the next unported dependencies.
 
 ## Separated Workspaces
 

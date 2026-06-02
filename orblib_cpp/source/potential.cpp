@@ -19,6 +19,121 @@ double stable_log1p(double ratio) noexcept {
     return 2.0 * std::atanh(ratio / (2.0 + ratio));
 }
 
+double zh_gammln(double xx) noexcept {
+    constexpr double cof[6] = {
+        76.18009172947146,
+        -86.50532032941677,
+        24.01409824083091,
+        -1.231739572450155,
+        0.1208650973866179e-2,
+        -0.5395239384953e-5,
+    };
+    constexpr double stp = 2.5066282746310005;
+    double x = xx;
+    double y = x;
+    double tmp = x + 5.5;
+    tmp = (x + 0.5) * std::log(tmp) - tmp;
+    double ser = 1.000000000190015;
+    for (double coefficient : cof) {
+        y += 1.0;
+        ser += coefficient / y;
+    }
+    return tmp + std::log(stp * ser / x);
+}
+
+double zh_beta(double z, double w) noexcept {
+    return std::exp(zh_gammln(z) + zh_gammln(w) - zh_gammln(z + w));
+}
+
+double zh_betacf(double a, double b, double x) noexcept {
+    constexpr int max_iterations = 500;
+    constexpr double epsilon = 3.0e-7;
+    constexpr double fpmin = 1.0e-30;
+
+    const double qab = a + b;
+    const double qap = a + 1.0;
+    const double qam = a - 1.0;
+    double c = 1.0;
+    double d = 1.0 - qab * x / qap;
+    if (std::abs(d) < fpmin) {
+        d = fpmin;
+    }
+    d = 1.0 / d;
+    double h = d;
+
+    for (int m = 1; m <= max_iterations; ++m) {
+        const int m2 = 2 * m;
+        double aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d;
+        if (std::abs(d) < fpmin) {
+            d = fpmin;
+        }
+        c = 1.0 + aa / c;
+        if (std::abs(c) < fpmin) {
+            c = fpmin;
+        }
+        d = 1.0 / d;
+        h *= d * c;
+
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d;
+        if (std::abs(d) < fpmin) {
+            d = fpmin;
+        }
+        c = 1.0 + aa / c;
+        if (std::abs(c) < fpmin) {
+            c = fpmin;
+        }
+        d = 1.0 / d;
+        const double del = d * c;
+        h *= del;
+        if (std::abs(del - 1.0) < epsilon) {
+            break;
+        }
+    }
+
+    return h;
+}
+
+double zh_betai(double a, double b, double x) noexcept {
+    double bt = 0.0;
+    if (x == 0.0) {
+        bt = 0.0;
+    } else if (x == 1.0) {
+        return zh_beta(a, b);
+    } else {
+        bt = std::pow(x, a) * std::pow(1.0 - x, b);
+    }
+
+    if (x < (a + 1.0) / (a + b + 2.0) || b <= 0.0) {
+        return bt * zh_betacf(a, b, x) / a;
+    }
+    return zh_beta(a, b) - bt * zh_betacf(b, a, 1.0 - x) / b;
+}
+
+double gnfw_zeta(double concentration, double gamma) noexcept {
+    if (gamma < 1.0) {
+        return std::pow((1.0 + concentration) / concentration, gamma - 2.0) *
+                   (2.0 * gamma * concentration - 3.0 * concentration + gamma - 2.0) /
+                   (gamma * gamma - 3.0 * gamma + 2.0) / concentration +
+               std::exp(zh_gammln(2.0 - gamma) - zh_gammln(1.0 - gamma)) *
+                   zh_betai(1.0 - gamma, 0.0, concentration / (concentration + 1.0)) /
+                   (1.0 - gamma);
+    }
+    if (gamma == 1.0) {
+        return std::log(1.0 + concentration) - concentration / (1.0 + concentration);
+    }
+
+    const double tmp_gamma =
+        kPi / std::sin(kPi * (1.0 - gamma)) / std::exp(zh_gammln(gamma));
+    return std::pow((1.0 + concentration) / concentration, gamma - 2.0) *
+               (2.0 * gamma * concentration - 3.0 * concentration + gamma - 2.0) /
+               (gamma * gamma - 3.0 * gamma + 2.0) / concentration +
+           (std::exp(zh_gammln(2.0 - gamma)) / tmp_gamma) *
+               zh_betai(1.0 - gamma, 0.0, concentration / (concentration + 1.0)) /
+               (1.0 - gamma);
+}
+
 void evaluate_black_hole(
     double mass,
     double softening_km,
@@ -98,6 +213,30 @@ bool setup_dark_halo(
         halo.params[2] = params[2] * params[2];
         halo.params[3] = params[3] * params[3];
         return true;
+    case 5: {
+        if (n_params != 3 || params == nullptr || params[0] <= 0.0 || params[1] <= 0.0 ||
+            !std::isfinite(params[2])) {
+            return false;
+        }
+        const double concentration = params[0];
+        const double virial_mass = params[1];
+        const double gamma = params[2];
+        const double zeta = gnfw_zeta(concentration, gamma);
+        if (!std::isfinite(zeta) || zeta == 0.0) {
+            return false;
+        }
+        halo.rhoc = (200.0 / 3.0) * kRhoCrit * concentration * concentration * concentration /
+                    zeta;
+        halo.rc = std::pow(
+            3.0 * virial_mass /
+                (800.0 * kPi * kRhoCrit * concentration * concentration * concentration),
+            1.0 / 3.0
+        );
+        halo.params[0] = concentration;
+        halo.params[1] = virial_mass;
+        halo.params[2] = gamma;
+        return std::isfinite(halo.rhoc) && std::isfinite(halo.rc) && halo.rc > 0.0;
+    }
     default:
         return false;
     }
@@ -173,6 +312,32 @@ bool evaluate_dark_halo(
         accel_z = -vc_squared * (z / q_squared) / denominator;
         return true;
     }
+    case 5: {
+        if (radius <= 0.0 || halo.rc <= 0.0) {
+            return false;
+        }
+        const double gamma = halo.params[2];
+        const double dnorm = radius / halo.rc;
+        const double xi = dnorm / (1.0 + dnorm);
+        const double ibeta_v2 = zh_betai(3.0 - gamma, 0.0, xi);
+        const double ibeta_v3 = zh_betai(1.0, 2.0 - gamma, 1.0 - xi);
+        potential = 4.0 * kPi * kGravConstKm * halo.rhoc *
+                    (ibeta_v2 / dnorm + ibeta_v3) * halo.rc * halo.rc;
+
+        const double acceleration_r = 4.0 * kPi * kGravConstKm * halo.rhoc * halo.rc / dnorm;
+        const double one_plus_dnorm = 1.0 + dnorm;
+        const double t1 = std::pow(xi, 2.0 - gamma) / (1.0 - xi) / halo.rc / dnorm /
+                          (one_plus_dnorm * one_plus_dnorm);
+        const double t2 = std::pow(xi, 1.0 - gamma) / halo.rc /
+                          (one_plus_dnorm * one_plus_dnorm);
+        const double t3 = ibeta_v2 * halo.rc / radius_squared;
+        const double scale = acceleration_r * (t1 - t2 - t3);
+        accel_x = x * scale;
+        accel_y = y * scale;
+        accel_z = z * scale;
+        return std::isfinite(potential) && std::isfinite(accel_x) && std::isfinite(accel_y) &&
+               std::isfinite(accel_z);
+    }
     default:
         return false;
     }
@@ -237,6 +402,27 @@ bool evaluate_dark_halo_acceleration(
         accel_y = -vc_squared * (y / p_squared) / denominator;
         accel_z = -vc_squared * (z / q_squared) / denominator;
         return true;
+    }
+    case 5: {
+        if (radius <= 0.0 || halo.rc <= 0.0) {
+            return false;
+        }
+        const double gamma = halo.params[2];
+        const double dnorm = radius / halo.rc;
+        const double xi = dnorm / (1.0 + dnorm);
+        const double ibeta_v2 = zh_betai(3.0 - gamma, 0.0, xi);
+        const double acceleration_r = 4.0 * kPi * kGravConstKm * halo.rhoc * halo.rc / dnorm;
+        const double one_plus_dnorm = 1.0 + dnorm;
+        const double t1 = std::pow(xi, 2.0 - gamma) / (1.0 - xi) / halo.rc / dnorm /
+                          (one_plus_dnorm * one_plus_dnorm);
+        const double t2 = std::pow(xi, 1.0 - gamma) / halo.rc /
+                          (one_plus_dnorm * one_plus_dnorm);
+        const double t3 = ibeta_v2 * halo.rc / radius_squared;
+        const double scale = acceleration_r * (t1 - t2 - t3);
+        accel_x = x * scale;
+        accel_y = y * scale;
+        accel_z = z * scale;
+        return std::isfinite(accel_x) && std::isfinite(accel_y) && std::isfinite(accel_z);
     }
     default:
         return false;

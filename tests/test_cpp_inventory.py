@@ -351,6 +351,107 @@ def _stable_nfw_log1p(ratio):
     )
 
 
+def _zh_gammln(xx):
+    coefficients = np.array(
+        [
+            76.18009172947146,
+            -86.50532032941677,
+            24.01409824083091,
+            -1.231739572450155,
+            0.1208650973866179e-2,
+            -0.5395239384953e-5,
+        ],
+        dtype=np.float64,
+    )
+    x = float(xx)
+    y = x
+    tmp = x + 5.5
+    tmp = (x + 0.5) * np.log(tmp) - tmp
+    series = 1.000000000190015
+    for coefficient in coefficients:
+        y += 1.0
+        series += coefficient / y
+    return tmp + np.log(2.5066282746310005 * series / x)
+
+
+def _zh_beta(z, w):
+    return np.exp(_zh_gammln(z) + _zh_gammln(w) - _zh_gammln(z + w))
+
+
+def _zh_betacf(a, b, x):
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < 1.0e-30:
+        d = 1.0e-30
+    d = 1.0 / d
+    h = d
+    for m in range(1, 501):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1.0e-30:
+            d = 1.0e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1.0e-30:
+            c = 1.0e-30
+        d = 1.0 / d
+        h *= d * c
+
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1.0e-30:
+            d = 1.0e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1.0e-30:
+            c = 1.0e-30
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 3.0e-7:
+            break
+    return h
+
+
+def _zh_betai(a, b, x):
+    if x == 0.0:
+        bt = 0.0
+    elif x == 1.0:
+        return _zh_beta(a, b)
+    else:
+        bt = x**a * (1.0 - x) ** b
+    if x < (a + 1.0) / (a + b + 2.0) or b <= 0.0:
+        return bt * _zh_betacf(a, b, x) / a
+    return _zh_beta(a, b) - bt * _zh_betacf(b, a, 1.0 - x) / b
+
+
+def _expected_gnfw_zeta(concentration, gamma):
+    if gamma < 1.0:
+        return (
+            ((1.0 + concentration) / concentration) ** (gamma - 2.0)
+            * (2.0 * gamma * concentration - 3.0 * concentration + gamma - 2.0)
+            / (gamma**2 - 3.0 * gamma + 2.0)
+            / concentration
+            + np.exp(_zh_gammln(2.0 - gamma) - _zh_gammln(1.0 - gamma))
+            * _zh_betai(1.0 - gamma, 0.0, concentration / (concentration + 1.0))
+            / (1.0 - gamma)
+        )
+    if gamma == 1.0:
+        return np.log1p(concentration) - concentration / (1.0 + concentration)
+    tmp_gamma = np.pi / np.sin(np.pi * (1.0 - gamma)) / np.exp(_zh_gammln(gamma))
+    return (
+        ((1.0 + concentration) / concentration) ** (gamma - 2.0)
+        * (2.0 * gamma * concentration - 3.0 * concentration + gamma - 2.0)
+        / (gamma**2 - 3.0 * gamma + 2.0)
+        / concentration
+        + (np.exp(_zh_gammln(2.0 - gamma)) / tmp_gamma)
+        * _zh_betai(1.0 - gamma, 0.0, concentration / (concentration + 1.0))
+        / (1.0 - gamma)
+    )
+
+
 def _expected_dark_halo_setup(profile_type, params, total_stellar_mass):
     params = np.asarray(params, dtype=np.float64)
     if profile_type == 0:
@@ -381,6 +482,18 @@ def _expected_dark_halo_setup(profile_type, params, total_stellar_mass):
             "p_squared": params[2] ** 2,
             "q_squared": params[3] ** 2,
         }
+    if profile_type == 5:
+        concentration = params[0]
+        virial_mass = params[1]
+        gamma = params[2]
+        zeta = _expected_gnfw_zeta(concentration, gamma)
+        rhoc = (200.0 / 3.0) * RHO_CRIT * concentration**3 / zeta
+        rc = (
+            3.0
+            * virial_mass
+            / (800.0 * np.pi * RHO_CRIT * concentration**3)
+        ) ** (1.0 / 3.0)
+        return {"profile_type": 5, "rhoc": rhoc, "rc": rc, "gamma": gamma}
     raise ValueError(f"unsupported test profile {profile_type}")
 
 
@@ -436,6 +549,39 @@ def _expected_dark_halo_evaluation(halo, points):
         accelerations[:, 2] = (
             -halo["vc_squared"] * (points[:, 2] / halo["q_squared"]) / denominator
         )
+        return potentials, accelerations
+    if halo["profile_type"] == 5:
+        gamma = halo["gamma"]
+        dnorm = radius / halo["rc"]
+        xi = dnorm / (1.0 + dnorm)
+        ibeta_v2 = np.array(
+            [_zh_betai(3.0 - gamma, 0.0, float(value)) for value in xi],
+            dtype=np.float64,
+        )
+        ibeta_v3 = np.array(
+            [_zh_betai(1.0, 2.0 - gamma, float(1.0 - value)) for value in xi],
+            dtype=np.float64,
+        )
+        potentials = (
+            4.0
+            * np.pi
+            * GRAV_CONST_KM
+            * halo["rhoc"]
+            * (ibeta_v2 / dnorm + ibeta_v3)
+            * halo["rc"] ** 2
+        )
+        acceleration_r = 4.0 * np.pi * GRAV_CONST_KM * halo["rhoc"] * halo["rc"] / dnorm
+        t1 = (
+            xi ** (2.0 - gamma)
+            / (1.0 - xi)
+            / halo["rc"]
+            / dnorm
+            / (1.0 + dnorm) ** 2
+        )
+        t2 = xi ** (1.0 - gamma) / halo["rc"] / (1.0 + dnorm) ** 2
+        t3 = ibeta_v2 * halo["rc"] / radius_squared
+        acceleration_scale = acceleration_r * (t1 - t2 - t3)
+        accelerations = points * acceleration_scale[:, np.newaxis]
         return potentials, accelerations
     raise ValueError(f"unsupported test profile {halo['profile_type']}")
 
@@ -873,6 +1019,9 @@ def test_orblib_cpp_triaxial_mge_evaluator_matches_formula_branches():
         (1, [3.0, 0.8]),
         (2, [2.0e-58, 2.0e18]),
         (3, [160.0, 2.0, 0.9, 0.7]),
+        (5, [8.0, 5.0e12, 0.7]),
+        (5, [8.0, 5.0e12, 1.0]),
+        (5, [8.0, 5.0e12, 1.4]),
     ],
 )
 def test_orblib_cpp_potential_stack_matches_black_hole_and_supported_dark_halos(

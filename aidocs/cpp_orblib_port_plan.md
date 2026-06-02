@@ -111,10 +111,12 @@ Current branch status:
   and is tested against independent Python/SciPy calculations of the Fortran
   formulas.
 - The current `dmpotent.f90` black-hole/dark-halo additions are ported for the
-  Plummer-style black-hole term and dark-halo profiles 0 through 3: no halo,
-  NFW, Hernquist, and triaxial cored logarithmic. The combined potential-stack
-  ABI helper is tested against independent Python/SciPy calculations of the
-  Fortran formulas.
+  Plummer-style black-hole term, dark-halo profiles 0 through 3, and profile 5
+  gNFW: no halo, NFW, Hernquist, triaxial cored logarithmic, and gNFW. The
+  profile 5 path includes the unregularized incomplete-beta helper stack from
+  `orblib_fortran/source/numerics/specfunc_beta.f90`. The combined
+  potential-stack ABI helper is tested against independent Python/SciPy
+  calculations of the Fortran formulas.
 - The in-memory `interpolpotent.f90` acceleration interpolation math is ported
   as `dynamite::orblib_cpp::InterpolatedPotential`, including the radius range
   formulas, spherical-octant grid, log-acceleration storage, trilinear
@@ -133,9 +135,9 @@ Current branch status:
   Classification, projection, histograms, qgrid accumulation, and output
   writing are not part of these helpers.
 - The orbit-specific C++ engine is still not implemented yet:
-  gNFW profile 5, interpolation-grid disk caching, orbit-start generation,
-  orbit classification, projection, PSF, aperture mapping, LOSVD binning,
-  qgrid accumulation, and binary output writing still remain.
+  interpolation-grid disk caching, orbit-start generation, orbit
+  classification, projection, PSF, aperture mapping, LOSVD binning, qgrid
+  accumulation, and binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -269,11 +271,11 @@ mixed with the first C++ parity port.
 5. In progress: port potential and acceleration evaluation. Done so far:
    elliptic setup helpers, non-bar triaxial MGE setup/deprojection, stellar
    triaxial MGE potential/acceleration evaluation, Plummer-style black-hole
-   contribution, dark-halo profiles 0 through 3, and in-memory acceleration
-   interpolation-grid math, the orbit RHS formula, and single-orbit DOP853
-   final-state integration plus prescribed dense-output sample extraction using
-   that RHS. Still required: gNFW profile 5, legacy interpolation-grid disk
-   caching if C++ parity requires it, orbit classification,
+   contribution, dark-halo profiles 0 through 3 plus profile 5 gNFW, and
+   in-memory acceleration interpolation-grid math, the orbit RHS formula, and
+   single-orbit DOP853 final-state integration plus prescribed dense-output
+   sample extraction using that RHS. Still required: legacy interpolation-grid
+   disk caching if C++ parity requires it, orbit classification,
    projection/binning/output wiring, and Fortran-value parity tests for full
    orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.

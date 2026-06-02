@@ -45,8 +45,8 @@ Current coverage:
 - C++ stellar triaxial MGE potential/acceleration validation across inner,
   mid-radius quadrature, and far-field branches;
 - C++ combined potential-stack validation for the Plummer-style black-hole
-  term and supported dark-halo profiles 0 through 3 against independent
-  Python/SciPy calculations of the Fortran formulas;
+  term and supported dark-halo profiles 0 through 3 plus profile 5 gNFW
+  against independent Python/SciPy calculations of the Fortran formulas;
 - C++ in-memory acceleration interpolation-grid validation against an
   independent Python implementation of the Fortran `interpolpotent.f90`
   metadata, log-acceleration grid, trilinear interpolation, and direct-fallback

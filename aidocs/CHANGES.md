@@ -272,3 +272,13 @@ This file is append-only. Add new entries at the bottom.
   DOP853 dense output on an independent softened black-hole RHS. Orbit
   classification, projection, LOSVD/qgrid accumulation, and output writing
   remain unported.
+- Ported dark-halo profile 5 gNFW support into the C++ potential stack in
+  `orblib_cpp/source/potential.cpp`, including the Fortran
+  `specfunc_beta.f90` unregularized incomplete-beta helper stack, gNFW
+  setup normalization, potential, and acceleration formulas. Extended the
+  opt-in C++ potential-stack pytest coverage to validate gamma branches below,
+  equal to, and above `1` against independent Python calculations of the
+  Fortran formulas. The remaining C++ orbit-library gaps are now
+  interpolation-grid disk caching if required for parity, orbit-start
+  generation, classification, projection/PSF/aperture mapping, LOSVD/qgrid
+  accumulation, and binary output writing.

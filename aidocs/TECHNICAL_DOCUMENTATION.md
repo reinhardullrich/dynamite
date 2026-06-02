@@ -846,13 +846,14 @@ The first actual ported Fortran kernels are:
 - The black-hole and supported dark-halo additions from `dmpotent.f90`,
   implemented as `dynamite::orblib_cpp::DarkHaloSetup` and the C++ potential
   stack in `orblib_cpp/source/potential.cpp`. This currently covers the
-  Plummer-style black-hole term and dark-halo profiles 0 through 3: no halo,
-  NFW, Hernquist, and triaxial cored logarithmic. Profile 5 gNFW remains
-  unported because it still needs the beta-function helper stack from
+  Plummer-style black-hole term, dark-halo profiles 0 through 3, and profile 5
+  gNFW: no halo, NFW, Hernquist, triaxial cored logarithmic, and gNFW. The
+  profile 5 path also ports the unregularized incomplete-beta helper stack from
   `orblib_fortran/source/numerics/specfunc_beta.f90`. The test-only C ABI
   helper `orblib_cpp_api_potential_stack_evaluate` validates the combined
   stellar MGE, black-hole, and supported dark-halo terms against independent
-  Python/SciPy calculations of the Fortran formulas.
+  Python/SciPy calculations of the Fortran formulas, including gNFW gamma
+  branches below, equal to, and above `1`.
 - The in-memory acceleration interpolation math from `interpolpotent.f90`,
   implemented as `dynamite::orblib_cpp::InterpolatedPotential` in
   `orblib_cpp/include/interpolated_potential.hpp` and
