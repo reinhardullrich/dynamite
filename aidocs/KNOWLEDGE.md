@@ -83,10 +83,16 @@ changes from the original project.
   engine is ported. The first ported numerical kernels are the C++ `Ran1`
   implementation in `orblib_cpp/include/ran1.hpp` and
   `orblib_cpp/source/ran1.cpp`, plus a translated DOP853 solver in
-  `orblib_cpp/include/dop853.hpp` and `orblib_cpp/source/dop853.cpp`. `Ran1`
-  is tested against the existing Python/Fortran reference sequence; DOP853 is
-  tested through the shared library on harmonic-oscillator final-state and
-  dense-output samples.
+  `orblib_cpp/include/dop853.hpp` and `orblib_cpp/source/dop853.cpp`, a
+  tightened C++ Carlson/Legendre elliptic-integral implementation in
+  `orblib_cpp/include/elliptic_integrals.hpp` and
+  `orblib_cpp/source/elliptic_integrals.cpp`, and the non-bar triaxial MGE
+  setup/deprojection stage in `orblib_cpp/include/triaxial_mge.hpp` and
+  `orblib_cpp/source/triaxial_mge.cpp`. `Ran1` is tested against the existing
+  Python/Fortran reference sequence; DOP853 is tested through the shared
+  library on harmonic-oscillator final-state and dense-output samples;
+  elliptic integrals are tested against SciPy; and MGE setup is tested against
+  an independent NumPy implementation of the Fortran formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -171,7 +177,10 @@ source files.
   `orblib_cpp_api_ran1_sequence`, and `numerics/dop853.f`, implemented as a
   reusable C++ `Dop853` solver with preallocated work arrays, dense-output
   evaluation, Fortran-style result counters, and ABI test helper
-  `orblib_cpp_api_dop853_harmonic`.
+  `orblib_cpp_api_dop853_harmonic`. The current branch also has C++ support for
+  `numerics/ellipint.f90` and the non-bar `tp_setup()`/`iniparam_from_arrays()`
+  MGE setup formulas; the hot potential/acceleration evaluator is the next
+  unported dependency.
 
 ## Separated Workspaces
 

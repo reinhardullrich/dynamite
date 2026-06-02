@@ -40,6 +40,8 @@ Current coverage:
   sequence;
 - C++ DOP853 harmonic-oscillator final-state and dense-output validation
   through the experimental shared library;
+- C++ elliptic-integral validation against SciPy and C++ non-bar triaxial MGE
+  setup/deprojection validation against the Fortran formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

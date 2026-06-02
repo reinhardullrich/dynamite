@@ -209,3 +209,14 @@ This file is append-only. Add new entries at the bottom.
   before the integration loop. Added test-only C ABI helper
   `orblib_cpp_api_dop853_harmonic` and opt-in pytest coverage validating
   harmonic-oscillator final state and dense-output samples to `5e-12`.
+- Ported the next C++ potential-setup dependencies: `numerics/ellipint.f90`
+  is represented by C++ Carlson/Legendre elliptic integrals in
+  `orblib_cpp/include/elliptic_integrals.hpp` and
+  `orblib_cpp/source/elliptic_integrals.cpp`, and the non-bar
+  `iniparam_from_arrays()`/`tp_setup()` MGE setup formulas are represented by
+  `dynamite::orblib_cpp::TriaxialMgeSetup` in
+  `orblib_cpp/include/triaxial_mge.hpp` and
+  `orblib_cpp/source/triaxial_mge.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_elliptic_legendre` and
+  `orblib_cpp_api_triaxial_mge_setup`, with opt-in pytest coverage against
+  SciPy elliptic integrals and the Fortran MGE setup formulas.

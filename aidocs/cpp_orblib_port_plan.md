@@ -71,6 +71,8 @@ style as the current Fortran shared library:
 ```text
 orblib_cpp_api_abi_version
 orblib_cpp_api_ran1_sequence
+orblib_cpp_api_elliptic_legendre
+orblib_cpp_api_triaxial_mge_setup
 orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
@@ -90,10 +92,18 @@ Current branch status:
   adaptive stepping and dense-output evaluation. The current test fixture
   validates a harmonic oscillator final state and dense samples through the
   shared library.
-- The orbit-specific C++ engine is not implemented yet: potential/acceleration
-  evaluation, orbit-start generation, one-orbit integration/classification,
-  projection, PSF, aperture mapping, LOSVD binning, qgrid accumulation, and
-  binary output writing still remain.
+- `numerics/ellipint.f90` is ported as C++ Carlson/Legendre elliptic
+  integrals. The formulas are preserved, with a tighter convergence threshold
+  than the original Fortran because the original setup-only routine differs
+  from SciPy by roughly `1e-8` for larger modulus cases.
+- The non-bar `iniparam_from_arrays()` plus `tp_setup()` MGE setup/deprojection
+  stage is ported as `dynamite::orblib_cpp::TriaxialMgeSetup` and tested
+  against an independent NumPy implementation of the Fortran formulas on the
+  NGC6278 fixture MGE.
+- The orbit-specific C++ engine is still not implemented yet:
+  potential/acceleration evaluation, orbit-start generation, one-orbit
+  integration/classification, projection, PSF, aperture mapping, LOSVD binning,
+  qgrid accumulation, and binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -224,7 +234,11 @@ mixed with the first C++ parity port.
 4. Done for the standalone solver: port DOP853 and test dense output on a
    harmonic-oscillator ODE fixture. Orbit-specific use still needs the C++
    RHS/potential code from step 5.
-5. Port potential and acceleration evaluation; test against Fortran values.
+5. In progress: port potential and acceleration evaluation. Done so far:
+   elliptic setup helpers and non-bar triaxial MGE setup/deprojection. Still
+   required: quadrature-backed MGE potential/acceleration, black-hole and
+   dark-halo terms, interpolation grid behavior, and Fortran-value parity
+   tests.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.

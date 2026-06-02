@@ -1,7 +1,10 @@
 #include "dop853.hpp"
+#include "elliptic_integrals.hpp"
 #include "ran1.hpp"
+#include "triaxial_mge.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cmath>
 #include <limits>
 
@@ -95,6 +98,93 @@ extern "C" void orblib_cpp_api_ran1_sequence(
         values[i] = rng.next();
     }
     set_status(status, kStatusOk);
+}
+
+extern "C" void orblib_cpp_api_elliptic_legendre(
+    double phi,
+    double modulus,
+    double* value_f,
+    double* value_e,
+    int* status
+) noexcept {
+    if (value_f == nullptr || value_e == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    double result_f = 0.0;
+    double result_e = 0.0;
+    if (!dynamite::orblib_cpp::elliptic_f(phi, modulus, result_f) ||
+        !dynamite::orblib_cpp::elliptic_e(phi, modulus, result_e)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    *value_f = result_f;
+    *value_e = result_e;
+    set_status(status, kStatusOk);
+}
+
+extern "C" void orblib_cpp_api_triaxial_mge_setup(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double* pintr,
+    double* qintr,
+    double* sigintr_km,
+    double* density,
+    double* v0,
+    double* triaxiality,
+    double* total_mass,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || pintr == nullptr || qintr == nullptr || sigintr_km == nullptr ||
+        density == nullptr || v0 == nullptr || triaxiality == nullptr || total_mass == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup setup;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                setup
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        for (int i = 0; i < ngauss; ++i) {
+            const auto idx = static_cast<std::size_t>(i);
+            pintr[i] = setup.pintr[idx];
+            qintr[i] = setup.qintr[idx];
+            sigintr_km[i] = setup.sigintr_km[idx];
+            density[i] = setup.density[idx];
+            v0[i] = setup.v0[idx];
+            triaxiality[i] = setup.triaxiality[idx];
+        }
+        *total_mass = setup.total_mass;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
 }
 
 extern "C" void orblib_cpp_api_dop853_harmonic(
