@@ -314,3 +314,13 @@ This file is append-only. Add new entries at the bottom.
   The remaining C++ orbit-library gaps are now interpolation-grid disk caching
   if required for parity, orbit-start generation, aperture mapping, LOSVD/qgrid
   accumulation, and binary output writing.
+- Ported the Fortran `aperture_boxed_find()` boxed-aperture pixel lookup into
+  C++ as `dynamite::orblib_cpp::find_boxed_aperture_pixels` in
+  `orblib_cpp/include/orbit_aperture.hpp` and
+  `orblib_cpp/source/orbit_aperture.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_find_boxed_aperture_pixels` and opt-in pytest coverage
+  comparing conversion-factor scaling, strict aperture boundaries, bin
+  transitions, and 1-based flattened pixel IDs against a Python mirror of the
+  Fortran formula. The remaining C++ orbit-library gaps are now
+  interpolation-grid disk caching if required for parity, orbit-start
+  generation, LOSVD/qgrid accumulation, and binary output writing.

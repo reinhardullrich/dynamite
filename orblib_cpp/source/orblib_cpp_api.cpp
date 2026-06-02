@@ -1,6 +1,7 @@
 #include "dop853.hpp"
 #include "elliptic_integrals.hpp"
 #include "interpolated_potential.hpp"
+#include "orbit_aperture.hpp"
 #include "orbit_classification.hpp"
 #include "orbit_integrator.hpp"
 #include "orbit_projection.hpp"
@@ -769,6 +770,53 @@ extern "C" void orblib_cpp_api_apply_psf(
                 seed,
                 convolved_x,
                 convolved_y
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_find_boxed_aperture_pixels(
+    double begin_x,
+    double begin_y,
+    double size_x,
+    double size_y,
+    double rotation_degrees,
+    int bins_x,
+    int bins_y,
+    double psi_radians,
+    double coordinate_scale,
+    int sample_count,
+    const double* projected_x,
+    const double* projected_y,
+    int* pixels,
+    int* status
+) noexcept {
+    if (sample_count < 0 || projected_x == nullptr || projected_y == nullptr ||
+        pixels == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::find_boxed_aperture_pixels(
+                begin_x,
+                begin_y,
+                size_x,
+                size_y,
+                rotation_degrees,
+                bins_x,
+                bins_y,
+                psi_radians,
+                coordinate_scale,
+                sample_count,
+                projected_x,
+                projected_y,
+                pixels
             )) {
             set_status(status, kStatusInvalidArgument);
             return;

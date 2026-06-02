@@ -15,6 +15,7 @@ CPP_SOURCES = [
     "include/dop853.hpp",
     "include/elliptic_integrals.hpp",
     "include/interpolated_potential.hpp",
+    "include/orbit_aperture.hpp",
     "include/orbit_classification.hpp",
     "include/orbit_integrator.hpp",
     "include/orbit_projection.hpp",
@@ -26,6 +27,7 @@ CPP_SOURCES = [
     "source/dop853.cpp",
     "source/elliptic_integrals.cpp",
     "source/interpolated_potential.cpp",
+    "source/orbit_aperture.cpp",
     "source/orbit_classification.cpp",
     "source/orbit_integrator.cpp",
     "source/orbit_projection.cpp",
@@ -906,6 +908,60 @@ def _expected_psf_application(projected, weights, sigmas, sigma_scale, seed):
         )
         expected[index] = projected[index] + gaussian[index] * sigma_map[sigma_index - 1]
     return expected
+
+
+def _projected_from_boxed_aperture_local(
+    local_points,
+    begin,
+    rotation_degrees,
+    psi_radians,
+    coordinate_scale,
+):
+    local_points = np.asarray(local_points, dtype=np.float64)
+    scaled_begin = np.asarray(begin, dtype=np.float64) * coordinate_scale
+    angle = -np.deg2rad(rotation_degrees) + 0.5 * np.pi - psi_radians
+    r1 = np.cos(angle)
+    r2 = np.sin(angle)
+    shifted_x = local_points[:, 0] + scaled_begin[0]
+    shifted_y = local_points[:, 1] + scaled_begin[1]
+    return np.ascontiguousarray(
+        np.column_stack(
+            [
+                shifted_x * r1 + shifted_y * r2,
+                -shifted_x * r2 + shifted_y * r1,
+            ],
+        ),
+        dtype=np.float64,
+    )
+
+
+def _expected_boxed_aperture_pixels(
+    projected,
+    begin,
+    size,
+    rotation_degrees,
+    bins_x,
+    bins_y,
+    psi_radians,
+    coordinate_scale,
+):
+    projected = np.asarray(projected, dtype=np.float64)
+    scaled_begin = np.asarray(begin, dtype=np.float64) * coordinate_scale
+    scaled_size = np.asarray(size, dtype=np.float64) * coordinate_scale
+    angle = -np.deg2rad(rotation_degrees) + 0.5 * np.pi - psi_radians
+    r1 = np.cos(angle)
+    r2 = np.sin(angle)
+    idx = bins_x / scaled_size[0]
+    idy = bins_y / scaled_size[1]
+    pixels = np.zeros(projected.shape[0], dtype=np.int32)
+
+    for index, (t, q) in enumerate(projected):
+        x = t * r1 - q * r2 - scaled_begin[0]
+        if 0.0 < x < scaled_size[0]:
+            y = t * r2 + q * r1 - scaled_begin[1]
+            if 0.0 < y < scaled_size[1]:
+                pixels[index] = int(x * idx) + int(y * idy) * bins_x + 1
+    return pixels
 
 
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
@@ -2126,6 +2182,104 @@ def test_orblib_cpp_applies_psf_like_fortran(weights, sigmas, sigma_scale):
     assert status.value == 0
     actual = np.column_stack([convolved_x, convolved_y])
     np.testing.assert_allclose(actual, expected, rtol=0.0, atol=2e-6)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_maps_boxed_aperture_pixels_like_fortran():
+    begin = np.array([2.0, -3.0], dtype=np.float64)
+    size = np.array([10.0, 8.0], dtype=np.float64)
+    rotation_degrees = 27.0
+    bins_x = 5
+    bins_y = 4
+    psi_radians = np.deg2rad(18.0)
+    coordinate_scale = 3.0
+    local_points = np.ascontiguousarray(
+        [
+            [0.1, 0.1],
+            [5.999, 0.5],
+            [6.001, 0.5],
+            [29.9, 0.5],
+            [0.5, 6.001],
+            [17.9, 18.1],
+            [29.9, 23.9],
+            [0.0, 1.0],
+            [30.0, 1.0],
+            [1.0, 0.0],
+            [1.0, 24.0],
+            [-0.1, 1.0],
+            [1.0, -0.1],
+            [30.1, 1.0],
+            [1.0, 24.1],
+        ],
+        dtype=np.float64,
+    )
+    projected = _projected_from_boxed_aperture_local(
+        local_points,
+        begin,
+        rotation_degrees,
+        psi_radians,
+        coordinate_scale,
+    )
+    expected = _expected_boxed_aperture_pixels(
+        projected,
+        begin,
+        size,
+        rotation_degrees,
+        bins_x,
+        bins_y,
+        psi_radians,
+        coordinate_scale,
+    )
+    np.testing.assert_array_equal(
+        expected,
+        np.array([1, 1, 2, 5, 6, 18, 20, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.int32),
+    )
+
+    projected_x = np.ascontiguousarray(projected[:, 0], dtype=np.float64)
+    projected_y = np.ascontiguousarray(projected[:, 1], dtype=np.float64)
+    pixels = np.full(projected.shape[0], -1, dtype=np.int32)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_find_boxed_aperture_pixels
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function.argtypes = [
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        int_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    function(
+        ctypes.c_double(begin[0]),
+        ctypes.c_double(begin[1]),
+        ctypes.c_double(size[0]),
+        ctypes.c_double(size[1]),
+        ctypes.c_double(rotation_degrees),
+        ctypes.c_int(bins_x),
+        ctypes.c_int(bins_y),
+        ctypes.c_double(psi_radians),
+        ctypes.c_double(coordinate_scale),
+        ctypes.c_int(projected.shape[0]),
+        projected_x.ctypes.data_as(double_p),
+        projected_y.ctypes.data_as(double_p),
+        pixels.ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(pixels, expected)
 
 
 @pytest.mark.orblib_cpp

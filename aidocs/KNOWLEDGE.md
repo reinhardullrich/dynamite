@@ -111,7 +111,9 @@ changes from the original project.
   sign tables. `orblib_cpp/include/orbit_psf.hpp` and
   `orblib_cpp/source/orbit_psf.cpp` port the Fortran PSF Gaussian convolution
   paths, including the single-Gaussian, tiny-sigma copy-through, and weighted
-  MGE-PSF sigma-map branches.
+  MGE-PSF sigma-map branches. `orblib_cpp/include/orbit_aperture.hpp` and
+  `orblib_cpp/source/orbit_aperture.cpp` port the Fortran boxed-aperture pixel
+  lookup formula from `aperture_boxed_find()`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -122,7 +124,9 @@ changes from the original project.
   tested against a Python mirror of the Fortran type and moment formulas, and
   projection is tested against a Python mirror of the Fortran `project_n()`
   formulas. PSF convolution is tested against a Python mirror of the Fortran
-  single-precision Gaussian and sigma-map formulas.
+  single-precision Gaussian and sigma-map formulas. Boxed aperture mapping is
+  tested against a Python mirror of the Fortran strict-bound and 1-based pixel
+  flattening formula.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -218,10 +222,10 @@ source files.
   plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
   barred-frame integration, and a single-orbit DOP853 final-state integration
   helper with prescribed dense-output sample extraction using that RHS, plus
-  the orbit classification, moment, projection, and LOS-velocity formulas. The
-  legacy `interpolgrid` disk-cache contract, orbit-start generation,
-  aperture mapping, LOSVD/qgrid accumulation, and binary output writing are the
-  next unported dependencies.
+  the orbit classification, moment, projection, LOS-velocity, PSF convolution,
+  and boxed-aperture pixel lookup formulas. The legacy `interpolgrid`
+  disk-cache contract, orbit-start generation, LOSVD/qgrid accumulation, and
+  binary output writing are the next unported dependencies.
 
 ## Separated Workspaces
 

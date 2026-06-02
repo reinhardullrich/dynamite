@@ -808,6 +808,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_classify_orbit_samples`
 - `orblib_cpp_api_project_orbit_samples`
 - `orblib_cpp_api_apply_psf`
+- `orblib_cpp_api_find_boxed_aperture_pixels`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -881,8 +882,8 @@ The first actual ported Fortran kernels are:
   as `dynamite::orblib_cpp::integrate_orbit_final_state` in
   `orblib_cpp/include/orbit_integrator.hpp` and
   `orblib_cpp/source/orbit_integrator.cpp`. This is not the full orbit-library
-  integrator yet: it does not perform aperture mapping, LOSVD binning, qgrid
-  accumulation, or output writing. The test-only C ABI helper
+  integrator yet: it does not perform LOSVD binning, qgrid accumulation, or
+  output writing. The test-only C ABI helper
   `orblib_cpp_api_integrate_orbit_final_state` validates the DOP853/RHS wiring
   against SciPy DOP853 on an independent softened black-hole RHS.
 - Prescribed dense-output sample extraction for a single orbit, implemented as
@@ -920,6 +921,16 @@ The first actual ported Fortran kernels are:
   the single-precision Gaussian deviate path used by the Fortran code. The
   test-only C ABI helper `orblib_cpp_api_apply_psf` validates those branches
   against a Python mirror of the Fortran formulas.
+- Boxed aperture pixel lookup from `aperture_boxed_find()` in
+  `orblib_f_new_mirror.f90`, implemented as
+  `dynamite::orblib_cpp::find_boxed_aperture_pixels` in
+  `orblib_cpp/include/orbit_aperture.hpp` and
+  `orblib_cpp/source/orbit_aperture.cpp`. It preserves the Fortran
+  `-aperture_rotation + pi/2 - psi_proj` rotation, conversion-factor scaling,
+  strict box bounds, and 1-based `xbin + ybin * bins_x + 1` flattening. The
+  test-only C ABI helper `orblib_cpp_api_find_boxed_aperture_pixels` validates
+  interior bins, bin transitions, and boundary exclusions against a Python
+  mirror of the Fortran formula.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

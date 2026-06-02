@@ -65,6 +65,8 @@ Current coverage:
   symmetries, and non-rotating/rotating-frame sign tables;
 - C++ PSF Gaussian convolution validation against a Python mirror of the
   Fortran `psf_gaussian()` and `psf_sigma_map()` branches;
+- C++ boxed aperture pixel-mapping validation against a Python mirror of the
+  Fortran `aperture_boxed_find()` strict-bound and 1-based flattening formula;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library
