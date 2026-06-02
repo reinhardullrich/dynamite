@@ -108,7 +108,10 @@ changes from the original project.
   `orblib_cpp/include/orbit_projection.hpp` and
   `orblib_cpp/source/orbit_projection.cpp` port the Fortran per-symmetry orbit
   projection and LOS-velocity formulas for non-rotating and rotating-frame
-  sign tables.
+  sign tables. `orblib_cpp/include/orbit_psf.hpp` and
+  `orblib_cpp/source/orbit_psf.cpp` port the Fortran PSF Gaussian convolution
+  paths, including the single-Gaussian, tiny-sigma copy-through, and weighted
+  MGE-PSF sigma-map branches.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -118,7 +121,8 @@ changes from the original project.
   NumPy/SciPy implementations of the Fortran formulas. Orbit classification is
   tested against a Python mirror of the Fortran type and moment formulas, and
   projection is tested against a Python mirror of the Fortran `project_n()`
-  formulas.
+  formulas. PSF convolution is tested against a Python mirror of the Fortran
+  single-precision Gaussian and sigma-map formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -216,8 +220,8 @@ source files.
   helper with prescribed dense-output sample extraction using that RHS, plus
   the orbit classification, moment, projection, and LOS-velocity formulas. The
   legacy `interpolgrid` disk-cache contract, orbit-start generation,
-  PSF/aperture mapping, LOSVD/qgrid accumulation, and binary output writing are
-  the next unported dependencies.
+  aperture mapping, LOSVD/qgrid accumulation, and binary output writing are the
+  next unported dependencies.
 
 ## Separated Workspaces
 

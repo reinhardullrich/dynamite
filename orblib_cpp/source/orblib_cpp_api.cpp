@@ -4,6 +4,7 @@
 #include "orbit_classification.hpp"
 #include "orbit_integrator.hpp"
 #include "orbit_projection.hpp"
+#include "orbit_psf.hpp"
 #include "orbit_rhs.hpp"
 #include "potential.hpp"
 #include "ran1.hpp"
@@ -726,6 +727,48 @@ extern "C" void orblib_cpp_api_project_orbit_samples(
                 projected_x,
                 projected_y,
                 los_velocity
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_apply_psf(
+    int gaussian_count,
+    const double* weights,
+    const double* sigmas,
+    double sigma_scale,
+    int sample_count,
+    const double* projected_x,
+    const double* projected_y,
+    int seed,
+    double* convolved_x,
+    double* convolved_y,
+    int* status
+) noexcept {
+    if (gaussian_count < 1 || weights == nullptr || sigmas == nullptr || sample_count < 0 ||
+        projected_x == nullptr || projected_y == nullptr || convolved_x == nullptr ||
+        convolved_y == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::apply_psf_to_projected_samples(
+                gaussian_count,
+                weights,
+                sigmas,
+                sigma_scale,
+                sample_count,
+                projected_x,
+                projected_y,
+                seed,
+                convolved_x,
+                convolved_y
             )) {
             set_status(status, kStatusInvalidArgument);
             return;

@@ -63,6 +63,8 @@ Current coverage:
 - C++ projection and LOS-velocity validation against a Python mirror of the
   Fortran `project_n()` formulas across all orbit types, all eight projection
   symmetries, and non-rotating/rotating-frame sign tables;
+- C++ PSF Gaussian convolution validation against a Python mirror of the
+  Fortran `psf_gaussian()` and `psf_sigma_map()` branches;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

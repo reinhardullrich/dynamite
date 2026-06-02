@@ -79,6 +79,7 @@ orblib_cpp_api_interpolated_potential_evaluate
 orblib_cpp_api_orbit_rhs_evaluate
 orblib_cpp_api_classify_orbit_samples
 orblib_cpp_api_project_orbit_samples
+orblib_cpp_api_apply_psf
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -142,12 +143,16 @@ Current branch status:
   `dynamite::orblib_cpp::project_orbit_samples` and tested against a Python
   mirror of the Fortran `project_n()` formulas for all five orbit types, all
   eight projection symmetries, and non-rotating/rotating-frame sign tables.
-  Histograms, qgrid accumulation, PSF/aperture mapping, and output writing are
-  not part of these helpers.
+- PSF Gaussian convolution is ported as
+  `dynamite::orblib_cpp::apply_psf_to_projected_samples` and tested against a
+  Python mirror of the Fortran `psf_gaussian()` and `psf_sigma_map()` formulas
+  for tiny single-Gaussian copy-through, resolved single-Gaussian convolution,
+  and weighted MGE-PSF convolution.
+  Histograms, qgrid accumulation, aperture mapping, and output writing are not
+  part of these helpers.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start generation, PSF/aperture
-  mapping, LOSVD binning, qgrid accumulation, and binary output writing still
-  remain.
+  interpolation-grid disk caching, orbit-start generation, aperture mapping,
+  LOSVD binning, qgrid accumulation, and binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -287,16 +292,17 @@ mixed with the first C++ parity port.
    sample extraction using that RHS, plus orbit classification, moment
    calculation, projection, and LOS-velocity calculation. Still required:
    legacy interpolation-grid disk caching if C++ parity requires it,
-   PSF/aperture mapping, binning/output wiring, and Fortran-value parity tests
-   for full orbit integration.
+   aperture mapping, binning/output wiring, and Fortran-value parity tests for
+   full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
    standalone classification/moment kernel are done; full one-orbit parity
    still needs the Fortran sampling schedule and downstream wiring.
-8. Port PSF, aperture, histogram, qgrid, and output writing.
-   Per-symmetry projection and LOS velocity are done; PSF/aperture mapping,
-   histogram/qgrid accumulation, and output writing still remain.
+8. Port aperture, histogram, qgrid, and output writing.
+   Per-symmetry projection, LOS velocity, and PSF convolution are done;
+   aperture mapping, histogram/qgrid accumulation, and output writing still
+   remain.
 9. Run full generated LOSVD parity against
    `comparison_losvd_shared_library.npz`.
 10. Only after correctness, benchmark and optimize memory layout, branching,

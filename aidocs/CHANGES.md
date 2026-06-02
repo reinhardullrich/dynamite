@@ -304,3 +304,13 @@ This file is append-only. Add new entries at the bottom.
   orbit-library gaps are now interpolation-grid disk caching if required for
   parity, orbit-start generation, PSF/aperture mapping, LOSVD/qgrid
   accumulation, and binary output writing.
+- Ported the Fortran PSF Gaussian convolution paths into C++ as
+  `dynamite::orblib_cpp::apply_psf_to_projected_samples` in
+  `orblib_cpp/include/orbit_psf.hpp` and `orblib_cpp/source/orbit_psf.cpp`.
+  Added test-only ABI helper `orblib_cpp_api_apply_psf` and opt-in pytest
+  coverage comparing tiny single-Gaussian copy-through, resolved
+  single-Gaussian convolution, and weighted MGE-PSF convolution against a
+  Python mirror of the Fortran `psf_gaussian()` and `psf_sigma_map()` formulas.
+  The remaining C++ orbit-library gaps are now interpolation-grid disk caching
+  if required for parity, orbit-start generation, aperture mapping, LOSVD/qgrid
+  accumulation, and binary output writing.

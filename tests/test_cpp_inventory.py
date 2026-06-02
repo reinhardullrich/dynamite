@@ -18,6 +18,7 @@ CPP_SOURCES = [
     "include/orbit_classification.hpp",
     "include/orbit_integrator.hpp",
     "include/orbit_projection.hpp",
+    "include/orbit_psf.hpp",
     "include/orbit_rhs.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
@@ -28,6 +29,7 @@ CPP_SOURCES = [
     "source/orbit_classification.cpp",
     "source/orbit_integrator.cpp",
     "source/orbit_projection.cpp",
+    "source/orbit_psf.cpp",
     "source/orbit_rhs.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
@@ -844,6 +846,66 @@ def _expected_orbit_projection(samples, orbit_type, projection_number, omega, th
         + np.cos(theta) * vsgn[2] * velocities[:, 2]
     )
     return projected_x, projected_y, los_velocity
+
+
+def _fortran_gaussian_pair(rng):
+    while True:
+        values = np.array([rng.ran1(), rng.ran1()], dtype=np.float32)
+        values = np.float32(2.0) * values - np.float32(1.0)
+        rsq = np.float32(np.sum(values * values, dtype=np.float32))
+        if np.float32(0.0) < rsq < np.float32(1.0):
+            break
+    scale = np.float32(
+        np.sqrt(np.float32(-2.0) * np.float32(np.log(rsq)) / rsq),
+    )
+    return (values * scale).astype(np.float64)
+
+
+def _fortran_nint_positive(value):
+    return int(np.floor(value + 0.5))
+
+
+def _expected_psf_application(projected, weights, sigmas, sigma_scale, seed):
+    projected = np.asarray(projected, dtype=np.float64)
+    weights = np.asarray(weights, dtype=np.float64)
+    sigmas = np.asarray(sigmas, dtype=np.float64) * sigma_scale
+    expected = np.empty_like(projected)
+    rng = MyRand(seed)
+    sample_count = projected.shape[0]
+
+    if sigmas.size == 1:
+        if sigmas[0] > 1.0:
+            for index in range(sample_count):
+                expected[index] = projected[index] + _fortran_gaussian_pair(rng) * sigmas[0]
+        else:
+            expected[:, :] = projected[:, :]
+        return expected
+
+    weight_sum = np.sum(np.abs(weights))
+    weight_index = np.ones(sigmas.size + 1, dtype=np.int64)
+    cumulative = 0.0
+    for index in range(sigmas.size):
+        cumulative += abs(weights[index])
+        weight_index[index + 1] = (
+            _fortran_nint_positive(cumulative * ((sample_count - 1) / weight_sum)) + 1
+        )
+    weight_index[0] = 1
+    weight_index[-1] = sample_count
+    sigma_map = np.zeros(sample_count, dtype=np.float64)
+    for index, sigma in enumerate(sigmas):
+        for map_index in range(weight_index[index], weight_index[index + 1] + 1):
+            sigma_map[map_index - 1] = sigma
+
+    gaussian = np.empty_like(projected)
+    for index in range(sample_count):
+        gaussian[index] = _fortran_gaussian_pair(rng)
+    for index in range(sample_count):
+        selector = np.float32(rng.ran1())
+        sigma_index = int(
+            np.float32(selector * np.float32(sample_count - 1) + np.float32(1.0)),
+        )
+        expected[index] = projected[index] + gaussian[index] * sigma_map[sigma_index - 1]
+    return expected
 
 
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
@@ -1997,6 +2059,73 @@ def test_orblib_cpp_projects_orbit_samples_like_fortran(omega):
             np.testing.assert_allclose(projected_x, expected_x, rtol=0.0, atol=1e-14)
             np.testing.assert_allclose(projected_y, expected_y, rtol=0.0, atol=1e-14)
             np.testing.assert_allclose(los_velocity, expected_los, rtol=0.0, atol=1e-14)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize(
+    ("weights", "sigmas", "sigma_scale"),
+    [
+        ([1.0], [0.05], 10.0),
+        ([1.0], [0.35], 10.0),
+        ([0.2, 0.7, -0.1], [0.1, 0.4, 0.9], 10.0),
+    ],
+)
+def test_orblib_cpp_applies_psf_like_fortran(weights, sigmas, sigma_scale):
+    projected = np.ascontiguousarray(
+        [
+            [1.5, -2.0],
+            [-4.0, 2.25],
+            [2.75, 3.25],
+            [0.5, -0.75],
+            [7.0, 8.0],
+            [-1.25, 4.5],
+            [3.5, -6.0],
+        ],
+        dtype=np.float64,
+    )
+    weights = np.ascontiguousarray(weights, dtype=np.float64)
+    sigmas = np.ascontiguousarray(sigmas, dtype=np.float64)
+    seed = -4242
+    expected = _expected_psf_application(projected, weights, sigmas, sigma_scale, seed)
+
+    convolved_x = np.empty(projected.shape[0], dtype=np.float64)
+    convolved_y = np.empty(projected.shape[0], dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_apply_psf
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    function(
+        ctypes.c_int(sigmas.size),
+        weights.ctypes.data_as(double_p),
+        sigmas.ctypes.data_as(double_p),
+        ctypes.c_double(sigma_scale),
+        ctypes.c_int(projected.shape[0]),
+        np.ascontiguousarray(projected[:, 0], dtype=np.float64).ctypes.data_as(double_p),
+        np.ascontiguousarray(projected[:, 1], dtype=np.float64).ctypes.data_as(double_p),
+        ctypes.c_int(seed),
+        convolved_x.ctypes.data_as(double_p),
+        convolved_y.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    actual = np.column_stack([convolved_x, convolved_y])
+    np.testing.assert_allclose(actual, expected, rtol=0.0, atol=2e-6)
 
 
 @pytest.mark.orblib_cpp
