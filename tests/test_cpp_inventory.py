@@ -1578,6 +1578,223 @@ def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
 
 
 @pytest.mark.orblib_cpp
+@pytest.mark.parametrize("omega", [0.0, 1.5e-16])
+def test_orblib_cpp_integrates_orbit_dense_samples_against_scipy(omega):
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = 18.0
+    rlogmax = 19.0
+    t_start = 0.0
+    t_end = 2.0e6
+    rtol = 1.0e-10
+    atol = 1.0e-7
+    max_steps = 10000
+    sample_times = np.ascontiguousarray(np.linspace(t_start, t_end, 7), dtype=np.float64)
+    initial_state = np.ascontiguousarray(
+        [1.0e13, -2.0e12, 5.0e12, 18.0, -11.0, 3.0],
+        dtype=np.float64,
+    )
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    black_hole_softening_km = black_hole_softening_arcsec * expected_setup["conversion_factor"]
+
+    def rhs(_, state):
+        position = state[:3]
+        velocity = state[3:]
+        softened_radius_squared = np.dot(position, position) + black_hole_softening_km**2
+        acceleration = (
+            -GRAV_CONST_KM
+            * black_hole_mass
+            * position
+            / (softened_radius_squared * np.sqrt(softened_radius_squared))
+        )
+        derivative = np.empty(6, dtype=np.float64)
+        if omega == 0.0:
+            derivative[:3] = velocity
+            derivative[3:] = acceleration
+        else:
+            derivative[0] = velocity[0] + omega * position[1]
+            derivative[1] = velocity[1] - omega * position[0]
+            derivative[2] = velocity[2]
+            derivative[3] = acceleration[0] + omega * velocity[1]
+            derivative[4] = acceleration[1] - omega * velocity[0]
+            derivative[5] = acceleration[2]
+        return derivative
+
+    expected = scipy.integrate.solve_ivp(
+        rhs,
+        (t_start, t_end),
+        initial_state,
+        method="DOP853",
+        rtol=rtol,
+        atol=atol,
+        dense_output=True,
+    )
+    assert expected.success
+    expected_samples = expected.sol(sample_times).T
+
+    final_state = np.empty(6, dtype=np.float64)
+    sample_state_x = np.empty(sample_times.size, dtype=np.float64)
+    sample_state_y = np.empty(sample_times.size, dtype=np.float64)
+    sample_state_z = np.empty(sample_times.size, dtype=np.float64)
+    sample_state_vx = np.empty(sample_times.size, dtype=np.float64)
+    sample_state_vy = np.empty(sample_times.size, dtype=np.float64)
+    sample_state_vz = np.empty(sample_times.size, dtype=np.float64)
+    samples_written = ctypes.c_int(-1)
+    final_time = ctypes.c_double(np.nan)
+    function_evaluations = ctypes.c_int(-1)
+    computed_steps = ctypes.c_int(-1)
+    accepted_steps = ctypes.c_int(-1)
+    rejected_steps = ctypes.c_int(-1)
+    inner_fallback_count = ctypes.c_int(-1)
+    outer_fallback_count = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_integrate_orbit_samples
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_double(omega),
+        ctypes.c_double(t_start),
+        ctypes.c_double(t_end),
+        ctypes.c_double(rtol),
+        ctypes.c_double(atol),
+        ctypes.c_int(max_steps),
+        initial_state.ctypes.data_as(double_p),
+        sample_times.ctypes.data_as(double_p),
+        ctypes.c_int(sample_times.size),
+        final_state.ctypes.data_as(double_p),
+        sample_state_x.ctypes.data_as(double_p),
+        sample_state_y.ctypes.data_as(double_p),
+        sample_state_z.ctypes.data_as(double_p),
+        sample_state_vx.ctypes.data_as(double_p),
+        sample_state_vy.ctypes.data_as(double_p),
+        sample_state_vz.ctypes.data_as(double_p),
+        ctypes.byref(samples_written),
+        ctypes.byref(final_time),
+        ctypes.byref(function_evaluations),
+        ctypes.byref(computed_steps),
+        ctypes.byref(accepted_steps),
+        ctypes.byref(rejected_steps),
+        ctypes.byref(inner_fallback_count),
+        ctypes.byref(outer_fallback_count),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 1
+    assert samples_written.value == sample_times.size
+    assert final_time.value == pytest.approx(t_end)
+    assert function_evaluations.value > 0
+    assert computed_steps.value >= accepted_steps.value > 0
+    assert rejected_steps.value >= 0
+    assert inner_fallback_count.value > 0
+    assert outer_fallback_count.value == 0
+    actual_samples = np.column_stack(
+        [
+            sample_state_x,
+            sample_state_y,
+            sample_state_z,
+            sample_state_vx,
+            sample_state_vy,
+            sample_state_vz,
+        ],
+    )
+    np.testing.assert_allclose(final_state, expected.y[:, -1], rtol=2e-10, atol=1e-7)
+    np.testing.assert_allclose(actual_samples, expected_samples, rtol=2e-10, atol=1e-7)
+
+
+@pytest.mark.orblib_cpp
 def test_orblib_cpp_dop853_harmonic_oscillator_dense_output():
     sample_x = np.linspace(0.0, 2.0 * np.pi, 17, dtype=np.float64)
     sample_y0 = np.empty_like(sample_x)

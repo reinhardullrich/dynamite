@@ -264,3 +264,11 @@ This file is append-only. Add new entries at the bottom.
   comparing the final state against SciPy DOP853 on an independent softened
   black-hole RHS. Dense-output orbit sampling, classification, projection,
   LOSVD/qgrid accumulation, and output writing remain unported.
+- Added prescribed dense-output sample extraction for single-orbit C++
+  integration using the C++ DOP853 dense-output polynomial and orbit RHS as
+  `dynamite::orblib_cpp::integrate_orbit_samples`. Added test-only ABI helper
+  `orblib_cpp_api_integrate_orbit_samples` and opt-in pytest coverage
+  comparing final state plus sampled six-component orbit states against SciPy
+  DOP853 dense output on an independent softened black-hole RHS. Orbit
+  classification, projection, LOSVD/qgrid accumulation, and output writing
+  remain unported.

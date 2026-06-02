@@ -23,4 +23,20 @@ OrbitIntegrationResult integrate_orbit_final_state(
     double final_state[6]
 ) noexcept;
 
+OrbitIntegrationResult integrate_orbit_samples(
+    InterpolatedPotential& potential,
+    double omega,
+    double t_start,
+    const double initial_state[6],
+    double t_end,
+    double rtol,
+    double atol,
+    int max_steps,
+    const double* sample_times,
+    int sample_count,
+    double final_state[6],
+    double* sample_states,
+    int& samples_written
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

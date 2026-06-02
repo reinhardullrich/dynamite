@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 namespace {
 
@@ -745,6 +746,169 @@ extern "C" void orblib_cpp_api_integrate_orbit_final_state(
                 final_state
             );
 
+        *final_time = result.final_time;
+        *function_evaluations = result.solver.function_evaluations;
+        *computed_steps = result.solver.computed_steps;
+        *accepted_steps = result.solver.accepted_steps;
+        *rejected_steps = result.solver.rejected_steps;
+        *inner_fallback_count = interpolated.inner_fallback_count();
+        *outer_fallback_count = interpolated.outer_fallback_count();
+        if (result.rhs_failed) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, result.solver.status);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_integrate_orbit_samples(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    double rlogmin,
+    double rlogmax,
+    double omega,
+    double t_start,
+    double t_end,
+    double rtol,
+    double atol,
+    int max_steps,
+    const double* initial_state,
+    const double* sample_times,
+    int sample_count,
+    double* final_state,
+    double* sample_state_x,
+    double* sample_state_y,
+    double* sample_state_z,
+    double* sample_state_vx,
+    double* sample_state_vy,
+    double* sample_state_vz,
+    int* samples_written,
+    double* final_time,
+    int* function_evaluations,
+    int* computed_steps,
+    int* accepted_steps,
+    int* rejected_steps,
+    int* inner_fallback_count,
+    int* outer_fallback_count,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        n_radius < 2 || n_theta < 2 || n_phi < 2 || rlogmax <= rlogmin ||
+        t_end == t_start || rtol <= 0.0 || atol <= 0.0 || max_steps <= 0 ||
+        sample_count < 0 || initial_state == nullptr || final_state == nullptr ||
+        samples_written == nullptr || final_time == nullptr ||
+        function_evaluations == nullptr || computed_steps == nullptr ||
+        accepted_steps == nullptr || rejected_steps == nullptr ||
+        inner_fallback_count == nullptr || outer_fallback_count == nullptr ||
+        (sample_count > 0 &&
+         (sample_times == nullptr || sample_state_x == nullptr || sample_state_y == nullptr ||
+          sample_state_z == nullptr || sample_state_vx == nullptr || sample_state_vy == nullptr ||
+          sample_state_vz == nullptr))) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin;
+        config.rlogmax = rlogmax;
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_arcsec * mge.conversion_factor,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        std::vector<double> sample_states(static_cast<std::size_t>(sample_count) * 6U, 0.0);
+        int written = 0;
+        const dynamite::orblib_cpp::OrbitIntegrationResult result =
+            dynamite::orblib_cpp::integrate_orbit_samples(
+                interpolated,
+                omega,
+                t_start,
+                initial_state,
+                t_end,
+                rtol,
+                atol,
+                max_steps,
+                sample_times,
+                sample_count,
+                final_state,
+                sample_states.data(),
+                written
+            );
+
+        for (int i = 0; i < written; ++i) {
+            const int offset = i * 6;
+            sample_state_x[i] = sample_states[static_cast<std::size_t>(offset)];
+            sample_state_y[i] = sample_states[static_cast<std::size_t>(offset + 1)];
+            sample_state_z[i] = sample_states[static_cast<std::size_t>(offset + 2)];
+            sample_state_vx[i] = sample_states[static_cast<std::size_t>(offset + 3)];
+            sample_state_vy[i] = sample_states[static_cast<std::size_t>(offset + 4)];
+            sample_state_vz[i] = sample_states[static_cast<std::size_t>(offset + 5)];
+        }
+
+        *samples_written = written;
         *final_time = result.final_time;
         *function_evaluations = result.solver.function_evaluations;
         *computed_steps = result.solver.computed_steps;
