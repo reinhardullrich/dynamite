@@ -49,11 +49,10 @@ The reports in this folder have been adapted for the current
   numerical correctness findings.
 - `12_operational_risk.md`: reproducibility, disk, destructive actions,
   concurrency, and local/global install risk findings.
-- `13_galahad_runtime_check.md`: local GALAHAD build, link, and runtime solver
-  checks after the initial audit gap was closed.
+- `13_active_runtime_verification.md`: active shared-library build, API,
+  output, solver, and pytest verification policy.
 - `14_improvement_opportunities.md`: non-bug-fix performance, smoothness,
   maintainability, and simplification roadmap.
-- `15_nnls_galahad_scipy_benchmark.md`: solver-path clarification, GALAHAD vs
-  legacy Fortran NNLS vs Python SciPy/CVXOPT usage, benchmark results, and
-  removal options.
+- `15_active_nnls_solver_benchmark.md`: active Python NNLS solver policy,
+  validation, caching, test-fixture, and benchmark guidance.
 - `SUMMARY.md`: final prioritized findings and recommended next actions.

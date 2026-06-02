@@ -7,12 +7,12 @@ Repository: `/home/reinhard/projects/thomas/dynamite`
 Current-status update: this summary has been adapted for the
 `fortran-cleanup` branch as of 2026-06-02. The original audit evidence remains
 useful for risk analysis, but several build/test/backend findings are now
-resolved or superseded by the direct shared-library orbit backend, archived
-legacy solver tree, archived development-test tree, and current pytest baseline.
+resolved or superseded by the direct shared-library orbit backend and current
+pytest baseline.
 
 ## Verification Completed
 
-Original local-only setup was used for the 2026-06-01 audit:
+Current local verification baseline for the `fortran-cleanup` branch:
 
 - Python virtualenv created in `.venv/`.
 - Editable install with testing extras completed:
@@ -21,26 +21,13 @@ Original local-only setup was used for the 2026-06-01 audit:
 - Core imports succeeded for DYNAMITE, NumPy, SciPy, Astropy, and Matplotlib.
 - Python compile check passed for `dynamite/`.
 - GNU Fortran 13.3.0 is available locally.
-- `make nogal` succeeded in the old removed Fortran layout before cleanup.
-- Local GALAHAD 2.3 QP installation completed using the then-active vendored
-  `archive/legacy_nnls_fortran/legacy_fortran/galahad-2.3`, `cuter`, and `hsl` trees.
-- Full GALAHAD-backed `make all` succeeded after repairing two generated static
-  archives that were missing `gltr.o` and `hsl_ma57d.o`.
-- GALAHAD-linked `triaxnnls_*` binaries passed link/load checks with no missing
-  dynamic libraries and no unresolved GALAHAD/HSL symbol matches.
-- A temporary real-model legacy run in `/tmp/dynamite-galahad-run` completed 5
-  classic NNLS weight solves with exit code 0.
-- Direct solver-mode `5` GALAHAD/QPB probes reached `QPB_solve` for both
-  `triaxnnls_noCRcut` and `triaxnnls_CRcut`.
-- Pytest collection was attempted and failed before collecting tests.
-
-Current 2026-06-02 verification after cleanup:
-
-- The active Fortran build is shared-library-only under `orblib_fortran/`.
-- Legacy NNLS/GALAHAD solver code is archived under
-  `archive/legacy_nnls_fortran/`.
+- The active Fortran build is shared-library-only under `orblib_fortran/` and
+  writes `orblib_fortran/build/lib/liborblib_fortran.so`.
+- Chapter 13 now records the active runtime verification contract for the
+  shared-library build, direct Python-input API, binary `datfil/` outputs,
+  Python `NNLS`, and current pytest coverage.
 - Current pytest coverage exists under `tests/`; focused fast tests and opt-in
-  slow orblib shared-library LOSVD parity tests passed during the cleanup.
+  slow orblib shared-library LOSVD tests passed during the cleanup.
 
 ## Highest-Priority Findings
 
@@ -81,9 +68,8 @@ Priority: high.
 
 Solver paths do not consistently validate convergence status, all finite
 weights, non-negative weights, finite chi-square values, and required output
-dimensions. This is now confirmed at runtime for GALAHAD: direct solver-mode
-`5` runs reached QPB, logged `QPB_solve exit status = -5`, then still exited
-with shell status `0` and wrote downstream output files.
+dimensions. The current Python `NNLS` path should make solver input, output,
+status, diagnostics, and model-completion validation explicit.
 
 Priority: high.
 
@@ -116,9 +102,6 @@ Priority: high/medium depending on workflow.
 
 ## Medium-Priority Findings
 
-- Full GALAHAD/legacy solver build is fragile: the vendored dependency trees
-  are present, but the local GALAHAD installer left required objects out of
-  generated static archives under GNU Fortran 13.3.0.
 - Default Fortran flags use `-ffast-math` and `-march=native`, reducing
   reproducibility and portability.
 - Orbit-library reuse and model lookup use default `np.allclose()` matching,
@@ -179,8 +162,8 @@ Highest-payoff improvement themes:
 0. Keep runtime expectations realistic:
    - local `import dynamite` takes about 3.6 seconds, so startup matters for
      short tools and test collection;
-   - full legacy model runs are dominated by Fortran orbit-library generation
-     and surrounding disk I/O, not import time.
+   - full active model runs are dominated by shared-library orbit-library
+     generation and surrounding disk I/O, not import time.
 
 1. Reduce hot-path text I/O:
    - keep ECSV for inspection/export;
@@ -209,38 +192,34 @@ Highest-payoff improvement themes:
    - introduce typed settings wrappers incrementally;
    - add a small public workflow API for validate/plan/run/resume/summarize.
 
-7. Treat Python `NNLS` as the modern solver path:
-   - keep archived legacy Fortran/GALAHAD only as historical/parity reference
-     material unless it is explicitly restored;
+7. Make Python `NNLS` an explicit, validated solver contract:
    - introduce a common `SolverProblem` / `SolverResult` interface;
-   - add parity checks before changing defaults;
-   - evaluate `scipy.lsq_linear` and sparse/iterative approaches only after
-     matrix density and memory use are measured.
+   - add deterministic active solver fixtures;
+   - cache prepared matrix blocks only with strict keys;
+   - evaluate additional active solver approaches only after matrix density
+     and memory use are measured.
 
-## Solver Benchmark Follow-Up
+## Active Solver Follow-Up
 
 The solver-specific continuation is recorded in
-`15_nnls_galahad_scipy_benchmark.md`.
+`15_active_nnls_solver_benchmark.md`.
 
 Key result:
 
-- SciPy `optimize.nnls` matched the old Fortran Lawson-Hanson NNLS solution to
-  roundoff on the five tested NGC6278 models.
-- SciPy `optimize.nnls` was the fastest valid backend once the matrix existed:
-  about `0.039 s` mean solver time.
-- CVXOPT installed locally and worked as an optional cross-check, but required
-  stricter tolerances and was slower.
-- GALAHAD/QPB mode `5` failed on all five tested models with
-  `QPB_solve exit status = -5`.
+- The active weight-solver path is Python `NNLS`.
+- `nnls_solver: "scipy"` remains the recommended default for plain
+  non-negative least squares.
+- CVXOPT remains an optional cross-check backend.
+- The next useful benchmark work is to split matrix assembly, solve time,
+  chi-square reconstruction, and output writing.
 
 Recommendation:
 
-- remove GALAHAD from the required/recommended workflow for normal plain-NNLS
-  DYNAMITE work;
-- keep archived legacy Fortran/GALAHAD only as compatibility/reproduction
-  material unless a controlled backend is explicitly restored;
-- keep the current pytest parity tests under `tests/` as the active replacement
-  for old `archive/dev_tests/` comparisons.
+- keep active configs on `type: "NNLS"` with `nnls_solver: "scipy"` unless
+  current-code benchmarks justify a change;
+- add `SolverProblem` and `SolverResult` internally;
+- add deterministic solver-kernel and matrix-construction fixtures;
+- cache prepared matrix blocks only with strict dependency keys.
 
 ## Local Worktree Status
 

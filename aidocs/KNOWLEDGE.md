@@ -126,18 +126,20 @@ source files.
   Python-to-Fortran failure detection, solver-result validation gaps, physical
   parameter domain gaps, and non-atomic model/cache writes. After the local
   Fortran cleanup, active orbit generation uses the direct shared-library API,
-  archived development-test workflows have pytest replacements under `tests/`, and
-  the old `LegacyWeightSolver`/GALAHAD path is rejected rather than active.
-- GALAHAD follow-up: direct solver-mode `5` probes reached QPB in
-  `triaxnnls_noCRcut` and `triaxnnls_CRcut`, but both logged
-  `QPB_solve exit status = -5` while the shell process exited `0` and output
-  files were written. Treat solver-status propagation as a confirmed high-risk
-  issue.
+  active pytest coverage lives under `tests/`, and Python `NNLS` is the active
+  weight-solver path.
+- Active runtime verification: `13_active_runtime_verification.md` documents
+  the current shared-library build, direct Python-input API, binary `datfil/`
+  output contract, Python `NNLS` solver contract, pytest coverage, verification
+  gaps, and acceptance criteria.
 - Improvement continuation: `14_improvement_opportunities.md` focuses on
-  non-bug-fix changes: lazy imports, binary sidecar caches, prepared NNLS matrix
-  caching, stable model/orbit-library keys, explicit timing manifests,
-  structured command specs, typed settings wrappers, and smaller stage-specific
-  helper functions.
+  current-code improvements: per-stage timing manifests, binary sidecar caches,
+  prepared NNLS matrix caching, explicit solver problem/result objects, stable
+  model/orbit-library keys, direct shared-library API hardening, binary output
+  contract versioning, lighter imports, cleaner config/runtime separation, and
+  active build profiles. `15_active_nnls_solver_benchmark.md` now documents the
+  active Python `NNLS` solver policy, validation, fixture, caching, and benchmark
+  plan only.
 
 ## Separated Workspaces
 

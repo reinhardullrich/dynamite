@@ -173,3 +173,13 @@ This file is append-only. Add new entries at the bottom.
   archived legacy NNLS/GALAHAD and mass-helper code, rejected
   `LegacyWeightSolver`, current pytest baseline under `tests/`, and the
   direct shared-library LOSVD parity fixtures.
+- Rewrote full-audit chapters 14 and 15 to cover only current active code:
+  shared-library orblib generation, Python `NNLS`, active solver validation,
+  caching, benchmark manifests, and current pytest fixture strategy. Removed
+  retired solver-code descriptions from those chapters, renamed chapter 15 to
+  `15_active_nnls_solver_benchmark.md`, and updated the audit README/SUMMARY
+  references accordingly.
+- Rewrote full-audit chapter 13 as current active runtime verification only,
+  renamed it to `13_active_runtime_verification.md`, and updated the audit
+  README, SUMMARY, environment reference, and canonical knowledge summary to
+  point at the active shared-library/orblib/NNLS verification contract.

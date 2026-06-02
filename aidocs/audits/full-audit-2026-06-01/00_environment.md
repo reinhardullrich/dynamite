@@ -254,7 +254,8 @@ Runtime GALAHAD/QPB check:
 Current status: archived. `LegacyWeightSolver` is rejected by active runtime
 configuration/model execution.
 
-Detailed evidence is recorded in `13_galahad_runtime_check.md`.
+Current active runtime verification is recorded in
+`13_active_runtime_verification.md`.
 
 ## Python Baseline Checks
 
