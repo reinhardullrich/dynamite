@@ -6,7 +6,11 @@ import scipy.integrate
 import scipy.io
 import scipy.special
 
-from conftest import ORBLIB_CPP_DIR, ORBLIB_CPP_SHARED_LIBRARY
+from conftest import (
+    ORBLIB_CPP_DIR,
+    ORBLIB_CPP_SHARED_LIBRARY,
+    ORBLIB_FORTRAN_SHARED_LIBRARY,
+)
 from dynamite import orblib_api
 from dynamite.myrand import MyRand
 
@@ -5667,6 +5671,301 @@ def test_orblib_cpp_orbitstart_builds_start_arrays_like_runorbitstart():
     np.testing.assert_array_equal(begin_noreg, expected_flags)
     np.testing.assert_allclose(beginbox_records, expected_beginbox, rtol=0.0, atol=2e-3)
     np.testing.assert_array_equal(beginbox_noreg, expected_flags)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.orblib_fortran
+def test_orblib_cpp_orbitstart_start_arrays_match_active_fortran_memory_api(
+    monkeypatch,
+    tmp_path,
+):
+    assert ORBLIB_CPP_SHARED_LIBRARY.is_file()
+    assert ORBLIB_FORTRAN_SHARED_LIBRARY.is_file()
+    monkeypatch.chdir(tmp_path)
+
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.0
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin_km = 13.0
+    rlogmax_km = 13.1
+    energy_count = 2
+    i2_count = 4
+    i3_count = 1
+    orbit_dithering = 1
+    omega = 0.0
+    integrator_accuracy = 1.0e-4
+    crossing_capacity = 400
+    type_sample_count = 5000
+    total_records = energy_count * i2_count * i3_count
+
+    conversion_factor = (
+        distance * 1.0e6 * np.tan(np.pi / 648e3) * PARSEC_KM
+    )
+    rlogmin_arcsec = rlogmin_km - np.log10(conversion_factor)
+    rlogmax_arcsec = rlogmax_km - np.log10(conversion_factor)
+
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+
+    max_rows = total_records
+    fortran_begin = np.empty(max_rows * 9, dtype=np.float64)
+    fortran_beginbox = np.empty(max_rows * 9, dtype=np.float64)
+    fortran_begin_noreg = np.empty(max_rows, dtype=np.int32)
+    fortran_beginbox_noreg = np.empty(max_rows, dtype=np.int32)
+    fortran_rows = ctypes.c_int(-1)
+    fortran_box_rows = ctypes.c_int(-1)
+    fortran_status = ctypes.c_int(-999)
+
+    fortran_library = ctypes.CDLL(str(ORBLIB_FORTRAN_SHARED_LIBRARY))
+    fortran_function = fortran_library.orblib_api_run_orbitstart_memory
+    fortran_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        int_p,
+        double_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+    ]
+    fortran_function.restype = None
+    fortran_function(
+        ctypes.c_int(123),
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(energy_count),
+        ctypes.c_double(rlogmin_arcsec),
+        ctypes.c_double(rlogmax_arcsec),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_int(orbit_dithering),
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(max_rows),
+        fortran_begin.ctypes.data_as(double_p),
+        fortran_begin_noreg.ctypes.data_as(int_p),
+        fortran_beginbox.ctypes.data_as(double_p),
+        fortran_beginbox_noreg.ctypes.data_as(int_p),
+        ctypes.byref(fortran_rows),
+        ctypes.byref(fortran_box_rows),
+        ctypes.byref(fortran_status),
+    )
+    assert fortran_status.value == 0
+    assert fortran_rows.value == total_records
+    assert fortran_box_rows.value == total_records
+
+    circular_radii = np.empty(energy_count, dtype=np.float64)
+    circular_velocities = np.empty(energy_count, dtype=np.float64)
+    circular_periods = np.empty(energy_count, dtype=np.float64)
+    energies = np.empty(energy_count, dtype=np.float64)
+    theta_values = np.empty(i2_count, dtype=np.float64)
+    inner_boundaries = np.empty((energy_count, i2_count), dtype=np.float64)
+    middle_boundaries = np.empty_like(inner_boundaries)
+    outer_boundaries = np.empty_like(inner_boundaries)
+    irregular = np.empty(energy_count, dtype=np.int32)
+    inner_orbit_types = np.empty_like(inner_boundaries, dtype=np.int32)
+    middle_orbit_types = np.empty_like(inner_boundaries, dtype=np.int32)
+    noreg_grid = np.empty_like(inner_boundaries, dtype=np.int32)
+    cpp_begin = np.empty((total_records, 9), dtype=np.float64)
+    cpp_begin_noreg = np.empty(total_records, dtype=np.int32)
+    cpp_beginbox = np.empty_like(cpp_begin)
+    cpp_beginbox_noreg = np.empty_like(cpp_begin_noreg)
+    box_iterations = np.empty(total_records, dtype=np.int32)
+    used_triaxial_branch = ctypes.c_int(-1)
+    rounded_irregular_energy_count = ctypes.c_int(-1)
+    equivalent_radius_iterations = ctypes.c_int(-1)
+    inner_width_evaluations = ctypes.c_int(-1)
+    inner_type_evaluations = ctypes.c_int(-1)
+    outer_width_evaluations = ctypes.c_int(-1)
+    outer_type_evaluations = ctypes.c_int(-1)
+    box_equivalent_radius_iterations = ctypes.c_int(-1)
+    cpp_rows = ctypes.c_int(-1)
+    cpp_box_rows = ctypes.c_int(-1)
+    cpp_status = ctypes.c_int(-999)
+
+    cpp_library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    cpp_function = cpp_library.orblib_cpp_api_orbitstart_build_start_arrays
+    cpp_function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        double_p,
+        int_p,
+        double_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+    ]
+    cpp_function.restype = None
+    cpp_function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin_km),
+        ctypes.c_double(rlogmax_km),
+        ctypes.c_int(energy_count),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_int(orbit_dithering),
+        ctypes.c_double(omega),
+        ctypes.c_double(integrator_accuracy),
+        ctypes.c_int(crossing_capacity),
+        ctypes.c_int(type_sample_count),
+        circular_radii.ctypes.data_as(double_p),
+        circular_velocities.ctypes.data_as(double_p),
+        circular_periods.ctypes.data_as(double_p),
+        energies.ctypes.data_as(double_p),
+        theta_values.ctypes.data_as(double_p),
+        inner_boundaries.ctypes.data_as(double_p),
+        middle_boundaries.ctypes.data_as(double_p),
+        outer_boundaries.ctypes.data_as(double_p),
+        irregular.ctypes.data_as(int_p),
+        inner_orbit_types.ctypes.data_as(int_p),
+        middle_orbit_types.ctypes.data_as(int_p),
+        noreg_grid.ctypes.data_as(int_p),
+        cpp_begin.ctypes.data_as(double_p),
+        cpp_begin_noreg.ctypes.data_as(int_p),
+        cpp_beginbox.ctypes.data_as(double_p),
+        cpp_beginbox_noreg.ctypes.data_as(int_p),
+        box_iterations.ctypes.data_as(int_p),
+        ctypes.byref(used_triaxial_branch),
+        ctypes.byref(rounded_irregular_energy_count),
+        ctypes.byref(equivalent_radius_iterations),
+        ctypes.byref(inner_width_evaluations),
+        ctypes.byref(inner_type_evaluations),
+        ctypes.byref(outer_width_evaluations),
+        ctypes.byref(outer_type_evaluations),
+        ctypes.byref(box_equivalent_radius_iterations),
+        ctypes.byref(cpp_rows),
+        ctypes.byref(cpp_box_rows),
+        ctypes.byref(cpp_status),
+    )
+    assert cpp_status.value == 0
+    assert used_triaxial_branch.value == 1
+    assert cpp_rows.value == total_records
+    assert cpp_box_rows.value == total_records
+    assert box_equivalent_radius_iterations.value > 0
+
+    fortran_begin = fortran_begin.reshape(max_rows, 9)
+    fortran_beginbox = fortran_beginbox.reshape(max_rows, 9)
+    np.testing.assert_array_equal(cpp_begin_noreg, fortran_begin_noreg)
+    np.testing.assert_array_equal(cpp_beginbox_noreg, fortran_beginbox_noreg)
+    np.testing.assert_allclose(cpp_begin, fortran_begin, rtol=5e-12, atol=1e-6)
+    np.testing.assert_allclose(cpp_beginbox, fortran_beginbox, rtol=5e-12, atol=1e-6)
 
 
 @pytest.mark.orblib_cpp

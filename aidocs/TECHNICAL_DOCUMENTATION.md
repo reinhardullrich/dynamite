@@ -1082,7 +1082,12 @@ The first actual ported Fortran kernels are:
   expansion, `noreggrid`, tube begin records, `Omega != 0` retrograde
   beginbox records, and `Omega == 0` box beginbox records. The production C++
   generation entry points are still stubs until this start-array layer is
-  wired into the full orbit engine.
+  wired into the full orbit engine. An opt-in test now compares the C++
+  start-array helper directly against the active Fortran
+  `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube records
+  and `Omega == 0` beginbox box records. That test feeds Fortran arcsec-log
+  radius settings and C++ converted km-log radius settings because those are
+  the two active interfaces.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

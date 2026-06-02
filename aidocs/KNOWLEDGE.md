@@ -1,6 +1,6 @@
 # Project Knowledge
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 This file is the canonical current-state overview for the local DYNAMITE fork
 at `/home/reinhard/projects/thomas/dynamite`.
@@ -188,7 +188,10 @@ changes from the original project.
   inner-boundary ABI as the expensive probe oracle. The composed start-array
   orchestration helper is tested for triaxial branch selection, diagnostic
   counters, `noreggrid`, begin records, and rotating-frame retrograde beginbox
-  records.
+  records. It also has an opt-in active Fortran memory-ABI parity test for
+  the non-rotating begin tube records and `Omega == 0` beginbox box records,
+  using Fortran's hardcoded 400 crossing samples and 5000 `find_type()`
+  samples.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -300,7 +303,9 @@ source files.
   memory-side `runorbitstart()` start-array orchestration. The legacy
   `interpolgrid` disk-cache contract if fixture parity requires it, production
   C++ generation entry-point wiring, and full orbit-engine wiring are the next
-  unported dependencies. A known parity
+  unported dependencies. The current start-array coverage includes direct
+  active Fortran memory-ABI parity for non-rotating begin and beginbox records.
+  A known parity
   note is recorded in `aidocs/cpp_orblib_port_plan.md`: Fortran
   `make_startpoints()` comments describe a "last irregular energy" noreg rule,
   but the code uses `maxval(irregular(:)) .eq. i`, which flags energy index 1

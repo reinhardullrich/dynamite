@@ -568,3 +568,13 @@ This file is append-only. Add new entries at the bottom.
   canonical knowledge, C++ port documentation, technical documentation, and
   test documentation. The C++ generation entry points remain explicit stubs
   until this start-array layer is wired into the full orbit engine.
+- Added an opt-in active Fortran memory-ABI parity test for the C++
+  `build_orbit_start_arrays()` helper. The new
+  `tests/test_cpp_inventory.py` case compares C++ begin tube records, beginbox
+  box records, and noreg flags against
+  `orblib_api_run_orbitstart_memory` for a small non-rotating direct-input
+  model using Fortran's hardcoded 400 tube-width crossing samples and 5000
+  `find_type()` samples. The test runs Fortran from a pytest temp directory so
+  its `interpolgrid` cache is not created in the repository root. Updated
+  canonical knowledge, C++ port documentation, technical documentation, and
+  test documentation.

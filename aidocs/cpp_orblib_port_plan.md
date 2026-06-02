@@ -327,6 +327,10 @@ Current branch status:
   `orblib_cpp_api_orbitstart_build_start_arrays` validates the composed branch
   selection, diagnostic counters, `noreggrid`, begin records, and retrograde
   beginbox records against Python mirrors of the Fortran startpoint formulas.
+  A separate opt-in parity test compares the same C++ helper against the active
+  Fortran `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube
+  records and `Omega == 0` beginbox box records, using the Fortran hardcoded
+  `findtubeorbitwidth()`/`find_type()` sample counts.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
   `find_equivalent_radius()` and testing the Fortran one-based
@@ -514,8 +518,9 @@ mixed with the first C++ parity port.
    measurement, tube-radius minimization, box startpoint records, and tube
    begin/retrograde record arrays plus orbit-type probing and inner/outer
    boundary search are done; full memory-side `runorbitstart()` start-array
-   orchestration is done. Production entry-point wiring and fixture parity
-   against current begin/beginbox outputs still remain.
+   orchestration is done. Active Fortran memory-ABI parity for non-rotating
+   begin and beginbox records is covered by an opt-in test. Production
+   entry-point wiring and full generated-output parity still remain.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
    standalone classification/moment kernel are done; full one-orbit parity

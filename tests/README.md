@@ -23,6 +23,7 @@ DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -
 DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests
 make -C orblib_cpp shared
 DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_inventory.py tests/test_orblib_api.py -m orblib_cpp
+DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_inventory.py -m "orblib_cpp and orblib_fortran"
 ```
 
 Current coverage:
@@ -97,7 +98,9 @@ Current coverage:
   angular-grid setup, `findReq()` outer boundaries, inner-boundary wiring, and
   post-inner circular metadata recomputation, plus composed start-array
   orchestration validation for triaxial branch selection, `noreggrid`, tube
-  begin records, and rotating-frame retrograde beginbox records;
+  begin records, and rotating-frame retrograde beginbox records, plus an
+  opt-in active Fortran memory-ABI parity check for non-rotating begin tube
+  records and `Omega == 0` beginbox box records;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library
