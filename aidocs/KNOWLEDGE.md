@@ -95,13 +95,17 @@ changes from the original project.
   (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). It also includes
   `orblib_cpp/include/interpolated_potential.hpp` and
   `orblib_cpp/source/interpolated_potential.cpp` for an in-memory port of
-  `interpolpotent.f90`'s acceleration interpolation math. gNFW profile 5
-  remains unported because it depends on the beta-function stack. `Ran1` is
-  tested against the existing Python/Fortran reference sequence; DOP853 is
-  tested through the shared library on harmonic-oscillator final-state and
-  dense-output samples; elliptic integrals are tested against SciPy; MGE setup,
-  potential-stack evaluation, and interpolation-grid evaluation are tested
-  against independent NumPy/SciPy implementations of the Fortran formulas.
+  `interpolpotent.f90`'s acceleration interpolation math. The C++ orbit RHS
+  formula lives in `orblib_cpp/include/orbit_rhs.hpp` and
+  `orblib_cpp/source/orbit_rhs.cpp`, covering both non-rotating and
+  barred-frame `Omega` terms from `orblib_f_new_mirror.f90`'s `derivs`.
+  gNFW profile 5 remains unported because it depends on the beta-function
+  stack. `Ran1` is tested against the existing Python/Fortran reference
+  sequence; DOP853 is tested through the shared library on harmonic-oscillator
+  final-state and dense-output samples; elliptic integrals are tested against
+  SciPy; MGE setup, potential-stack evaluation, interpolation-grid evaluation,
+  and orbit RHS evaluation are tested against independent NumPy/SciPy
+  implementations of the Fortran formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -192,10 +196,12 @@ source files.
   evaluation across the inner approximation, mid-radius quadrature, and
   far-field point-mass approximation. The branch now also ports the
   Plummer-style black-hole term, dark-halo profiles 0 through 3, and the
-  in-memory acceleration interpolation-grid math from `interpolpotent.f90`.
+  in-memory acceleration interpolation-grid math from `interpolpotent.f90`,
+  plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
+  barred-frame integration.
   The legacy `interpolgrid` disk-cache contract, gNFW profile 5 beta-function
-  path, and orbit RHS wiring are the next unported potential-stack
-  dependencies.
+  path, and full DOP853 orbit integration with classification/output are the
+  next unported dependencies.
 
 ## Separated Workspaces
 

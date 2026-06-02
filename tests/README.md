@@ -51,6 +51,9 @@ Current coverage:
   independent Python implementation of the Fortran `interpolpotent.f90`
   metadata, log-acceleration grid, trilinear interpolation, and direct-fallback
   formulas;
+- C++ orbit RHS validation for the non-rotating and barred-frame `Omega`
+  branches against independent Python calculations of the Fortran `derivs`
+  formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

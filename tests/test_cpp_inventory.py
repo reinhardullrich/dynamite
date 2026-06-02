@@ -15,12 +15,14 @@ CPP_SOURCES = [
     "include/dop853.hpp",
     "include/elliptic_integrals.hpp",
     "include/interpolated_potential.hpp",
+    "include/orbit_rhs.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
     "include/triaxial_mge.hpp",
     "source/dop853.cpp",
     "source/elliptic_integrals.cpp",
     "source/interpolated_potential.cpp",
+    "source/orbit_rhs.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
     "source/ran1.cpp",
@@ -622,6 +624,22 @@ def _expected_interpolated_potential_evaluation(
     )
 
 
+def _expected_orbit_rhs_evaluation(interpolated_acceleration, states, omega):
+    derivatives = np.empty_like(states)
+    if omega == 0.0:
+        derivatives[:, 0:3] = states[:, 3:6]
+        derivatives[:, 3:6] = interpolated_acceleration
+        return derivatives
+
+    derivatives[:, 0] = states[:, 3] + omega * states[:, 1]
+    derivatives[:, 1] = states[:, 4] - omega * states[:, 0]
+    derivatives[:, 2] = states[:, 5]
+    derivatives[:, 3] = interpolated_acceleration[:, 0] + omega * states[:, 4]
+    derivatives[:, 4] = interpolated_acceleration[:, 1] - omega * states[:, 3]
+    derivatives[:, 5] = interpolated_acceleration[:, 2]
+    return derivatives
+
+
 @pytest.mark.orblib_cpp
 def test_orblib_cpp_triaxial_mge_setup_matches_fortran_formulas():
     surf_pc = np.array(
@@ -1174,6 +1192,202 @@ def test_orblib_cpp_interpolated_potential_matches_fortran_grid_formula():
     np.testing.assert_allclose(
         np.column_stack([accel_x, accel_y, accel_z]),
         expected_acceleration,
+        rtol=2e-12,
+        atol=0.0,
+    )
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize("omega", [0.0, 1.5e-16])
+def test_orblib_cpp_orbit_rhs_matches_fortran_derivs_formula(omega):
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = 18.0
+    rlogmax = 19.0
+
+    def spherical_point(radius, theta_value, phi_value):
+        return [
+            radius * np.sin(theta_value) * np.cos(phi_value),
+            -radius * np.sin(theta_value) * np.sin(phi_value),
+            radius * np.cos(theta_value),
+        ]
+
+    positions = np.ascontiguousarray(
+        [
+            spherical_point(1.0e17, 0.7, 0.35),
+            spherical_point(1.0e13, 0.8, 0.4),
+            spherical_point(3.0e19, 0.9, 0.5),
+        ],
+        dtype=np.float64,
+    )
+    velocities = np.ascontiguousarray(
+        [
+            [12.0, -21.0, 5.0],
+            [-7.5, 4.0, 2.5],
+            [30.0, -11.0, -3.0],
+        ],
+        dtype=np.float64,
+    )
+    states = np.ascontiguousarray(np.column_stack([positions, velocities]), dtype=np.float64)
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    (
+        _,
+        expected_acceleration,
+        _,
+        expected_inner_fallback_count,
+        expected_outer_fallback_count,
+    ) = _expected_interpolated_potential_evaluation(
+        expected_setup,
+        positions,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+        rlogmin,
+        rlogmax,
+        n_radius,
+        n_theta,
+        n_phi,
+    )
+    expected_derivative = _expected_orbit_rhs_evaluation(
+        expected_acceleration,
+        states,
+        omega,
+    )
+
+    derivatives = np.empty_like(states)
+    inner_fallback_count = ctypes.c_int(-1)
+    outer_fallback_count = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_orbit_rhs_evaluate
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    state_x = np.ascontiguousarray(states[:, 0], dtype=np.float64)
+    state_y = np.ascontiguousarray(states[:, 1], dtype=np.float64)
+    state_z = np.ascontiguousarray(states[:, 2], dtype=np.float64)
+    state_vx = np.ascontiguousarray(states[:, 3], dtype=np.float64)
+    state_vy = np.ascontiguousarray(states[:, 4], dtype=np.float64)
+    state_vz = np.ascontiguousarray(states[:, 5], dtype=np.float64)
+    derivative_x = np.ascontiguousarray(derivatives[:, 0])
+    derivative_y = np.ascontiguousarray(derivatives[:, 1])
+    derivative_z = np.ascontiguousarray(derivatives[:, 2])
+    derivative_vx = np.ascontiguousarray(derivatives[:, 3])
+    derivative_vy = np.ascontiguousarray(derivatives[:, 4])
+    derivative_vz = np.ascontiguousarray(derivatives[:, 5])
+
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_double(omega),
+        ctypes.c_int(states.shape[0]),
+        state_x.ctypes.data_as(double_p),
+        state_y.ctypes.data_as(double_p),
+        state_z.ctypes.data_as(double_p),
+        state_vx.ctypes.data_as(double_p),
+        state_vy.ctypes.data_as(double_p),
+        state_vz.ctypes.data_as(double_p),
+        derivative_x.ctypes.data_as(double_p),
+        derivative_y.ctypes.data_as(double_p),
+        derivative_z.ctypes.data_as(double_p),
+        derivative_vx.ctypes.data_as(double_p),
+        derivative_vy.ctypes.data_as(double_p),
+        derivative_vz.ctypes.data_as(double_p),
+        ctypes.byref(inner_fallback_count),
+        ctypes.byref(outer_fallback_count),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert inner_fallback_count.value == expected_inner_fallback_count
+    assert outer_fallback_count.value == expected_outer_fallback_count
+    actual_derivative = np.column_stack(
+        [derivative_x, derivative_y, derivative_z, derivative_vx, derivative_vy, derivative_vz],
+    )
+    np.testing.assert_allclose(
+        actual_derivative,
+        expected_derivative,
         rtol=2e-12,
         atol=0.0,
     )

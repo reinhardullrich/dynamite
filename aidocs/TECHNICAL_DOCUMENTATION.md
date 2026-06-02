@@ -804,6 +804,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_triaxial_mge_evaluate`
 - `orblib_cpp_api_potential_stack_evaluate`
 - `orblib_cpp_api_interpolated_potential_evaluate`
+- `orblib_cpp_api_orbit_rhs_evaluate`
 - `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
@@ -862,6 +863,14 @@ The first actual ported Fortran kernels are:
   validates metadata, direct potential, interpolated acceleration, and fallback
   counters against an independent Python implementation of the Fortran grid
   formulas.
+- The orbit RHS derivative formula from `orblib_f_new_mirror.f90`'s `derivs`,
+  implemented as `dynamite::orblib_cpp::evaluate_orbit_rhs` in
+  `orblib_cpp/include/orbit_rhs.hpp` and `orblib_cpp/source/orbit_rhs.cpp`.
+  It calls the C++ interpolated acceleration path and applies the same
+  non-rotating derivative assignment and barred-frame `Omega` terms used by the
+  Fortran orbit-library integrator. The test-only C ABI helper
+  `orblib_cpp_api_orbit_rhs_evaluate` validates both `Omega == 0` and
+  `Omega != 0` against independent Python calculations of the Fortran formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

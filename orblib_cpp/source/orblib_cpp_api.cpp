@@ -1,6 +1,7 @@
 #include "dop853.hpp"
 #include "elliptic_integrals.hpp"
 #include "interpolated_potential.hpp"
+#include "orbit_rhs.hpp"
 #include "potential.hpp"
 #include "ran1.hpp"
 #include "triaxial_mge.hpp"
@@ -480,6 +481,146 @@ extern "C" void orblib_cpp_api_interpolated_potential_evaluate(
         *rlog_min = metadata.rlog_min;
         *rmin2 = metadata.rmin2;
         *rmax2 = metadata.rmax2;
+        *inner_fallback_count = interpolated.inner_fallback_count();
+        *outer_fallback_count = interpolated.outer_fallback_count();
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_orbit_rhs_evaluate(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    double rlogmin,
+    double rlogmax,
+    double omega,
+    int state_count,
+    const double* state_x,
+    const double* state_y,
+    const double* state_z,
+    const double* state_vx,
+    const double* state_vy,
+    const double* state_vz,
+    double* derivative_x,
+    double* derivative_y,
+    double* derivative_z,
+    double* derivative_vx,
+    double* derivative_vy,
+    double* derivative_vz,
+    int* inner_fallback_count,
+    int* outer_fallback_count,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        n_radius < 2 || n_theta < 2 || n_phi < 2 || rlogmax <= rlogmin ||
+        inner_fallback_count == nullptr || outer_fallback_count == nullptr ||
+        state_count < 0 ||
+        (state_count > 0 &&
+         (state_x == nullptr || state_y == nullptr || state_z == nullptr ||
+          state_vx == nullptr || state_vy == nullptr || state_vz == nullptr ||
+          derivative_x == nullptr || derivative_y == nullptr || derivative_z == nullptr ||
+          derivative_vx == nullptr || derivative_vy == nullptr || derivative_vz == nullptr))) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin;
+        config.rlogmax = rlogmax;
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_arcsec * mge.conversion_factor,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        for (int i = 0; i < state_count; ++i) {
+            const double state[6] = {
+                state_x[i],
+                state_y[i],
+                state_z[i],
+                state_vx[i],
+                state_vy[i],
+                state_vz[i],
+            };
+            double derivative[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            if (!dynamite::orblib_cpp::evaluate_orbit_rhs(
+                    interpolated,
+                    omega,
+                    state,
+                    derivative
+                )) {
+                set_status(status, kStatusInvalidArgument);
+                return;
+            }
+            derivative_x[i] = derivative[0];
+            derivative_y[i] = derivative[1];
+            derivative_z[i] = derivative[2];
+            derivative_vx[i] = derivative[3];
+            derivative_vy[i] = derivative[4];
+            derivative_vz[i] = derivative[5];
+        }
+
         *inner_fallback_count = interpolated.inner_fallback_count();
         *outer_fallback_count = interpolated.outer_fallback_count();
         set_status(status, kStatusOk);

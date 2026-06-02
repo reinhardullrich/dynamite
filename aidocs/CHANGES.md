@@ -248,3 +248,11 @@ This file is append-only. Add new entries at the bottom.
   opt-in pytest coverage against an independent Python implementation of the
   Fortran grid formulas. The legacy `interpolgrid` disk-cache read/write
   behavior remains unported.
+- Ported the orbit RHS derivative formula from `orblib_f_new_mirror.f90`'s
+  `derivs` to C++ as `dynamite::orblib_cpp::evaluate_orbit_rhs` in
+  `orblib_cpp/include/orbit_rhs.hpp` and `orblib_cpp/source/orbit_rhs.cpp`.
+  The implementation uses the C++ interpolated acceleration path and preserves
+  both the non-rotating derivative assignment and the barred-frame `Omega`
+  terms. Added test-only ABI helper `orblib_cpp_api_orbit_rhs_evaluate` and
+  opt-in pytest coverage against independent Python calculations of the
+  Fortran formulas.

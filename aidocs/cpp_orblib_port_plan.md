@@ -76,6 +76,7 @@ orblib_cpp_api_triaxial_mge_setup
 orblib_cpp_api_triaxial_mge_evaluate
 orblib_cpp_api_potential_stack_evaluate
 orblib_cpp_api_interpolated_potential_evaluate
+orblib_cpp_api_orbit_rhs_evaluate
 orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
@@ -117,6 +118,10 @@ Current branch status:
   formulas, spherical-octant grid, log-acceleration storage, trilinear
   interpolation, and direct fallback outside the grid. The legacy
   `interpolgrid` disk-cache read/write behavior is not implemented yet.
+- The orbit RHS formula from `orblib_f_new_mirror.f90`'s `derivs` is ported as
+  `dynamite::orblib_cpp::evaluate_orbit_rhs`, including both the non-rotating
+  derivative assignment and the barred-frame `Omega` terms. It is tested
+  against independent Python calculations of the Fortran formulas.
 - The orbit-specific C++ engine is still not implemented yet:
   gNFW profile 5, interpolation-grid disk caching, orbit-start generation,
   one-orbit integration/classification, projection, PSF, aperture mapping,
@@ -255,9 +260,10 @@ mixed with the first C++ parity port.
    elliptic setup helpers, non-bar triaxial MGE setup/deprojection, stellar
    triaxial MGE potential/acceleration evaluation, Plummer-style black-hole
    contribution, dark-halo profiles 0 through 3, and in-memory acceleration
-   interpolation-grid math. Still required: gNFW profile 5, legacy
-   interpolation-grid disk caching if C++ parity requires it, orbit RHS wiring,
-   and Fortran-value parity tests for the full orbit RHS/potential stack.
+   interpolation-grid math, and the orbit RHS formula. Still required: gNFW
+   profile 5, legacy interpolation-grid disk caching if C++ parity requires
+   it, DOP853 integration using the orbit RHS, and Fortran-value parity tests
+   for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.
