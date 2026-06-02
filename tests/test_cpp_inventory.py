@@ -25,6 +25,7 @@ CPP_SOURCES = [
     "include/orbit_psf.hpp",
     "include/orbit_qgrid.hpp",
     "include/orbit_rhs.hpp",
+    "include/orbit_start.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
     "include/triaxial_mge.hpp",
@@ -40,6 +41,7 @@ CPP_SOURCES = [
     "source/orbit_psf.cpp",
     "source/orbit_qgrid.cpp",
     "source/orbit_rhs.cpp",
+    "source/orbit_start.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
     "source/ran1.cpp",
@@ -3127,6 +3129,260 @@ def test_orblib_cpp_writes_orbit_class_file_like_fortran_reader(tmp_path):
     actual = data.reshape((5, dither_count, orbit_count), order="F")
     expected = moments.reshape((5, dither_count, orbit_count), order="F")
     np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize("energy_offset", [-40.0, 40.0])
+def test_orblib_cpp_orbitstart_calculates_start_state_like_fortran(energy_offset):
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    start_radius = 1.2e13
+    start_theta = 0.73
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    position = np.array(
+        [[start_radius * np.sin(start_theta), 0.0, start_radius * np.cos(start_theta)]],
+        dtype=np.float64,
+    )
+    potential, _ = _expected_potential_stack_evaluation(
+        expected_setup,
+        position,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    energy = potential[0] + energy_offset
+    vy = 2.0 * (potential[0] - energy)
+    if vy >= 1.0e-300:
+        vy = np.sqrt(vy)
+    if vy < 0.0 or np.isnan(vy):
+        vy = np.sqrt(2.0 * potential[0] * 1.0e-12)
+    expected_state = np.array(
+        [position[0, 0], 0.0, position[0, 2], 0.0, vy, 0.0],
+        dtype=np.float64,
+    )
+
+    state = np.empty(6, dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function = library.orblib_cpp_api_orbitstart_calc_start_state
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_double(start_radius),
+        ctypes.c_double(start_theta),
+        ctypes.c_double(energy),
+        state.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(state, expected_state, rtol=0.0, atol=1e-10)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_finds_equivalent_radius_like_fortran():
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    request_radius = 1.0e13
+    expected_radius = 0.77 * request_radius
+    start_theta = 0.9
+    start_phi = 0.4
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    point = np.array(
+        [
+            [
+                expected_radius * np.sin(start_theta) * np.cos(start_phi),
+                expected_radius * np.sin(start_theta) * np.sin(start_phi),
+                expected_radius * np.cos(start_theta),
+            ],
+        ],
+        dtype=np.float64,
+    )
+    potential, _ = _expected_potential_stack_evaluation(
+        expected_setup,
+        point,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+
+    def potential_at_radius(radius_value):
+        radius_point = np.array(
+            [
+                [
+                    radius_value * np.sin(start_theta) * np.cos(start_phi),
+                    radius_value * np.sin(start_theta) * np.sin(start_phi),
+                    radius_value * np.cos(start_theta),
+                ],
+            ],
+            dtype=np.float64,
+        )
+        radius_potential, _ = _expected_potential_stack_evaluation(
+            expected_setup,
+            radius_point,
+            black_hole_mass,
+            black_hole_softening_arcsec,
+            dark_halo_profile_type,
+            dark_halo_parameters,
+        )
+        return radius_potential[0]
+
+    min_radius = 0.01 * request_radius
+    max_radius = 1.1 * request_radius
+    expected_bisection_radius = np.nan
+    expected_iterations = -1
+    for iteration in range(60001):
+        expected_bisection_radius = 0.5 * (min_radius + max_radius)
+        midpoint_potential = potential_at_radius(expected_bisection_radius)
+        if abs((potential[0] - midpoint_potential) / potential[0]) < 1.0e-7:
+            expected_iterations = iteration
+            break
+        if midpoint_potential > potential[0]:
+            min_radius = expected_bisection_radius
+        else:
+            max_radius = expected_bisection_radius
+    assert expected_iterations > 0
+
+    radius = ctypes.c_double(np.nan)
+    iterations = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function = library.orblib_cpp_api_orbitstart_find_equivalent_radius
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_double(request_radius),
+        ctypes.c_double(potential[0]),
+        ctypes.c_double(start_theta),
+        ctypes.c_double(start_phi),
+        ctypes.byref(radius),
+        ctypes.byref(iterations),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert iterations.value == expected_iterations
+    assert radius.value == pytest.approx(expected_bisection_radius, rel=0.0, abs=1e-6)
 
 
 @pytest.mark.orblib_cpp

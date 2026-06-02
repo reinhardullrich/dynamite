@@ -821,6 +821,8 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_write_losvd_histogram_file`
 - `orblib_cpp_api_write_population_mass_file`
 - `orblib_cpp_api_write_orbit_class_file`
+- `orblib_cpp_api_orbitstart_calc_start_state`
+- `orblib_cpp_api_orbitstart_find_equivalent_radius`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -1011,6 +1013,19 @@ The first actual ported Fortran kernels are:
   `read_orbit_property_file_base()`'s `reshape(..., order='F')` path. The
   test-only C ABI helper `orblib_cpp_api_write_orbit_class_file` validates the
   generated text file against that Python reader contract.
+- Direct-potential orbit-start kernels from `orbitstart_f.f90`, implemented as
+  `dynamite::orblib_cpp::calculate_orbit_start_state` and
+  `dynamite::orblib_cpp::find_equivalent_radius` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. The first preserves
+  `calc_startpos()`'s x/z placement, zero vx/vz, positive-y velocity formula,
+  and tiny fallback for negative or NaN kinetic terms. The second preserves
+  `findReq()`'s bisection range, potential comparison, `1e-7` relative
+  potential stopping rule, and 60000-iteration cap. Test-only C ABI helpers
+  `orblib_cpp_api_orbitstart_calc_start_state` and
+  `orblib_cpp_api_orbitstart_find_equivalent_radius` validate these formulas
+  against independent Python mirrors. The boundary-search routines and full
+  begin/beginbox array generation are not ported yet.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

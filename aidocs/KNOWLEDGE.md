@@ -127,6 +127,9 @@ changes from the original project.
   and `orblib_cpp/source/orbit_output.cpp` port qgrid, sparse LOSVD, and
   population-mass Fortran-record binary serialization plus formatted orbclass
   text output for files readable by the existing Python readers.
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp` port the direct-potential orbit-start
+  kernels `calc_startpos()` and `findReq()` from `orbitstart_f.f90`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -151,6 +154,8 @@ changes from the original project.
   tested the same way against the existing Python reader's record order.
   Population-mass binary output is tested through SciPy `FortranFile`, and
   orbclass text output is tested against the current Python reshape contract.
+  Orbit-start `calc_startpos()` and `findReq()` are tested against independent
+  Python mirrors of the Fortran formulas and bisection stopping rule.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -252,9 +257,10 @@ source files.
   row-range formulas, plus intrinsic qgrid boundary setup, accumulation, and
   normalization formulas, plus qgrid and sparse LOSVD binary file
   serialization, population-mass binary file serialization, and formatted
-  orbclass output writing. The legacy `interpolgrid` disk-cache contract,
-  orbit-start generation, and full orbit-engine wiring are the next unported
-  dependencies.
+  orbclass output writing, plus direct-potential orbit-start state construction
+  and equivalent-radius bisection. The legacy `interpolgrid` disk-cache
+  contract, full orbit-start boundary search/array generation, and full
+  orbit-engine wiring are the next unported dependencies.
 
 ## Separated Workspaces
 

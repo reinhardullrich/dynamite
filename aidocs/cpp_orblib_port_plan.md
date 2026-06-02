@@ -93,6 +93,8 @@ orblib_cpp_api_write_qgrid_file
 orblib_cpp_api_write_losvd_histogram_file
 orblib_cpp_api_write_population_mass_file
 orblib_cpp_api_write_orbit_class_file
+orblib_cpp_api_orbitstart_calc_start_state
+orblib_cpp_api_orbitstart_find_equivalent_radius
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -200,9 +202,16 @@ Current branch status:
   `orblib_cpp/source/orbit_output.cpp` as `write_orbit_class_file()` and
   tested against the current Python reader's `reshape(..., order='F')`
   contract.
+- Direct-potential orbit-start kernels `calc_startpos()` and `findReq()` are
+  ported in `orblib_cpp/source/orbit_start.cpp` as
+  `calculate_orbit_start_state()` and `find_equivalent_radius()`, and tested
+  against independent Python mirrors of the Fortran state construction,
+  negative-kinetic-energy fallback, bisection range, and `1e-7` relative
+  potential stopping rule.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start generation, full orbit-engine
-  wiring, and full-output orchestration still remain.
+  interpolation-grid disk caching, orbit-start boundary search/full begin-array
+  generation, full orbit-engine wiring, and full-output orchestration still
+  remain.
 
 ## DOP853 Policy
 
@@ -346,10 +355,15 @@ mixed with the first C++ parity port.
    row-range preparation, plus intrinsic qgrid boundary setup, accumulation,
    and normalization, plus qgrid and LOSVD sparse Fortran-record file
    serialization, plus population-mass binary serialization and formatted
-   orbclass output writing. Still required: legacy interpolation-grid disk
-   caching if C++ parity requires it, full-output orchestration, and
+   orbclass output writing, plus direct-potential orbit-start state
+   construction and equivalent-radius bisection. Still required: legacy
+   interpolation-grid disk caching if C++ parity requires it, full orbit-start
+   boundary search/array generation, full-output orchestration, and
    Fortran-value parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
+   Direct-potential `calc_startpos()` and `findReq()` kernels are done; inner
+   boundary, outer boundary, tube-width, orbit-type probing, box startpoint,
+   and full begin/beginbox array generation still remain.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
    standalone classification/moment kernel are done; full one-orbit parity

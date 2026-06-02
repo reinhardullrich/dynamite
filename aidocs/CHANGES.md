@@ -398,3 +398,16 @@ This file is append-only. Add new entries at the bottom.
   `reshape(..., order='F')` reader contract. Remaining C++ gaps now include
   interpolation-grid disk caching if required for parity, orbit-start
   generation, and full orbit-engine wiring.
+- Ported the direct-potential orbit-start `calc_startpos()` and `findReq()`
+  kernels from `orbitstart_f.f90` into C++ as
+  `dynamite::orblib_cpp::calculate_orbit_start_state` and
+  `dynamite::orblib_cpp::find_equivalent_radius` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_orbitstart_calc_start_state` and
+  `orblib_cpp_api_orbitstart_find_equivalent_radius` with opt-in pytest
+  coverage for x/z start placement, positive-y velocity construction,
+  negative-kinetic-energy fallback, and the Fortran bisection stopping rule.
+  Remaining C++ gaps now include interpolation-grid disk caching if required
+  for parity, full orbit-start boundary search/array generation, and full
+  orbit-engine wiring.
