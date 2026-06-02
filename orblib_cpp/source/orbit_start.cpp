@@ -1,14 +1,188 @@
 #include "orbit_start.hpp"
 
+#include "dop853.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <cmath>
+#include <limits>
 
 namespace dynamite::orblib_cpp {
 
 namespace {
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
+
+struct TubeWidthRhsContext {
+    InterpolatedPotential* potential = nullptr;
+    bool failed = false;
+};
+
+struct TubeWidthObserverContext {
+    int plane_index = 0;
+    int crossing_capacity = 0;
+    int crossing_count = 0;
+    double crossing_tolerance_radius = 0.0;
+    double previous_plane_value = 0.0;
+    double min_projected_radius = std::numeric_limits<double>::infinity();
+    double max_projected_radius = -std::numeric_limits<double>::infinity();
+    double* crossing_positions = nullptr;
+};
+
+void tube_width_rhs(
+    int n,
+    double,
+    const double* y,
+    double* dydx,
+    void* context
+) noexcept {
+    auto* rhs_context = static_cast<TubeWidthRhsContext*>(context);
+    if (n != 6 || rhs_context == nullptr || rhs_context->potential == nullptr) {
+        if (rhs_context != nullptr) {
+            rhs_context->failed = true;
+        }
+        for (int i = 0; i < n; ++i) {
+            dydx[i] = 0.0;
+        }
+        return;
+    }
+
+    dydx[0] = y[3];
+    dydx[1] = y[4];
+    dydx[2] = y[5];
+    if (!rhs_context->potential->evaluate_acceleration(
+            y[0],
+            y[1],
+            y[2],
+            dydx[3],
+            dydx[4],
+            dydx[5]
+        )) {
+        rhs_context->failed = true;
+        dydx[3] = 0.0;
+        dydx[4] = 0.0;
+        dydx[5] = 0.0;
+    }
+}
+
+double projected_radius_for_plane(const double* position, int plane_index) noexcept {
+    if (plane_index == 0) {
+        return std::sqrt(position[1] * position[1] + position[2] * position[2]);
+    }
+    if (plane_index == 1) {
+        return std::sqrt(position[0] * position[0] + position[2] * position[2]);
+    }
+    return std::sqrt(position[0] * position[0] + position[1] * position[1]);
+}
+
+int tube_width_observer(
+    int nr,
+    double x_old,
+    double x,
+    const double* y,
+    int,
+    const Dop853& solver,
+    void* context
+) noexcept {
+    auto* observer = static_cast<TubeWidthObserverContext*>(context);
+    if (observer == nullptr) {
+        return -1;
+    }
+    if (nr == 1) {
+        observer->crossing_count = 0;
+        observer->previous_plane_value = y[observer->plane_index];
+        return 1;
+    }
+    if (observer->crossing_count >= observer->crossing_capacity) {
+        return -1;
+    }
+
+    const double current_plane_value = y[observer->plane_index];
+    if (current_plane_value * observer->previous_plane_value < 0.0) {
+        double x_max = current_plane_value > 0.0 ? x : x_old;
+        double x_min = current_plane_value > 0.0 ? x_old : x;
+        double x_mid = 0.5 * (x_min + x_max);
+        int bisection_count = 0;
+        for (;;) {
+            x_mid = 0.5 * (x_min + x_max);
+            const double y_mid = solver.dense_value(observer->plane_index, x_mid);
+            bisection_count += 1;
+            if (std::abs(y_mid) < observer->crossing_tolerance_radius * 1.0e-4 ||
+                bisection_count > 40) {
+                break;
+            }
+            if (y_mid < 0.0) {
+                x_min = x_mid;
+            } else {
+                x_max = x_mid;
+            }
+        }
+        if (bisection_count < 40) {
+            double position[3] = {
+                solver.dense_value(0, x_mid),
+                solver.dense_value(1, x_mid),
+                solver.dense_value(2, x_mid),
+            };
+            const int crossing_index = observer->crossing_count;
+            if (observer->crossing_positions != nullptr) {
+                const int offset = crossing_index * 3;
+                observer->crossing_positions[offset] = position[0];
+                observer->crossing_positions[offset + 1] = position[1];
+                observer->crossing_positions[offset + 2] = position[2];
+            }
+            const double projected_radius = projected_radius_for_plane(position, observer->plane_index);
+            observer->min_projected_radius =
+                std::min(observer->min_projected_radius, projected_radius);
+            observer->max_projected_radius =
+                std::max(observer->max_projected_radius, projected_radius);
+            observer->crossing_count += 1;
+            if (observer->crossing_count >= observer->crossing_capacity) {
+                observer->previous_plane_value = current_plane_value;
+                return -1;
+            }
+        }
+    }
+
+    observer->previous_plane_value = current_plane_value;
+    return 1;
+}
+
+bool calculate_interpolated_orbit_start_state(
+    InterpolatedPotential& potential,
+    double radius,
+    double theta,
+    double energy,
+    double* state
+) noexcept {
+    if (state == nullptr || radius < 0.0 || !std::isfinite(radius) ||
+        !std::isfinite(theta) || !std::isfinite(energy)) {
+        return false;
+    }
+
+    state[0] = radius * std::sin(theta);
+    state[1] = 0.0;
+    state[2] = radius * std::cos(theta);
+    state[3] = 0.0;
+    state[4] = 0.0;
+    state[5] = 0.0;
+
+    double potential_value = 0.0;
+    if (!potential.evaluate_potential(state[0], state[1], state[2], potential_value)) {
+        return false;
+    }
+    double vy = 2.0 * (potential_value - energy);
+    if (vy >= 1.0e-300) {
+        vy = std::sqrt(vy);
+    }
+    if (vy < 0.0 || std::isnan(vy)) {
+        vy = std::sqrt(2.0 * potential_value * 1.0e-12);
+    }
+    if (!std::isfinite(vy)) {
+        return false;
+    }
+    state[4] = vy;
+    return true;
+}
 
 }  // namespace
 
@@ -435,6 +609,78 @@ bool build_tube_start_records(
         }
     }
     return true;
+}
+
+bool measure_tube_orbit_width(
+    InterpolatedPotential& potential,
+    double radius,
+    double theta,
+    double energy,
+    double circular_period,
+    int plane,
+    double integrator_accuracy,
+    int crossing_capacity,
+    double* crossing_positions,
+    double& width,
+    int& crossing_count,
+    int& solver_status,
+    int& function_evaluations
+) noexcept {
+    width = 0.0;
+    crossing_count = 0;
+    solver_status = 0;
+    function_evaluations = 0;
+    if (radius <= 0.0 || circular_period <= 0.0 || integrator_accuracy <= 0.0 ||
+        crossing_capacity <= 0 || plane < 1 || plane > 3 || !std::isfinite(radius) ||
+        !std::isfinite(theta) || !std::isfinite(energy) || !std::isfinite(circular_period)) {
+        return false;
+    }
+
+    double state[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    if (!calculate_interpolated_orbit_start_state(potential, radius, theta, energy, state)) {
+        return false;
+    }
+
+    TubeWidthRhsContext rhs_context;
+    rhs_context.potential = &potential;
+
+    TubeWidthObserverContext observer;
+    observer.plane_index = plane - 1;
+    observer.crossing_capacity = crossing_capacity;
+    observer.crossing_tolerance_radius = radius;
+    observer.crossing_positions = crossing_positions;
+
+    Dop853Options options;
+    options.rtol = integrator_accuracy;
+    options.atol = 1.0e-8;
+    options.max_steps = 100000000;
+    options.stiffness_check_interval = -1;
+    options.dense_components = 3;
+
+    double time = 0.0;
+    const double end_time = 500.0 * static_cast<double>(crossing_capacity) * circular_period;
+    Dop853 solver;
+    const Dop853Result result = solver.integrate(
+        6,
+        time,
+        state,
+        end_time,
+        tube_width_rhs,
+        &rhs_context,
+        options,
+        tube_width_observer,
+        &observer
+    );
+
+    solver_status = result.status;
+    function_evaluations = result.function_evaluations;
+    crossing_count = observer.crossing_count;
+    if (rhs_context.failed || crossing_count <= 0 || !std::isfinite(observer.min_projected_radius) ||
+        !std::isfinite(observer.max_projected_radius)) {
+        return false;
+    }
+    width = observer.max_projected_radius - observer.min_projected_radius;
+    return result.status == 1 || result.status == 2;
 }
 
 }  // namespace dynamite::orblib_cpp

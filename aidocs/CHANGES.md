@@ -466,3 +466,16 @@ This file is append-only. Add new entries at the bottom.
   negated `vy`. Remaining C++ gaps now include interpolation-grid disk caching
   if required for parity, orbit-start boundary search/runtime orchestration,
   full orbit-engine wiring, and full-output orchestration.
+- Ported the DOP853 plane-crossing sampler and projected-radius width
+  calculation from `findtubeorbitwidth()` into C++ as
+  `dynamite::orblib_cpp::measure_tube_orbit_width` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_tube_orbit_width` with opt-in pytest coverage
+  against an independent SciPy DOP853 stepper for a direct black-hole orbit,
+  including Fortran's `SOLOUTOB` sign-change detection, dense-output crossing
+  bisection, `R*1e-4` crossing tolerance, crossing-buffer early interruption,
+  and width calculation from projected crossing radii. Remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, `findtube()`
+  golden-section minimization, orbit-start boundary search/runtime
+  orchestration, full orbit-engine wiring, and full-output orchestration.

@@ -221,6 +221,14 @@ Current branch status:
   tests cover Fortran loop order, irregular-energy boundary replacement,
   nearly closed-boundary radius sampling, exact noreg flag propagation, and
   retrograde flag/value parity.
+- The DOP853 crossing-sampling and projected-radius width calculation from
+  `findtubeorbitwidth()` is ported as `measure_tube_orbit_width()`, using the
+  in-memory `InterpolatedPotential` acceleration path, Fortran's
+  `500*intsteps*tcirc` nominal end time, early interruption when the crossing
+  buffer is full, the `SOLOUTOB` sign-change test, 40-step dense-output
+  crossing bisection, and the `R*1e-4` crossing tolerance. ABI tests compare
+  the projected crossing radii and width against an independent SciPy DOP853
+  stepper for a direct black-hole orbit.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
   `find_equivalent_radius()` and testing the Fortran one-based
@@ -233,9 +241,9 @@ Current branch status:
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start boundary search/runtime
-  orchestration, full orbit-engine wiring, and full-output orchestration still
-  remain.
+  interpolation-grid disk caching, `findtube()` golden-section minimization,
+  orbit-start boundary search/runtime orchestration, full orbit-engine wiring,
+  and full-output orchestration still remain.
 
 ## Known Fortran Parity Notes To Revisit
 

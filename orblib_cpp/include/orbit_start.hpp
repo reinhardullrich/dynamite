@@ -1,5 +1,6 @@
 #pragma once
 
+#include "interpolated_potential.hpp"
 #include "potential.hpp"
 
 namespace dynamite::orblib_cpp {
@@ -108,6 +109,22 @@ bool build_box_start_records(
     double* records,
     int* noreg_flags,
     int* iterations
+) noexcept;
+
+bool measure_tube_orbit_width(
+    InterpolatedPotential& potential,
+    double radius,
+    double theta,
+    double energy,
+    double circular_period,
+    int plane,
+    double integrator_accuracy,
+    int crossing_capacity,
+    double* crossing_positions,
+    double& width,
+    int& crossing_count,
+    int& solver_status,
+    int& function_evaluations
 ) noexcept;
 
 }  // namespace dynamite::orblib_cpp

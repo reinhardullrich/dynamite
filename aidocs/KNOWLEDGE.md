@@ -133,7 +133,9 @@ changes from the original project.
   the unregularized-grid, tube-start radius/noreg scheduling, begin-record,
   and retrograde beginbox loops from `find_unregorbits()` and
   `make_startpoints()`, and the per-record plus flattened-array angular-grid
-  construction from `make_boxstartpoints()`.
+  construction from `make_boxstartpoints()`. It also ports the DOP853
+  plane-crossing sampler and projected-radius width calculation from
+  `findtubeorbitwidth()`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -161,8 +163,8 @@ changes from the original project.
   Orbit-start `calc_startpos()`, `findReq()`, unregularized-grid, tube-start
   schedule/record/retrograde, and box-start record/array kernels are tested
   against independent Python mirrors of the Fortran formulas, angular grid,
-  loop order, sampling fractions, flag propagation, and bisection stopping
-  rule.
+  loop order, sampling fractions, flag propagation, crossing bisection, and
+  bisection stopping rule.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -267,10 +269,11 @@ source files.
   orbclass output writing, plus direct-potential orbit-start state
   construction, equivalent-radius bisection, unregularized-grid construction,
   tube-start radius/noreg scheduling plus begin/retrograde record-array
-  construction, and box-start single-record and flattened-array construction.
-  The legacy `interpolgrid` disk-cache contract, full orbit-start boundary
-  search, runtime orbit-start orchestration, and full orbit-engine wiring are
-  the next unported dependencies. A known parity note is recorded
+  construction, box-start single-record and flattened-array construction, and
+  tube-orbit DOP853 crossing-width measurement. The legacy `interpolgrid`
+  disk-cache contract, `findtube()` golden-section search, full orbit-start
+  boundary search, runtime orbit-start orchestration, and full orbit-engine
+  wiring are the next unported dependencies. A known parity note is recorded
   in `aidocs/cpp_orblib_port_plan.md`: Fortran `make_startpoints()` comments
   describe a "last irregular energy" noreg rule, but the code uses
   `maxval(irregular(:)) .eq. i`, which flags energy index 1 when any

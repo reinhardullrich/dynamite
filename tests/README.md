@@ -85,7 +85,8 @@ Current coverage:
   independent Python mirrors of the Fortran formulas, plus unregularized-grid,
   tube-start radius/noreg schedule, tube-start begin/retrograde records, and
   box-start record/array validation against Python mirrors of the Fortran loop
-  order, angular grid, and flag rules;
+  order, angular grid, and flag rules, plus tube-width crossing measurement
+  validation against an independent SciPy DOP853 stepper;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

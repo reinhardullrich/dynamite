@@ -4058,6 +4058,219 @@ def test_orblib_cpp_orbitstart_tube_records_match_fortran_loop_and_retrograde():
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_tube_orbit_width_matches_python_dop853_crossings():
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.0
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = 18.0
+    rlogmax = 19.0
+    radius = 1.0e13
+    start_theta = 0.73
+    plane = 2
+    integrator_accuracy = 1.0e-10
+    crossing_capacity = 6
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    position = np.array(
+        [[radius * np.sin(start_theta), 0.0, radius * np.cos(start_theta)]],
+        dtype=np.float64,
+    )
+    potential, _ = _expected_potential_stack_evaluation(
+        expected_setup,
+        position,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    energy = 0.45 * potential[0]
+    initial_state = np.array(
+        [
+            position[0, 0],
+            0.0,
+            position[0, 2],
+            0.0,
+            np.sqrt(2.0 * (potential[0] - energy)),
+            0.0,
+        ],
+        dtype=np.float64,
+    )
+    circular_velocity = np.sqrt(GRAV_CONST_KM * black_hole_mass / radius)
+    circular_period = 2.0 * np.pi * radius / circular_velocity
+    plane_index = plane - 1
+
+    def rhs(_, state):
+        pos = state[:3]
+        softened_radius_squared = np.dot(pos, pos)
+        acceleration = (
+            -GRAV_CONST_KM
+            * black_hole_mass
+            * pos
+            / (softened_radius_squared * np.sqrt(softened_radius_squared))
+        )
+        derivative = np.empty(6, dtype=np.float64)
+        derivative[:3] = state[3:]
+        derivative[3:] = acceleration
+        return derivative
+
+    solver = scipy.integrate.DOP853(
+        rhs,
+        0.0,
+        initial_state,
+        500.0 * crossing_capacity * circular_period,
+        rtol=integrator_accuracy,
+        atol=1.0e-8,
+    )
+    previous_plane_value = initial_state[plane_index]
+    expected_positions = []
+    for _ in range(100000):
+        if solver.status != "running" or len(expected_positions) >= crossing_capacity:
+            break
+        x_old = solver.t
+        solver.step()
+        x = solver.t
+        dense = solver.dense_output()
+        current_plane_value = solver.y[plane_index]
+        if current_plane_value * previous_plane_value < 0.0:
+            if current_plane_value > 0.0:
+                x_max = x
+                x_min = x_old
+            else:
+                x_max = x_old
+                x_min = x
+            x_mid = 0.5 * (x_min + x_max)
+            bisection_count = 0
+            while True:
+                x_mid = 0.5 * (x_min + x_max)
+                y_mid = dense(x_mid)[plane_index]
+                bisection_count += 1
+                if abs(y_mid) < radius * 1.0e-4 or bisection_count > 40:
+                    break
+                if y_mid < 0.0:
+                    x_min = x_mid
+                else:
+                    x_max = x_mid
+            if bisection_count < 40:
+                expected_positions.append(dense(x_mid)[:3])
+        previous_plane_value = current_plane_value
+    expected_positions = np.asarray(expected_positions, dtype=np.float64)
+    assert expected_positions.shape == (crossing_capacity, 3)
+    expected_projected = np.sqrt(expected_positions[:, 0] ** 2 + expected_positions[:, 2] ** 2)
+    expected_width = np.max(expected_projected) - np.min(expected_projected)
+
+    crossing_positions = np.empty((crossing_capacity, 3), dtype=np.float64)
+    width = ctypes.c_double(np.nan)
+    crossing_count = ctypes.c_int(-1)
+    solver_status = ctypes.c_int(-1)
+    function_evaluations = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function = library.orblib_cpp_api_orbitstart_tube_orbit_width
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_double(radius),
+        ctypes.c_double(start_theta),
+        ctypes.c_double(energy),
+        ctypes.c_double(circular_period),
+        ctypes.c_int(plane),
+        ctypes.c_double(integrator_accuracy),
+        ctypes.c_int(crossing_capacity),
+        crossing_positions.ctypes.data_as(double_p),
+        ctypes.byref(width),
+        ctypes.byref(crossing_count),
+        ctypes.byref(solver_status),
+        ctypes.byref(function_evaluations),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert crossing_count.value == crossing_capacity
+    assert solver_status.value == 2
+    assert function_evaluations.value > 0
+    np.testing.assert_allclose(crossing_positions[:, [0, 2]], expected_positions[:, [0, 2]], rtol=2e-5, atol=2e8)
+    assert np.max(np.abs(crossing_positions[:, plane_index])) < radius * 2.0e-4
+    assert width.value == pytest.approx(expected_width, rel=2e-5, abs=2e8)
+
+
+@pytest.mark.orblib_cpp
 @pytest.mark.parametrize("omega", [0.0, 1.5e-16])
 def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
     surf_pc = np.array([0.0], dtype=np.float64)
