@@ -811,6 +811,9 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_find_boxed_aperture_pixels`
 - `orblib_cpp_api_losvd_velocity_bins`
 - `orblib_cpp_api_accumulate_losvd_histogram`
+- `orblib_cpp_api_collapse_losvd_binning`
+- `orblib_cpp_api_normalize_losvd_histogram`
+- `orblib_cpp_api_sparse_losvd_ranges`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -944,8 +947,21 @@ The first actual ported Fortran kernels are:
   normalization counter increment. Test-only C ABI helpers
   `orblib_cpp_api_losvd_velocity_bins` and
   `orblib_cpp_api_accumulate_losvd_histogram` validate those rules against
-  Python mirrors of the Fortran formulas. Bin-order collapsing, normalization,
-  sparse binary LOSVD output, and full orbit-engine wiring remain unported.
+  Python mirrors of the Fortran formulas.
+- LOSVD bin-order collapsing, normalization, and sparse row-range preparation
+  from `binning_add_it_up()`, `histogram_write()`, and
+  `histogram_write_compat_sparse()` in `orblib_f_new_mirror.f90`, implemented
+  as `dynamite::orblib_cpp::collapse_losvd_binning`,
+  `dynamite::orblib_cpp::normalize_losvd_histogram`, and
+  `dynamite::orblib_cpp::compute_sparse_losvd_ranges`. The port preserves
+  bin-order `0` discard behavior, many-to-one aperture-bin summation,
+  reciprocal normalization for positive stored counts, zeroing for nonpositive
+  stored counts, and the Fortran sparse begin/end velocity-offset convention.
+  Test-only C ABI helpers `orblib_cpp_api_collapse_losvd_binning`,
+  `orblib_cpp_api_normalize_losvd_histogram`, and
+  `orblib_cpp_api_sparse_losvd_ranges` validate the memory-side preparation.
+  Actual binary LOSVD file serialization and full orbit-engine wiring remain
+  unported.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

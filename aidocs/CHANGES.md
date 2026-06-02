@@ -337,3 +337,18 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, orbit-start
   generation, LOSVD bin-order normalization/output, qgrid accumulation, and
   binary output writing.
+- Ported the Fortran LOSVD bin-order collapse, normalization, and sparse
+  row-range preparation formulas from `binning_add_it_up()`,
+  `histogram_write()`, and `histogram_write_compat_sparse()` into
+  `orblib_cpp/source/orbit_histogram.cpp` as
+  `dynamite::orblib_cpp::collapse_losvd_binning`,
+  `dynamite::orblib_cpp::normalize_losvd_histogram`, and
+  `dynamite::orblib_cpp::compute_sparse_losvd_ranges`. Added test-only ABI
+  helpers `orblib_cpp_api_collapse_losvd_binning`,
+  `orblib_cpp_api_normalize_losvd_histogram`, and
+  `orblib_cpp_api_sparse_losvd_ranges` with opt-in pytest coverage for
+  bin-order `0` discard, many-to-one bin summation, normalization, sparse
+  begin/end offsets, and empty-row sentinels. Remaining C++ gaps now include
+  interpolation-grid disk caching if required for parity, orbit-start
+  generation, qgrid accumulation, full orbit-engine wiring, and binary output
+  writing.

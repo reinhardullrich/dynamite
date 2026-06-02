@@ -116,8 +116,10 @@ changes from the original project.
   lookup formula from `aperture_boxed_find()`.
   `orblib_cpp/include/orbit_histogram.hpp` and
   `orblib_cpp/source/orbit_histogram.cpp` port the Fortran LOSVD velocity bin
-  mapping and per-aperture histogram accumulation formulas from
-  `histogram_velbin()` and `histogram_store()`.
+  mapping, per-aperture histogram accumulation, bin-order collapse,
+  normalization, and sparse row-range formulas from `histogram_velbin()`,
+  `histogram_store()`, `binning_add_it_up()`, and
+  `histogram_write_compat_sparse()`.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -132,7 +134,9 @@ changes from the original project.
   tested against a Python mirror of the Fortran strict-bound and 1-based pixel
   flattening formula. LOSVD velocity-bin mapping and histogram accumulation
   are tested against Python mirrors of the Fortran clamp, strict-bound, zero
-  aperture-pixel, and normalization-counter behavior.
+  aperture-pixel, and normalization-counter behavior. LOSVD bin-order
+  collapse, normalization, and sparse row-range preparation are tested against
+  Python mirrors of the Fortran writer-preparation formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -229,11 +233,11 @@ source files.
   barred-frame integration, and a single-orbit DOP853 final-state integration
   helper with prescribed dense-output sample extraction using that RHS, plus
   the orbit classification, moment, projection, LOS-velocity, PSF convolution,
-  boxed-aperture pixel lookup, LOSVD velocity-bin mapping, and per-aperture
-  histogram accumulation formulas. The legacy `interpolgrid` disk-cache
-  contract, orbit-start generation, LOSVD bin-order normalization/output,
-  qgrid accumulation, and binary output writing are the next unported
-  dependencies.
+  boxed-aperture pixel lookup, LOSVD velocity-bin mapping, per-aperture
+  histogram accumulation, bin-order collapse, normalization, and sparse
+  row-range formulas. The legacy `interpolgrid` disk-cache contract,
+  orbit-start generation, qgrid accumulation, full orbit-engine wiring, and
+  binary output writing are the next unported dependencies.
 
 ## Separated Workspaces
 

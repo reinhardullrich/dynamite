@@ -22,4 +22,28 @@ bool accumulate_losvd_histogram(
     double* stored_count
 ) noexcept;
 
+bool collapse_losvd_binning(
+    int source_pixel_count,
+    int velocity_bin_count,
+    int target_pixel_count,
+    const int* bin_order,
+    const double* source_histogram,
+    double* target_histogram
+) noexcept;
+
+bool normalize_losvd_histogram(
+    int pixel_count,
+    int velocity_bin_count,
+    double stored_count,
+    double* histogram
+) noexcept;
+
+bool compute_sparse_losvd_ranges(
+    int pixel_count,
+    int velocity_bin_count,
+    const double* histogram,
+    int* begin_offsets,
+    int* end_offsets
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

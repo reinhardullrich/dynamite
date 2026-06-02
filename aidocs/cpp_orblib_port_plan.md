@@ -83,6 +83,9 @@ orblib_cpp_api_apply_psf
 orblib_cpp_api_find_boxed_aperture_pixels
 orblib_cpp_api_losvd_velocity_bins
 orblib_cpp_api_accumulate_losvd_histogram
+orblib_cpp_api_collapse_losvd_binning
+orblib_cpp_api_normalize_losvd_histogram
+orblib_cpp_api_sparse_losvd_ranges
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -162,12 +165,18 @@ Current branch status:
   ported as `dynamite::orblib_cpp::map_losvd_velocity_bins` and
   `dynamite::orblib_cpp::accumulate_losvd_histogram`, and tested against
   Python mirrors of the Fortran `histogram_velbin()` and `histogram_store()`
-  formulas. Bin-order collapsing, normalization, sparse binary LOSVD output,
-  and full orbit-engine wiring are not part of this helper.
+  formulas.
+- LOSVD bin-order collapse, normalization, and sparse row-range preparation are
+  ported as `dynamite::orblib_cpp::collapse_losvd_binning`,
+  `dynamite::orblib_cpp::normalize_losvd_histogram`, and
+  `dynamite::orblib_cpp::compute_sparse_losvd_ranges`, and tested against
+  Python mirrors of the Fortran `binning_add_it_up()`, `histogram_write()`,
+  and `histogram_write_compat_sparse()` preparation formulas. Actual binary
+  LOSVD file serialization and full orbit-engine wiring are not part of this
+  helper.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start generation, LOSVD bin-order
-  normalization/output, qgrid accumulation, and binary output writing still
-  remain.
+  interpolation-grid disk caching, orbit-start generation, qgrid accumulation,
+  full orbit-engine wiring, and binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -307,9 +316,10 @@ mixed with the first C++ parity port.
    sample extraction using that RHS, plus orbit classification, moment
    calculation, projection, LOS-velocity calculation, PSF convolution, and
    boxed aperture mapping, plus LOSVD velocity-bin mapping and per-aperture
-   histogram accumulation. Still required: legacy interpolation-grid disk
-   caching if C++ parity requires it, bin-order/output wiring, qgrid
-   accumulation, and Fortran-value parity tests for full orbit integration.
+   histogram accumulation, bin-order collapse, normalization, and sparse
+   row-range preparation. Still required: legacy interpolation-grid disk
+   caching if C++ parity requires it, binary output wiring, qgrid accumulation,
+   and Fortran-value parity tests for full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
@@ -318,8 +328,8 @@ mixed with the first C++ parity port.
 8. Port aperture, histogram, qgrid, and output writing.
    Per-symmetry projection, LOS velocity, PSF convolution, and boxed aperture
    mapping are done, and the LOSVD velocity-bin plus per-aperture histogram
-   accumulation core is done; bin-order normalization/output, qgrid
-   accumulation, and output writing still remain.
+   accumulation core plus memory-side sparse row preparation are done; qgrid
+   accumulation and output writing still remain.
 9. Run full generated LOSVD parity against
    `comparison_losvd_shared_library.npz`.
 10. Only after correctness, benchmark and optimize memory layout, branching,

@@ -897,6 +897,96 @@ extern "C" void orblib_cpp_api_accumulate_losvd_histogram(
     }
 }
 
+extern "C" void orblib_cpp_api_collapse_losvd_binning(
+    int source_pixel_count,
+    int velocity_bin_count,
+    int target_pixel_count,
+    const int* bin_order,
+    const double* source_histogram,
+    double* target_histogram,
+    int* status
+) noexcept {
+    if (bin_order == nullptr || source_histogram == nullptr || target_histogram == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::collapse_losvd_binning(
+                source_pixel_count,
+                velocity_bin_count,
+                target_pixel_count,
+                bin_order,
+                source_histogram,
+                target_histogram
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_normalize_losvd_histogram(
+    int pixel_count,
+    int velocity_bin_count,
+    double stored_count,
+    double* histogram,
+    int* status
+) noexcept {
+    if (histogram == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::normalize_losvd_histogram(
+                pixel_count,
+                velocity_bin_count,
+                stored_count,
+                histogram
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_sparse_losvd_ranges(
+    int pixel_count,
+    int velocity_bin_count,
+    const double* histogram,
+    int* begin_offsets,
+    int* end_offsets,
+    int* status
+) noexcept {
+    if (histogram == nullptr || begin_offsets == nullptr || end_offsets == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::compute_sparse_losvd_ranges(
+                pixel_count,
+                velocity_bin_count,
+                histogram,
+                begin_offsets,
+                end_offsets
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_integrate_orbit_final_state(
     int ngauss,
     const double* surf_pc,

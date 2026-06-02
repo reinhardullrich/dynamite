@@ -988,6 +988,32 @@ def _expected_losvd_histogram(aperture_pixels, velocity_bins, aperture_pixel_cou
     return histogram
 
 
+def _expected_collapsed_losvd_histogram(source_histogram, bin_order, target_pixel_count):
+    collapsed = np.zeros((target_pixel_count, source_histogram.shape[1]), dtype=np.float64)
+    for source_index, target in enumerate(bin_order):
+        if target != 0:
+            collapsed[target - 1] += source_histogram[source_index]
+    return collapsed
+
+
+def _expected_sparse_losvd_ranges(histogram):
+    velocity_bin_count = histogram.shape[1]
+    center_bin = int(velocity_bin_count / 2.0 + 1.0)
+    begin_offsets = np.empty(histogram.shape[0], dtype=np.int32)
+    end_offsets = np.empty(histogram.shape[0], dtype=np.int32)
+    for row_index, row in enumerate(histogram):
+        nonzero = np.flatnonzero(row > 0.0) + 1
+        if nonzero.size == 0:
+            begin = 2 * velocity_bin_count
+            end = -2 * velocity_bin_count
+        else:
+            begin = int(nonzero.min())
+            end = int(nonzero.max())
+        begin_offsets[row_index] = begin - center_bin
+        end_offsets[row_index] = end - center_bin
+    return begin_offsets, end_offsets
+
+
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
     rmin2 = (np.min(setup["sigobs_km"]) / 10.0) ** 2
     rmax2 = (np.max(setup["sigintr_km"]) * 6.0) ** 2
@@ -2427,6 +2453,138 @@ def test_orblib_cpp_accumulates_losvd_histogram_like_fortran():
     assert status.value == 0
     assert stored_count.value == pytest.approx(3.5 + aperture_pixels.size)
     np.testing.assert_array_equal(histogram, expected_histogram)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_prepares_sparse_losvd_rows_like_fortran():
+    source_histogram = np.ascontiguousarray(
+        [
+            [0.0, 2.0, 0.0, 0.0, 1.0],
+            [1.0, 0.0, 3.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 0.0],
+            [4.0, 0.0, 0.0, 5.0, 0.0],
+            [0.0, 6.0, 0.0, 0.0, 0.0],
+            [7.0, 0.0, 0.0, 0.0, 8.0],
+        ],
+        dtype=np.float64,
+    )
+    bin_order = np.ascontiguousarray([1, 2, 0, 2, 3, 1], dtype=np.int32)
+    target_pixel_count = 3
+    velocity_bin_count = source_histogram.shape[1]
+    stored_count = 20.0
+    expected_collapsed = _expected_collapsed_losvd_histogram(
+        source_histogram,
+        bin_order,
+        target_pixel_count,
+    )
+    expected_normalized = expected_collapsed / stored_count
+    expected_begin, expected_end = _expected_sparse_losvd_ranges(expected_normalized)
+    np.testing.assert_array_equal(
+        expected_collapsed,
+        np.array(
+            [
+                [7.0, 2.0, 0.0, 0.0, 9.0],
+                [5.0, 0.0, 3.0, 5.0, 0.0],
+                [0.0, 6.0, 0.0, 0.0, 0.0],
+            ],
+            dtype=np.float64,
+        ),
+    )
+    np.testing.assert_array_equal(expected_begin, np.array([-2, -2, -1], dtype=np.int32))
+    np.testing.assert_array_equal(expected_end, np.array([2, 1, -1], dtype=np.int32))
+
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    status = ctypes.c_int(-999)
+
+    collapsed = np.full((target_pixel_count, velocity_bin_count), np.nan, dtype=np.float64)
+    collapse_function = library.orblib_cpp_api_collapse_losvd_binning
+    collapse_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        int_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    collapse_function.restype = None
+    collapse_function(
+        ctypes.c_int(source_histogram.shape[0]),
+        ctypes.c_int(velocity_bin_count),
+        ctypes.c_int(target_pixel_count),
+        bin_order.ctypes.data_as(int_p),
+        source_histogram.ctypes.data_as(double_p),
+        collapsed.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(collapsed, expected_collapsed)
+
+    normalize_function = library.orblib_cpp_api_normalize_losvd_histogram
+    normalize_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    normalize_function.restype = None
+    status.value = -999
+    normalize_function(
+        ctypes.c_int(target_pixel_count),
+        ctypes.c_int(velocity_bin_count),
+        ctypes.c_double(stored_count),
+        collapsed.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(collapsed, expected_normalized, rtol=0.0, atol=1e-15)
+
+    begin_offsets = np.full(target_pixel_count, 999, dtype=np.int32)
+    end_offsets = np.full(target_pixel_count, 999, dtype=np.int32)
+    sparse_function = library.orblib_cpp_api_sparse_losvd_ranges
+    sparse_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        int_p,
+        int_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    sparse_function.restype = None
+    status.value = -999
+    sparse_function(
+        ctypes.c_int(target_pixel_count),
+        ctypes.c_int(velocity_bin_count),
+        collapsed.ctypes.data_as(double_p),
+        begin_offsets.ctypes.data_as(int_p),
+        end_offsets.ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(begin_offsets, expected_begin)
+    np.testing.assert_array_equal(end_offsets, expected_end)
+
+    empty_histogram = np.zeros((1, velocity_bin_count), dtype=np.float64)
+    expected_empty_begin, expected_empty_end = _expected_sparse_losvd_ranges(empty_histogram)
+    status.value = -999
+    sparse_function(
+        ctypes.c_int(1),
+        ctypes.c_int(velocity_bin_count),
+        empty_histogram.ctypes.data_as(double_p),
+        begin_offsets[:1].ctypes.data_as(int_p),
+        end_offsets[:1].ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(begin_offsets[:1], expected_empty_begin)
+    np.testing.assert_array_equal(end_offsets[:1], expected_empty_end)
 
 
 @pytest.mark.orblib_cpp
