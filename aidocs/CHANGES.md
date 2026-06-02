@@ -411,3 +411,17 @@ This file is append-only. Add new entries at the bottom.
   Remaining C++ gaps now include interpolation-grid disk caching if required
   for parity, full orbit-start boundary search/array generation, and full
   orbit-engine wiring.
+- Ported the pure orbit-start scheduling kernels `find_unregorbits()` and the
+  radius/noreg part of `make_startpoints()` from `orbitstart_f.f90` into C++
+  as `dynamite::orblib_cpp::compute_unregularized_orbit_grid` and
+  `dynamite::orblib_cpp::compute_tube_start_schedule` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_orbitstart_unregularized_grid` and
+  `orblib_cpp_api_orbitstart_tube_schedule` with opt-in pytest coverage for
+  the reverse `nI2` propagation scan, irregular-energy boundary replacement,
+  nearly closed-boundary radius sampling, and the exact Fortran
+  `maxval(irregular) == i` noreg flag condition. Remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, full
+  orbit-start boundary search/state-array generation, and full orbit-engine
+  wiring.

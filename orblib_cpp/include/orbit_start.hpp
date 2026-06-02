@@ -28,4 +28,26 @@ bool find_equivalent_radius(
     int& iterations
 ) noexcept;
 
+bool compute_unregularized_orbit_grid(
+    int energy_count,
+    int i2_count,
+    const double* outer_boundaries,
+    const double* middle_boundaries,
+    const int* irregular,
+    int* noreg_grid
+) noexcept;
+
+bool compute_tube_start_schedule(
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* middle_boundaries,
+    const double* outer_boundaries,
+    const int* irregular,
+    const int* noreg_grid,
+    double* start_radii,
+    int* noreg_flags
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

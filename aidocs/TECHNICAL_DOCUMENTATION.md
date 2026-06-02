@@ -1024,8 +1024,14 @@ The first actual ported Fortran kernels are:
   potential stopping rule, and 60000-iteration cap. Test-only C ABI helpers
   `orblib_cpp_api_orbitstart_calc_start_state` and
   `orblib_cpp_api_orbitstart_find_equivalent_radius` validate these formulas
-  against independent Python mirrors. The boundary-search routines and full
-  begin/beginbox array generation are not ported yet.
+  against independent Python mirrors. The same module also ports
+  `find_unregorbits()` and the radius/noreg scheduling part of
+  `make_startpoints()` as
+  `dynamite::orblib_cpp::compute_unregularized_orbit_grid` and
+  `dynamite::orblib_cpp::compute_tube_start_schedule`; ABI tests validate the
+  reverse `nI2` propagation scan, irregular-energy boundary replacement, and
+  nearly closed-boundary sampling formula. The boundary-search routines and
+  full begin/beginbox state-array generation are not ported yet.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

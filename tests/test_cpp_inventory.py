@@ -3386,6 +3386,153 @@ def test_orblib_cpp_orbitstart_finds_equivalent_radius_like_fortran():
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_unregularized_grid_matches_fortran_loop_order():
+    outer_boundaries = np.ascontiguousarray(
+        [
+            [10.0, 10.0, 10.0, 10.0],
+            [20.0, 20.0, 20.0, 20.0],
+            [30.0, 30.0, 30.0, 30.0],
+        ],
+        dtype=np.float64,
+    )
+    middle_boundaries = np.ascontiguousarray(
+        [
+            [10.0, 10.0, 9.99, 10.0],
+            [19.0, 20.0, 19.0, 20.0],
+            [30.0, 30.0, 30.0, 29.0],
+        ],
+        dtype=np.float64,
+    )
+    irregular = np.ascontiguousarray([0, 1, 0], dtype=np.int32)
+    expected = np.zeros_like(middle_boundaries, dtype=np.int32)
+    for energy_index in range(outer_boundaries.shape[0]):
+        noreg = 0
+        for i2_index in range(outer_boundaries.shape[1] - 1, -1, -1):
+            if (
+                abs(
+                    middle_boundaries[energy_index, i2_index]
+                    - outer_boundaries[energy_index, i2_index]
+                )
+                / outer_boundaries[energy_index, i2_index]
+                > 1.0e-5
+                and irregular[energy_index] == 0
+            ):
+                noreg = 1
+            expected[energy_index, i2_index] = noreg
+
+    actual = np.empty_like(expected)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function = library.orblib_cpp_api_orbitstart_unregularized_grid
+    function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        int_p,
+        int_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(outer_boundaries.shape[0]),
+        ctypes.c_int(outer_boundaries.shape[1]),
+        outer_boundaries.ctypes.data_as(double_p),
+        middle_boundaries.ctypes.data_as(double_p),
+        irregular.ctypes.data_as(int_p),
+        actual.ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_tube_schedule_matches_fortran_sampling_flags():
+    inner_boundaries = np.ascontiguousarray(
+        [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+        dtype=np.float64,
+    )
+    middle_boundaries = np.ascontiguousarray(
+        [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0]],
+        dtype=np.float64,
+    )
+    outer_boundaries = np.ascontiguousarray(
+        [[21.0, 22.0], [23.0, 24.0], [25.0, 26.0]],
+        dtype=np.float64,
+    )
+    irregular = np.ascontiguousarray([0, 1, 0], dtype=np.int32)
+    noreg_grid = np.ascontiguousarray(
+        [[0, 1], [1, 0], [1, 1]],
+        dtype=np.int32,
+    )
+    energy_count, i2_count = inner_boundaries.shape
+    i3_count = 3
+    expected_radii = np.empty((energy_count, i2_count, i3_count), dtype=np.float64)
+    expected_flags = np.empty((energy_count, i2_count, i3_count), dtype=np.int32)
+    max_irregular = int(np.max(irregular))
+    for energy_index in range(energy_count):
+        for i2_index in range(i2_count):
+            inner = inner_boundaries[energy_index, i2_index]
+            middle = middle_boundaries[energy_index, i2_index]
+            if irregular[energy_index] == 1:
+                inner = 0.0
+                middle = outer_boundaries[energy_index, i2_index]
+            for i3_index in range(i3_count):
+                expected_radii[energy_index, i2_index, i3_index] = inner + (
+                    middle - inner
+                ) * (i3_index + 1.0 - 0.9) / (i3_count - 0.8)
+                noreg = 0
+                if i3_index == i3_count - 1 and noreg_grid[energy_index, i2_index] == 1:
+                    noreg = 1
+                if max_irregular == energy_index + 1:
+                    noreg = 1
+                expected_flags[energy_index, i2_index, i3_index] = noreg
+
+    actual_radii = np.empty_like(expected_radii)
+    actual_flags = np.empty_like(expected_flags)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    function = library.orblib_cpp_api_orbitstart_tube_schedule
+    function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        int_p,
+        int_p,
+        double_p,
+        int_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(energy_count),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        inner_boundaries.ctypes.data_as(double_p),
+        middle_boundaries.ctypes.data_as(double_p),
+        outer_boundaries.ctypes.data_as(double_p),
+        irregular.ctypes.data_as(int_p),
+        noreg_grid.ctypes.data_as(int_p),
+        actual_radii.ctypes.data_as(double_p),
+        actual_flags.ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_allclose(actual_radii, expected_radii, rtol=0.0, atol=1e-14)
+    np.testing.assert_array_equal(actual_flags, expected_flags)
+
+
+@pytest.mark.orblib_cpp
 @pytest.mark.parametrize("omega", [0.0, 1.5e-16])
 def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
     surf_pc = np.array([0.0], dtype=np.float64)

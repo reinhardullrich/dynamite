@@ -1,5 +1,6 @@
 #include "orbit_start.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace dynamite::orblib_cpp {
@@ -121,6 +122,93 @@ bool find_equivalent_radius(
     }
     iterations = max_iterations;
     return false;
+}
+
+bool compute_unregularized_orbit_grid(
+    int energy_count,
+    int i2_count,
+    const double* outer_boundaries,
+    const double* middle_boundaries,
+    const int* irregular,
+    int* noreg_grid
+) noexcept {
+    if (energy_count <= 0 || i2_count <= 0 || outer_boundaries == nullptr ||
+        middle_boundaries == nullptr || irregular == nullptr || noreg_grid == nullptr) {
+        return false;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        int noreg = 0;
+        for (int i2 = i2_count - 1; i2 >= 0; --i2) {
+            const int index = energy * i2_count + i2;
+            const double outer = outer_boundaries[index];
+            const double middle = middle_boundaries[index];
+            if (outer == 0.0 || !std::isfinite(outer) || !std::isfinite(middle)) {
+                return false;
+            }
+            if (std::abs(middle - outer) / outer > 1.0e-5 && irregular[energy] == 0) {
+                noreg = 1;
+            }
+            noreg_grid[index] = noreg;
+        }
+    }
+    return true;
+}
+
+bool compute_tube_start_schedule(
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* middle_boundaries,
+    const double* outer_boundaries,
+    const int* irregular,
+    const int* noreg_grid,
+    double* start_radii,
+    int* noreg_flags
+) noexcept {
+    if (energy_count <= 0 || i2_count <= 0 || i3_count <= 0 || inner_boundaries == nullptr ||
+        middle_boundaries == nullptr || outer_boundaries == nullptr || irregular == nullptr ||
+        noreg_grid == nullptr || start_radii == nullptr || noreg_flags == nullptr) {
+        return false;
+    }
+
+    const double denominator = static_cast<double>(i3_count) - 0.8;
+    if (denominator == 0.0) {
+        return false;
+    }
+    const int max_irregular = *std::max_element(irregular, irregular + energy_count);
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        for (int i2 = 0; i2 < i2_count; ++i2) {
+            const int boundary_index = energy * i2_count + i2;
+            double inner = inner_boundaries[boundary_index];
+            double middle = middle_boundaries[boundary_index];
+            const double outer = outer_boundaries[boundary_index];
+            if (!std::isfinite(inner) || !std::isfinite(middle) || !std::isfinite(outer)) {
+                return false;
+            }
+            if (irregular[energy] == 1) {
+                inner = 0.0;
+                middle = outer;
+            }
+            for (int i3 = 0; i3 < i3_count; ++i3) {
+                const double fraction = (static_cast<double>(i3 + 1) - 0.9) / denominator;
+                const int schedule_index = (energy * i2_count + i2) * i3_count + i3;
+                start_radii[schedule_index] = inner + (middle - inner) * fraction;
+
+                int noreg = 0;
+                if (i3 == i3_count - 1 && noreg_grid[boundary_index] == 1) {
+                    noreg = 1;
+                }
+                if (max_irregular == energy + 1) {
+                    noreg = 1;
+                }
+                noreg_flags[schedule_index] = noreg;
+            }
+        }
+    }
+    return true;
 }
 
 }  // namespace dynamite::orblib_cpp

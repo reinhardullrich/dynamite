@@ -1665,6 +1665,60 @@ extern "C" void orblib_cpp_api_orbitstart_find_equivalent_radius(
     }
 }
 
+extern "C" void orblib_cpp_api_orbitstart_unregularized_grid(
+    int energy_count,
+    int i2_count,
+    const double* outer_boundaries,
+    const double* middle_boundaries,
+    const int* irregular,
+    int* noreg_grid,
+    int* status
+) noexcept {
+    if (!dynamite::orblib_cpp::compute_unregularized_orbit_grid(
+            energy_count,
+            i2_count,
+            outer_boundaries,
+            middle_boundaries,
+            irregular,
+            noreg_grid
+        )) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+    set_status(status, kStatusOk);
+}
+
+extern "C" void orblib_cpp_api_orbitstart_tube_schedule(
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* middle_boundaries,
+    const double* outer_boundaries,
+    const int* irregular,
+    const int* noreg_grid,
+    double* start_radii,
+    int* noreg_flags,
+    int* status
+) noexcept {
+    if (!dynamite::orblib_cpp::compute_tube_start_schedule(
+            energy_count,
+            i2_count,
+            i3_count,
+            inner_boundaries,
+            middle_boundaries,
+            outer_boundaries,
+            irregular,
+            noreg_grid,
+            start_radii,
+            noreg_flags
+        )) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+    set_status(status, kStatusOk);
+}
+
 extern "C" void orblib_cpp_api_write_qgrid_file(
     const char* output_path,
     int orbit_count,

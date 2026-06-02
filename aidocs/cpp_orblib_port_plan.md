@@ -208,8 +208,14 @@ Current branch status:
   against independent Python mirrors of the Fortran state construction,
   negative-kinetic-energy fallback, bisection range, and `1e-7` relative
   potential stopping rule.
+- The pure orbit-start scheduling loops `find_unregorbits()` and the
+  radius/noreg part of `make_startpoints()` are ported as
+  `compute_unregularized_orbit_grid()` and `compute_tube_start_schedule()`,
+  with ABI tests for the reverse `nI2` propagation scan, irregular-energy
+  boundary replacement, nearly closed-boundary radius formula, and the exact
+  Fortran `maxval(irregular) == i` flag condition.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, orbit-start boundary search/full begin-array
+  interpolation-grid disk caching, orbit-start boundary search/full begin-state
   generation, full orbit-engine wiring, and full-output orchestration still
   remain.
 
