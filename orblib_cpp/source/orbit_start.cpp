@@ -29,6 +29,20 @@ struct TubeWidthObserverContext {
     double* crossing_positions = nullptr;
 };
 
+struct OrbitTypeObserverContext {
+    double sample_step = 0.0;
+    double next_sample_time = 0.0;
+    int sample_capacity = 0;
+    int sample_count = 0;
+    bool has_sample = false;
+    double lx_min = 0.0;
+    double lx_max = 0.0;
+    double ly_min = 0.0;
+    double ly_max = 0.0;
+    double lz_min = 0.0;
+    double lz_max = 0.0;
+};
+
 void tube_width_rhs(
     int n,
     double,
@@ -182,6 +196,71 @@ bool calculate_interpolated_orbit_start_state(
     }
     state[4] = vy;
     return true;
+}
+
+void update_orbit_type_ranges(
+    OrbitTypeObserverContext& observer,
+    double x,
+    double y,
+    double z,
+    double vx,
+    double vy,
+    double vz
+) noexcept {
+    const double lx = y * vz - z * vy;
+    const double ly = z * vx - x * vz;
+    const double lz = x * vy - y * vx;
+    if (!observer.has_sample) {
+        observer.lx_min = observer.lx_max = lx;
+        observer.ly_min = observer.ly_max = ly;
+        observer.lz_min = observer.lz_max = lz;
+        observer.has_sample = true;
+        return;
+    }
+    observer.lx_min = std::min(observer.lx_min, lx);
+    observer.lx_max = std::max(observer.lx_max, lx);
+    observer.ly_min = std::min(observer.ly_min, ly);
+    observer.ly_max = std::max(observer.ly_max, ly);
+    observer.lz_min = std::min(observer.lz_min, lz);
+    observer.lz_max = std::max(observer.lz_max, lz);
+}
+
+int orbit_type_observer(
+    int nr,
+    double,
+    double x,
+    const double*,
+    int,
+    const Dop853& solver,
+    void* context
+) noexcept {
+    auto* observer = static_cast<OrbitTypeObserverContext*>(context);
+    if (observer == nullptr) {
+        return -1;
+    }
+    if (nr == 1) {
+        observer->sample_count = 0;
+        observer->has_sample = false;
+        observer->next_sample_time = x + observer->sample_step;
+        return 1;
+    }
+
+    while (x >= observer->next_sample_time &&
+           observer->sample_count < observer->sample_capacity) {
+        const double sample_time = observer->next_sample_time;
+        update_orbit_type_ranges(
+            *observer,
+            solver.dense_value(0, sample_time),
+            solver.dense_value(1, sample_time),
+            solver.dense_value(2, sample_time),
+            solver.dense_value(3, sample_time),
+            solver.dense_value(4, sample_time),
+            solver.dense_value(5, sample_time)
+        );
+        observer->sample_count += 1;
+        observer->next_sample_time += observer->sample_step;
+    }
+    return 1;
 }
 
 }  // namespace
@@ -789,6 +868,90 @@ bool find_tube_radius(
         width = t2;
     }
     return std::isfinite(radius) && std::isfinite(width);
+}
+
+bool find_orbit_type(
+    InterpolatedPotential& potential,
+    double radius,
+    double theta,
+    double energy,
+    double circular_period,
+    double integrator_accuracy,
+    int sample_count,
+    int& orbit_type,
+    int& samples_collected,
+    int& solver_status,
+    int& function_evaluations
+) noexcept {
+    orbit_type = 5;
+    samples_collected = 0;
+    solver_status = 0;
+    function_evaluations = 0;
+    if (radius <= 0.0 || circular_period <= 0.0 || integrator_accuracy <= 0.0 ||
+        sample_count <= 0 || !std::isfinite(radius) || !std::isfinite(theta) ||
+        !std::isfinite(energy) || !std::isfinite(circular_period)) {
+        return false;
+    }
+
+    double state[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    if (!calculate_interpolated_orbit_start_state(potential, radius, theta, energy, state)) {
+        return false;
+    }
+
+    const double end_time = 100.0 * circular_period;
+    OrbitTypeObserverContext observer;
+    observer.sample_capacity = sample_count;
+    observer.sample_step = end_time / (static_cast<double>(sample_count) + 4.0);
+
+    TubeWidthRhsContext rhs_context;
+    rhs_context.potential = &potential;
+
+    Dop853Options options;
+    options.rtol = integrator_accuracy;
+    options.atol = 1.0e-8;
+    options.max_steps = 100000000;
+    options.stiffness_check_interval = -1;
+    options.dense_components = 6;
+
+    double time = 0.0;
+    Dop853 solver;
+    const Dop853Result result = solver.integrate(
+        6,
+        time,
+        state,
+        end_time,
+        tube_width_rhs,
+        &rhs_context,
+        options,
+        orbit_type_observer,
+        &observer
+    );
+
+    solver_status = result.status;
+    function_evaluations = result.function_evaluations;
+    samples_collected = observer.sample_count;
+    if (rhs_context.failed || result.status != 1 || observer.sample_count != sample_count ||
+        !observer.has_sample) {
+        return false;
+    }
+
+    const double lxc = observer.lx_max * observer.lx_min;
+    const double lyc = observer.ly_max * observer.ly_min;
+    const double lzc = observer.lz_max * observer.lz_min;
+    orbit_type = 5;
+    if (lxc > 0.0 && lyc < 0.0 && lzc < 0.0) {
+        orbit_type = 1;
+    }
+    if (lxc < 0.0 && lyc > 0.0 && lzc < 0.0) {
+        orbit_type = 2;
+    }
+    if (lxc < 0.0 && lyc < 0.0 && lzc > 0.0) {
+        orbit_type = 3;
+    }
+    if (lxc < 0.0 && lyc < 0.0 && lzc < 0.0) {
+        orbit_type = 4;
+    }
+    return true;
 }
 
 }  // namespace dynamite::orblib_cpp

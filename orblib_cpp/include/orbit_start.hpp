@@ -146,4 +146,18 @@ bool find_tube_radius(
     int& function_evaluations
 ) noexcept;
 
+bool find_orbit_type(
+    InterpolatedPotential& potential,
+    double radius,
+    double theta,
+    double energy,
+    double circular_period,
+    double integrator_accuracy,
+    int sample_count,
+    int& orbit_type,
+    int& samples_collected,
+    int& solver_status,
+    int& function_evaluations
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

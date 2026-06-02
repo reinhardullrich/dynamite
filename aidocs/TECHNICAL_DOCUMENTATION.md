@@ -830,6 +830,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_orbitstart_tube_start_records`
 - `orblib_cpp_api_orbitstart_tube_orbit_width`
 - `orblib_cpp_api_orbitstart_find_tube_radius`
+- `orblib_cpp_api_orbitstart_find_type`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -1055,8 +1056,12 @@ The first actual ported Fortran kernels are:
   golden-section minimizer is ported as
   `dynamite::orblib_cpp::find_tube_radius`; it reuses the width measurement
   kernel without storing crossing-position arrays during trial-radius probes.
-  Boundary-search routines and full runtime orbit-start orchestration are not
-  ported yet.
+  `find_type()` is ported as `dynamite::orblib_cpp::find_orbit_type`,
+  preserving the `100*tcirc` integration window, `XEND/(intsteps+4)` dense
+  sample spacing, and angular-momentum sign-product classification while
+  streaming min/max angular-momentum ranges instead of allocating full sampled
+  position/velocity arrays. Boundary-search routines and full runtime
+  orbit-start orchestration are not ported yet.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

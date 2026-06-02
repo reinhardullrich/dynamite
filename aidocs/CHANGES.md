@@ -492,3 +492,17 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, orbit-start
   boundary search/runtime orchestration, full orbit-engine wiring, and
   full-output orchestration.
+- Ported the orbit-start `find_type()` probe into C++ as
+  `dynamite::orblib_cpp::find_orbit_type` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_find_type` with opt-in pytest coverage against an
+  independent SciPy DOP853 direct black-hole orbit. The C++ port preserves the
+  Fortran `100*tcirc` integration length, `XEND/(intsteps+4)` dense-output
+  sampling cadence, DOP853 tolerance settings, and angular-momentum
+  sign-product classification, but streams angular-momentum min/max ranges
+  instead of allocating full `pos_t` and `vel_t` sample arrays for every
+  boundary probe. Updated C++ port documentation and test documentation;
+  remaining C++ gaps now include interpolation-grid disk caching if required
+  for parity, orbit-start boundary search/runtime orchestration, full
+  orbit-engine wiring, and full-output orchestration.
