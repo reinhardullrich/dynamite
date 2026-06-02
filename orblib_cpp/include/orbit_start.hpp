@@ -127,4 +127,23 @@ bool measure_tube_orbit_width(
     int& function_evaluations
 ) noexcept;
 
+bool find_tube_radius(
+    InterpolatedPotential& potential,
+    double inner_radius,
+    double middle_radius,
+    double outer_radius,
+    double energy,
+    double circular_period,
+    double theta,
+    int plane,
+    double integrator_accuracy,
+    int crossing_capacity,
+    double& radius,
+    double& width,
+    int& width_evaluations,
+    int& solver_status,
+    int& crossing_count,
+    int& function_evaluations
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

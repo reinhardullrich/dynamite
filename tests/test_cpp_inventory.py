@@ -4271,6 +4271,276 @@ def test_orblib_cpp_orbitstart_tube_orbit_width_matches_python_dop853_crossings(
 
 
 @pytest.mark.orblib_cpp
+def test_orblib_cpp_orbitstart_find_tube_radius_matches_fortran_golden_section():
+    surf_pc = np.array([0.0], dtype=np.float64)
+    sigobs_arcsec = np.array([0.49416], dtype=np.float64)
+    qobs = np.array([0.89541], dtype=np.float64)
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.0
+    dark_halo_profile_type = 0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    n_radius = 4
+    n_theta = 4
+    n_phi = 4
+    rlogmin = 18.0
+    rlogmax = 19.0
+    middle_radius = 1.0e13
+    inner_radius = 0.975e13
+    outer_radius = 1.025e13
+    start_theta = 0.73
+    plane = 2
+    integrator_accuracy = 1.0e-10
+    crossing_capacity = 6
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    position = np.array(
+        [[middle_radius * np.sin(start_theta), 0.0, middle_radius * np.cos(start_theta)]],
+        dtype=np.float64,
+    )
+    potential, _ = _expected_potential_stack_evaluation(
+        expected_setup,
+        position,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    energy = 0.45 * potential[0]
+    circular_velocity = np.sqrt(GRAV_CONST_KM * black_hole_mass / middle_radius)
+    circular_period = 2.0 * np.pi * middle_radius / circular_velocity
+
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    width_function = library.orblib_cpp_api_orbitstart_tube_orbit_width
+    width_function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    width_function.restype = None
+
+    def call_width(trial_radius):
+        crossing_positions = np.empty((crossing_capacity, 3), dtype=np.float64)
+        width = ctypes.c_double(np.nan)
+        crossing_count = ctypes.c_int(-1)
+        solver_status = ctypes.c_int(-1)
+        function_evaluations = ctypes.c_int(-1)
+        status = ctypes.c_int(-999)
+        width_function(
+            ctypes.c_int(surf_pc.size),
+            surf_pc.ctypes.data_as(double_p),
+            sigobs_arcsec.ctypes.data_as(double_p),
+            qobs.ctypes.data_as(double_p),
+            psi_obs.ctypes.data_as(double_p),
+            ctypes.c_double(distance),
+            ctypes.c_double(theta),
+            ctypes.c_double(phi),
+            ctypes.c_double(psi),
+            ctypes.c_double(upsilon),
+            ctypes.c_double(black_hole_mass),
+            ctypes.c_double(black_hole_softening_arcsec),
+            ctypes.c_int(dark_halo_profile_type),
+            ctypes.c_int(dark_halo_parameters.size),
+            None,
+            ctypes.c_int(n_radius),
+            ctypes.c_int(n_theta),
+            ctypes.c_int(n_phi),
+            ctypes.c_double(rlogmin),
+            ctypes.c_double(rlogmax),
+            ctypes.c_double(trial_radius),
+            ctypes.c_double(start_theta),
+            ctypes.c_double(energy),
+            ctypes.c_double(circular_period),
+            ctypes.c_int(plane),
+            ctypes.c_double(integrator_accuracy),
+            ctypes.c_int(crossing_capacity),
+            crossing_positions.ctypes.data_as(double_p),
+            ctypes.byref(width),
+            ctypes.byref(crossing_count),
+            ctypes.byref(solver_status),
+            ctypes.byref(function_evaluations),
+            ctypes.byref(status),
+        )
+        assert status.value == 0
+        assert crossing_count.value == crossing_capacity
+        assert solver_status.value == 2
+        assert function_evaluations.value > 0
+        return width.value
+
+    golden = 0.61803399
+    r0 = inner_radius
+    r3 = outer_radius
+    if abs(outer_radius - middle_radius) > abs(middle_radius - inner_radius):
+        r1 = middle_radius
+        r2 = middle_radius + (1.0 - golden) * (outer_radius - middle_radius)
+    else:
+        r2 = middle_radius
+        r1 = middle_radius - (1.0 - golden) * (middle_radius - inner_radius)
+    t1 = call_width(r1)
+    t2 = call_width(r2)
+    expected_evaluations = 2
+    while abs(r3 - r0) >= 1.0e-4 * (abs(r1) + abs(r2)):
+        if t2 < t1:
+            r0 = r1
+            r1 = r2
+            r2 = golden * r1 + (1.0 - golden) * r3
+            t1 = t2
+            t2 = call_width(r2)
+        else:
+            r3 = r2
+            r2 = r1
+            r1 = golden * r2 + (1.0 - golden) * r0
+            t2 = t1
+            t1 = call_width(r1)
+        expected_evaluations += 1
+    if t1 < t2:
+        expected_radius = r1
+        expected_width = t1
+    else:
+        expected_radius = r2
+        expected_width = t2
+
+    radius = ctypes.c_double(np.nan)
+    width = ctypes.c_double(np.nan)
+    width_evaluations = ctypes.c_int(-1)
+    crossing_count = ctypes.c_int(-1)
+    solver_status = ctypes.c_int(-1)
+    function_evaluations = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    function = library.orblib_cpp_api_orbitstart_find_tube_radius
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_double(rlogmin),
+        ctypes.c_double(rlogmax),
+        ctypes.c_double(inner_radius),
+        ctypes.c_double(middle_radius),
+        ctypes.c_double(outer_radius),
+        ctypes.c_double(start_theta),
+        ctypes.c_double(energy),
+        ctypes.c_double(circular_period),
+        ctypes.c_int(plane),
+        ctypes.c_double(integrator_accuracy),
+        ctypes.c_int(crossing_capacity),
+        ctypes.byref(radius),
+        ctypes.byref(width),
+        ctypes.byref(width_evaluations),
+        ctypes.byref(crossing_count),
+        ctypes.byref(solver_status),
+        ctypes.byref(function_evaluations),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert width_evaluations.value == expected_evaluations
+    assert crossing_count.value == crossing_capacity
+    assert solver_status.value == 2
+    assert function_evaluations.value > 0
+    assert radius.value == pytest.approx(expected_radius, rel=1e-12, abs=1e-3)
+    assert width.value == pytest.approx(expected_width, rel=1e-12, abs=1e3)
+
+
+@pytest.mark.orblib_cpp
 @pytest.mark.parametrize("omega", [0.0, 1.5e-16])
 def test_orblib_cpp_integrates_orbit_rhs_final_state_against_scipy(omega):
     surf_pc = np.array([0.0], dtype=np.float64)

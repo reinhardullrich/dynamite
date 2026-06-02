@@ -2164,6 +2164,151 @@ extern "C" void orblib_cpp_api_orbitstart_tube_orbit_width(
     }
 }
 
+extern "C" void orblib_cpp_api_orbitstart_find_tube_radius(
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    double rlogmin,
+    double rlogmax,
+    double inner_radius,
+    double middle_radius,
+    double outer_radius,
+    double start_theta,
+    double energy,
+    double circular_period,
+    int plane,
+    double integrator_accuracy,
+    int crossing_capacity,
+    double* radius,
+    double* width,
+    int* width_evaluations,
+    int* crossing_count,
+    int* solver_status,
+    int* function_evaluations,
+    int* status
+) noexcept {
+    if (ngauss <= 0 || surf_pc == nullptr || sigobs_arcsec == nullptr || qobs == nullptr ||
+        psi_obs_degrees == nullptr || black_hole_mass < 0.0 ||
+        black_hole_softening_arcsec < 0.0 || dark_halo_parameter_count < 0 ||
+        (dark_halo_parameter_count > 0 && dark_halo_parameters == nullptr) ||
+        n_radius < 2 || n_theta < 2 || n_phi < 2 || rlogmax <= rlogmin ||
+        inner_radius < 0.0 || middle_radius <= inner_radius ||
+        middle_radius >= outer_radius || outer_radius <= 0.0 || circular_period <= 0.0 ||
+        plane < 1 || plane > 3 || integrator_accuracy <= 0.0 || crossing_capacity <= 0 ||
+        radius == nullptr || width == nullptr || width_evaluations == nullptr ||
+        crossing_count == nullptr || solver_status == nullptr ||
+        function_evaluations == nullptr || !std::isfinite(inner_radius) ||
+        !std::isfinite(middle_radius) || !std::isfinite(outer_radius) ||
+        !std::isfinite(start_theta) || !std::isfinite(energy) ||
+        !std::isfinite(circular_period)) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        dynamite::orblib_cpp::TriaxialMgeSetup mge;
+        if (!dynamite::orblib_cpp::setup_triaxial_mge_from_observed(
+                ngauss,
+                surf_pc,
+                sigobs_arcsec,
+                qobs,
+                psi_obs_degrees,
+                distance_mpc,
+                theta_degrees,
+                phi_degrees,
+                psi_view_degrees,
+                upsilon,
+                mge
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::DarkHaloSetup halo;
+        if (!dynamite::orblib_cpp::setup_dark_halo(
+                dark_halo_profile_type,
+                dark_halo_parameter_count,
+                dark_halo_parameters,
+                mge.total_mass,
+                halo
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        dynamite::orblib_cpp::InterpolationGridConfig config;
+        config.n_radius = n_radius;
+        config.n_theta = n_theta;
+        config.n_phi = n_phi;
+        config.rlogmin = rlogmin;
+        config.rlogmax = rlogmax;
+
+        dynamite::orblib_cpp::InterpolatedPotential interpolated;
+        if (!interpolated.setup(
+                mge,
+                halo,
+                black_hole_mass,
+                black_hole_softening_arcsec * mge.conversion_factor,
+                config
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+
+        double result_radius = 0.0;
+        double result_width = 0.0;
+        int result_width_evaluations = 0;
+        int result_solver_status = 0;
+        int result_crossing_count = 0;
+        int result_function_evaluations = 0;
+        if (!dynamite::orblib_cpp::find_tube_radius(
+                interpolated,
+                inner_radius,
+                middle_radius,
+                outer_radius,
+                energy,
+                circular_period,
+                start_theta,
+                plane,
+                integrator_accuracy,
+                crossing_capacity,
+                result_radius,
+                result_width,
+                result_width_evaluations,
+                result_solver_status,
+                result_crossing_count,
+                result_function_evaluations
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        *radius = result_radius;
+        *width = result_width;
+        *width_evaluations = result_width_evaluations;
+        *crossing_count = result_crossing_count;
+        *solver_status = result_solver_status;
+        *function_evaluations = result_function_evaluations;
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
 extern "C" void orblib_cpp_api_write_qgrid_file(
     const char* output_path,
     int orbit_count,

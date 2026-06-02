@@ -479,3 +479,16 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, `findtube()`
   golden-section minimization, orbit-start boundary search/runtime
   orchestration, full orbit-engine wiring, and full-output orchestration.
+- Ported the `findtube()` golden-section tube-radius minimizer into C++ as
+  `dynamite::orblib_cpp::find_tube_radius` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_find_tube_radius` with opt-in pytest coverage
+  against a Python mirror of the Fortran golden-section loop using the
+  already SciPy-tested C++ tube-width ABI as the trial-width oracle. The C++
+  minimizer reuses `measure_tube_orbit_width()` with no crossing-position
+  output buffer during radius probes to avoid extra hot-path storage. Updated
+  C++ port documentation and test documentation; remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, orbit-start
+  boundary search/runtime orchestration, full orbit-engine wiring, and
+  full-output orchestration.

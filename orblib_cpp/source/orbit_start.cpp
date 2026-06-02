@@ -683,4 +683,112 @@ bool measure_tube_orbit_width(
     return result.status == 1 || result.status == 2;
 }
 
+bool find_tube_radius(
+    InterpolatedPotential& potential,
+    double inner_radius,
+    double middle_radius,
+    double outer_radius,
+    double energy,
+    double circular_period,
+    double theta,
+    int plane,
+    double integrator_accuracy,
+    int crossing_capacity,
+    double& radius,
+    double& width,
+    int& width_evaluations,
+    int& solver_status,
+    int& crossing_count,
+    int& function_evaluations
+) noexcept {
+    radius = 0.0;
+    width = 0.0;
+    width_evaluations = 0;
+    solver_status = 0;
+    crossing_count = 0;
+    function_evaluations = 0;
+    if (inner_radius < 0.0 || middle_radius <= inner_radius || middle_radius >= outer_radius ||
+        outer_radius <= 0.0 || circular_period <= 0.0 || integrator_accuracy <= 0.0 ||
+        crossing_capacity <= 0 || plane < 1 || plane > 3 ||
+        !std::isfinite(inner_radius) || !std::isfinite(middle_radius) ||
+        !std::isfinite(outer_radius) || !std::isfinite(energy) ||
+        !std::isfinite(circular_period) || !std::isfinite(theta)) {
+        return false;
+    }
+
+    constexpr double golden = 0.61803399;
+    double r0 = inner_radius;
+    double r3 = outer_radius;
+    double r1 = 0.0;
+    double r2 = 0.0;
+    if (std::abs(outer_radius - middle_radius) > std::abs(middle_radius - inner_radius)) {
+        r1 = middle_radius;
+        r2 = middle_radius + (1.0 - golden) * (outer_radius - middle_radius);
+    } else {
+        r2 = middle_radius;
+        r1 = middle_radius - (1.0 - golden) * (middle_radius - inner_radius);
+    }
+
+    auto evaluate_width = [&](double trial_radius, double& trial_width) noexcept -> bool {
+        int trial_crossing_count = 0;
+        int trial_solver_status = 0;
+        int trial_function_evaluations = 0;
+        width_evaluations += 1;
+        const bool ok = measure_tube_orbit_width(
+            potential,
+            trial_radius,
+            theta,
+            energy,
+            circular_period,
+            plane,
+            integrator_accuracy,
+            crossing_capacity,
+            nullptr,
+            trial_width,
+            trial_crossing_count,
+            trial_solver_status,
+            trial_function_evaluations
+        );
+        crossing_count = trial_crossing_count;
+        solver_status = trial_solver_status;
+        function_evaluations += trial_function_evaluations;
+        return ok && std::isfinite(trial_width);
+    };
+
+    double t1 = 0.0;
+    double t2 = 0.0;
+    if (!evaluate_width(r1, t1) || !evaluate_width(r2, t2)) {
+        return false;
+    }
+
+    while (std::abs(r3 - r0) >= 1.0e-4 * (std::abs(r1) + std::abs(r2))) {
+        if (t2 < t1) {
+            r0 = r1;
+            r1 = r2;
+            r2 = golden * r1 + (1.0 - golden) * r3;
+            t1 = t2;
+            if (!evaluate_width(r2, t2)) {
+                return false;
+            }
+        } else {
+            r3 = r2;
+            r2 = r1;
+            r1 = golden * r2 + (1.0 - golden) * r0;
+            t2 = t1;
+            if (!evaluate_width(r1, t1)) {
+                return false;
+            }
+        }
+    }
+
+    if (t1 < t2) {
+        radius = r1;
+        width = t1;
+    } else {
+        radius = r2;
+        width = t2;
+    }
+    return std::isfinite(radius) && std::isfinite(width);
+}
+
 }  // namespace dynamite::orblib_cpp
