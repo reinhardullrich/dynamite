@@ -44,6 +44,9 @@ Current coverage:
   setup/deprojection validation against the Fortran formulas;
 - C++ stellar triaxial MGE potential/acceleration validation across inner,
   mid-radius quadrature, and far-field branches;
+- C++ combined potential-stack validation for the Plummer-style black-hole
+  term and supported dark-halo profiles 0 through 3 against independent
+  Python/SciPy calculations of the Fortran formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

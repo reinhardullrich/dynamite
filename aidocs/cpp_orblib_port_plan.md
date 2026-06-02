@@ -73,6 +73,8 @@ orblib_cpp_api_abi_version
 orblib_cpp_api_ran1_sequence
 orblib_cpp_api_elliptic_legendre
 orblib_cpp_api_triaxial_mge_setup
+orblib_cpp_api_triaxial_mge_evaluate
+orblib_cpp_api_potential_stack_evaluate
 orblib_cpp_api_dop853_harmonic
 orblib_cpp_api_run_orbitstart_memory
 orblib_cpp_api_run_orblib_direct
@@ -104,11 +106,15 @@ Current branch status:
   inner approximation, mid-radius quadrature, and outer point-mass branches,
   and is tested against independent Python/SciPy calculations of the Fortran
   formulas.
+- The current `dmpotent.f90` black-hole/dark-halo additions are ported for the
+  Plummer-style black-hole term and dark-halo profiles 0 through 3: no halo,
+  NFW, Hernquist, and triaxial cored logarithmic. The combined potential-stack
+  ABI helper is tested against independent Python/SciPy calculations of the
+  Fortran formulas.
 - The orbit-specific C++ engine is still not implemented yet:
-  black-hole/dark-halo terms, interpolation-grid behavior, orbit-start
-  generation, one-orbit integration/classification, projection, PSF, aperture
-  mapping, LOSVD binning, qgrid accumulation, and binary output writing still
-  remain.
+  gNFW profile 5, interpolation-grid behavior, orbit-start generation,
+  one-orbit integration/classification, projection, PSF, aperture mapping,
+  LOSVD binning, qgrid accumulation, and binary output writing still remain.
 
 ## DOP853 Policy
 
@@ -240,10 +246,11 @@ mixed with the first C++ parity port.
    harmonic-oscillator ODE fixture. Orbit-specific use still needs the C++
    RHS/potential code from step 5.
 5. In progress: port potential and acceleration evaluation. Done so far:
-   elliptic setup helpers, non-bar triaxial MGE setup/deprojection, and stellar
-   triaxial MGE potential/acceleration evaluation. Still required:
-   black-hole/dark-halo terms, interpolation grid behavior, orbit RHS wiring,
-   and Fortran-value parity tests for the full potential stack.
+   elliptic setup helpers, non-bar triaxial MGE setup/deprojection, stellar
+   triaxial MGE potential/acceleration evaluation, Plummer-style black-hole
+   contribution, and dark-halo profiles 0 through 3. Still required:
+   gNFW profile 5, interpolation grid behavior, orbit RHS wiring, and
+   Fortran-value parity tests for the full orbit RHS/potential stack.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
 7. Port one-orbit integration and classification; test against Fortran.
 8. Port projection, PSF, aperture, histogram, qgrid, and output writing.

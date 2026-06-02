@@ -7,7 +7,7 @@ BUILD_DIRS := $(OBJDIR) $(LIBDIR)
 
 CXXFLAGS ?= -O3 -march=native -fPIC -std=c++20 -Wall -Wextra -Wpedantic -Iinclude
 LDFLAGS ?= -shared
-SOURCES := $(SRCDIR)/orblib_cpp_api.cpp $(SRCDIR)/dop853.cpp $(SRCDIR)/elliptic_integrals.cpp $(SRCDIR)/ran1.cpp $(SRCDIR)/triaxial_mge.cpp
+SOURCES := $(SRCDIR)/orblib_cpp_api.cpp $(SRCDIR)/dop853.cpp $(SRCDIR)/elliptic_integrals.cpp $(SRCDIR)/potential.cpp $(SRCDIR)/ran1.cpp $(SRCDIR)/triaxial_mge.cpp
 OBJECTS := $(patsubst $(SRCDIR)/%.cpp,$(OBJDIR)/%.o,$(SOURCES))
 
 all: shared

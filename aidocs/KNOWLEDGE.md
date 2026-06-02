@@ -77,7 +77,7 @@ changes from the original project.
   `triaxmass*` mass-helper sources are archived and are not part of the active
   build.
 - `orblib_cpp/`: experimental C++ orbit-library backend on the
-  `fortran-to-cpp` branch. The current first slice builds
+  `fortran-to-cpp` branch. The current branch builds
   `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, and exposes
   generation entry-point stubs that return status `-100` until the C++ orbit
   engine is ported. The first ported numerical kernels are the C++ `Ran1`
@@ -88,11 +88,17 @@ changes from the original project.
   `orblib_cpp/include/elliptic_integrals.hpp` and
   `orblib_cpp/source/elliptic_integrals.cpp`, and the non-bar triaxial MGE
   setup/deprojection stage in `orblib_cpp/include/triaxial_mge.hpp` and
-  `orblib_cpp/source/triaxial_mge.cpp`. `Ran1` is tested against the existing
-  Python/Fortran reference sequence; DOP853 is tested through the shared
-  library on harmonic-oscillator final-state and dense-output samples;
-  elliptic integrals are tested against SciPy; and MGE setup is tested against
-  an independent NumPy implementation of the Fortran formulas.
+  `orblib_cpp/source/triaxial_mge.cpp`. It also includes
+  `orblib_cpp/include/potential.hpp` and `orblib_cpp/source/potential.cpp` for
+  the current C++ potential stack: stellar triaxial MGE potential/acceleration,
+  the Plummer-style black-hole term, and dark-halo profiles 0 through 3
+  (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). gNFW profile 5
+  remains unported because it depends on the beta-function stack. `Ran1` is
+  tested against the existing Python/Fortran reference sequence; DOP853 is
+  tested through the shared library on harmonic-oscillator final-state and
+  dense-output samples; elliptic integrals are tested against SciPy; MGE setup
+  and potential-stack evaluation are tested against independent NumPy/SciPy
+  implementations of the Fortran formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -170,7 +176,7 @@ source files.
   numerical oracle. Correctness is the first rule; among correct versions,
   optimize aggressively for speed, allocation behavior, RHS/acceleration
   throughput, cache locality, and reproducible parallel execution. The current
-  first implementation slice builds a C++ shared library and wires
+  current implementation slices build a C++ shared library and wire
   `cpp_shared_library` into Python with a hard not-implemented status for
   generation calls. The first actual ported Fortran kernels are `ran1_nr.f`,
   implemented as a no-hot-loop-allocation C++ `Ran1` class with ABI test helper
@@ -181,9 +187,10 @@ source files.
   `numerics/ellipint.f90` and the non-bar `tp_setup()`/`iniparam_from_arrays()`
   MGE setup formulas, plus stellar triaxial MGE potential/acceleration
   evaluation across the inner approximation, mid-radius quadrature, and
-  far-field point-mass approximation. Black-hole/dark-halo terms,
-  interpolation-grid behavior, and orbit RHS wiring are the next unported
-  potential-stack dependencies.
+  far-field point-mass approximation. The branch now also ports the
+  Plummer-style black-hole term and dark-halo profiles 0 through 3. The gNFW
+  profile 5 beta-function path, interpolation-grid behavior, and orbit RHS
+  wiring are the next unported potential-stack dependencies.
 
 ## Separated Workspaces
 

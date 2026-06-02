@@ -227,3 +227,12 @@ This file is append-only. Add new entries at the bottom.
   `orblib_cpp_api_triaxial_mge_evaluate` and opt-in pytest coverage comparing
   representative branch points against independent Python/SciPy calculations
   of the Fortran formulas.
+- Ported the next C++ potential-stack slice from `dmpotent.f90`: the
+  Plummer-style black-hole contribution and dark-halo profiles 0 through 3
+  (`no halo`, NFW, Hernquist, and triaxial cored logarithmic). Added
+  `orblib_cpp/include/potential.hpp`, `orblib_cpp/source/potential.cpp`, and
+  test-only ABI helper `orblib_cpp_api_potential_stack_evaluate`, with opt-in
+  pytest coverage comparing combined stellar MGE, black-hole, and supported
+  dark-halo terms against independent Python/SciPy calculations of the Fortran
+  formulas. gNFW profile 5 remains unported pending the beta-function helper
+  stack.

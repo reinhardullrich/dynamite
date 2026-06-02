@@ -802,6 +802,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_elliptic_legendre`
 - `orblib_cpp_api_triaxial_mge_setup`
 - `orblib_cpp_api_triaxial_mge_evaluate`
+- `orblib_cpp_api_potential_stack_evaluate`
 - `orblib_cpp_api_dop853_harmonic`
 - `orblib_cpp_api_run_orbitstart_memory`
 - `orblib_cpp_api_run_orblib_direct`
@@ -838,6 +839,16 @@ The first actual ported Fortran kernels are:
   `orblib_cpp_api_triaxial_mge_evaluate` validates representative points from
   all three regimes against independent Python/SciPy calculations of the
   Fortran formulas.
+- The black-hole and supported dark-halo additions from `dmpotent.f90`,
+  implemented as `dynamite::orblib_cpp::DarkHaloSetup` and the C++ potential
+  stack in `orblib_cpp/source/potential.cpp`. This currently covers the
+  Plummer-style black-hole term and dark-halo profiles 0 through 3: no halo,
+  NFW, Hernquist, and triaxial cored logarithmic. Profile 5 gNFW remains
+  unported because it still needs the beta-function helper stack from
+  `orblib_fortran/source/numerics/specfunc_beta.f90`. The test-only C ABI
+  helper `orblib_cpp_api_potential_stack_evaluate` validates the combined
+  stellar MGE, black-hole, and supported dark-halo terms against independent
+  Python/SciPy calculations of the Fortran formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

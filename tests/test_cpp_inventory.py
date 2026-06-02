@@ -14,11 +14,13 @@ CPP_SOURCES = [
     "Makefile",
     "include/dop853.hpp",
     "include/elliptic_integrals.hpp",
+    "include/potential.hpp",
     "include/ran1.hpp",
     "include/triaxial_mge.hpp",
     "source/dop853.cpp",
     "source/elliptic_integrals.cpp",
     "source/orblib_cpp_api.cpp",
+    "source/potential.cpp",
     "source/ran1.cpp",
     "source/triaxial_mge.cpp",
 ]
@@ -26,6 +28,7 @@ CPP_SOURCES = [
 
 PARSEC_KM = 1.4959787068e8 * (648e3 / np.pi)
 GRAV_CONST_KM = 6.67428e-11 * 1.98892e30 / 1e9
+RHO_CRIT = (3.0 * (7.0e-5 / PARSEC_KM) ** 2) / (8.0 * np.pi * GRAV_CONST_KM)
 
 
 def test_cpp_backend_sources_are_present():
@@ -196,6 +199,7 @@ def _expected_triaxial_mge_setup(
         - elliptic_e
     ) / (pintr**2 - qintr**2)
     return {
+        "conversion_factor": conversion_factor,
         "pintr": pintr,
         "qintr": qintr,
         "sigintr_km": sigintr_km,
@@ -329,6 +333,133 @@ def _expected_triaxial_mge_evaluation(setup, points):
         potentials.append(point_potential)
         accelerations.append(point_acceleration)
     return np.array(potentials), np.array(accelerations)
+
+
+def _stable_nfw_log1p(ratio):
+    ratio = np.asarray(ratio, dtype=np.float64)
+    return np.where(
+        ratio >= 1.0,
+        np.log1p(ratio),
+        2.0 * np.arctanh(ratio / (2.0 + ratio)),
+    )
+
+
+def _expected_dark_halo_setup(profile_type, params, total_stellar_mass):
+    params = np.asarray(params, dtype=np.float64)
+    if profile_type == 0:
+        return {"profile_type": 0}
+    if profile_type == 1:
+        concentration = params[0]
+        dark_fraction = params[1]
+        rhoc = (
+            (200.0 / 3.0)
+            * RHO_CRIT
+            * concentration**3
+            / (np.log1p(concentration) - concentration / (1.0 + concentration))
+        )
+        rc = (
+            3.0
+            / (800.0 * np.pi * RHO_CRIT * concentration**3)
+            * dark_fraction
+            * total_stellar_mass
+        ) ** (1.0 / 3.0)
+        return {"profile_type": 1, "rhoc": rhoc, "rc": rc}
+    if profile_type == 2:
+        return {"profile_type": 2, "rhoc": params[0], "rc": params[1]}
+    if profile_type == 3:
+        return {
+            "profile_type": 3,
+            "vc_squared": params[0] ** 2,
+            "core_radius_squared": (params[1] * PARSEC_KM * 1.0e3) ** 2,
+            "p_squared": params[2] ** 2,
+            "q_squared": params[3] ** 2,
+        }
+    raise ValueError(f"unsupported test profile {profile_type}")
+
+
+def _expected_dark_halo_evaluation(halo, points):
+    points = np.asarray(points, dtype=np.float64)
+    potentials = np.zeros(points.shape[0], dtype=np.float64)
+    accelerations = np.zeros_like(points)
+    radius_squared = np.einsum("ij,ij->i", points, points)
+    radius = np.sqrt(radius_squared)
+
+    if halo["profile_type"] == 0:
+        return potentials, accelerations
+    if halo["profile_type"] == 1:
+        ratio = radius / halo["rc"]
+        log_term = _stable_nfw_log1p(ratio)
+        enclosed_term = log_term - ratio / (1.0 + ratio)
+        potential_scale = 4.0 * np.pi * GRAV_CONST_KM * halo["rhoc"] * halo["rc"] ** 3
+        potentials = potential_scale / radius * log_term
+        acceleration_scale = -potential_scale / radius_squared * enclosed_term / radius
+        accelerations = points * acceleration_scale[:, np.newaxis]
+        return potentials, accelerations
+    if halo["profile_type"] == 2:
+        potentials = (
+            4.0
+            * np.pi
+            * GRAV_CONST_KM
+            * halo["rhoc"]
+            * halo["rc"] ** 2
+            / (2.0 * (1.0 + radius / halo["rc"]))
+        )
+        acceleration_r = (
+            -2.0
+            * np.pi
+            * GRAV_CONST_KM
+            * halo["rhoc"]
+            * halo["rc"]
+            / (1.0 + radius / halo["rc"]) ** 2
+        )
+        accelerations = points / radius[:, np.newaxis] * acceleration_r[:, np.newaxis]
+        return potentials, accelerations
+    if halo["profile_type"] == 3:
+        denominator = (
+            halo["core_radius_squared"]
+            + points[:, 0] ** 2
+            + points[:, 1] ** 2 / halo["p_squared"]
+            + points[:, 2] ** 2 / halo["q_squared"]
+        )
+        potentials = -0.5 * halo["vc_squared"] * np.log(denominator)
+        accelerations[:, 0] = -halo["vc_squared"] * points[:, 0] / denominator
+        accelerations[:, 1] = (
+            -halo["vc_squared"] * (points[:, 1] / halo["p_squared"]) / denominator
+        )
+        accelerations[:, 2] = (
+            -halo["vc_squared"] * (points[:, 2] / halo["q_squared"]) / denominator
+        )
+        return potentials, accelerations
+    raise ValueError(f"unsupported test profile {halo['profile_type']}")
+
+
+def _expected_potential_stack_evaluation(
+    setup,
+    points,
+    black_hole_mass,
+    black_hole_softening_arcsec,
+    dark_halo_profile_type,
+    dark_halo_parameters,
+):
+    potentials, accelerations = _expected_triaxial_mge_evaluation(setup, points)
+    radius_squared = np.einsum("ij,ij->i", points, points)
+    black_hole_softening_km = black_hole_softening_arcsec * setup["conversion_factor"]
+    softened_radius_squared = radius_squared + black_hole_softening_km**2
+    potentials = potentials + GRAV_CONST_KM * black_hole_mass / np.sqrt(softened_radius_squared)
+    acceleration_scale = (
+        -GRAV_CONST_KM
+        * black_hole_mass
+        / (softened_radius_squared * np.sqrt(softened_radius_squared))
+    )
+    accelerations = accelerations + points * acceleration_scale[:, np.newaxis]
+
+    halo = _expected_dark_halo_setup(
+        dark_halo_profile_type,
+        dark_halo_parameters,
+        setup["total_mass"],
+    )
+    halo_potential, halo_acceleration = _expected_dark_halo_evaluation(halo, points)
+    return potentials + halo_potential, accelerations + halo_acceleration
 
 
 @pytest.mark.orblib_cpp
@@ -527,6 +658,156 @@ def test_orblib_cpp_triaxial_mge_evaluator_matches_formula_branches():
         ctypes.c_double(phi),
         ctypes.c_double(psi),
         ctypes.c_double(upsilon),
+        ctypes.c_int(points.shape[0]),
+        point_x.ctypes.data_as(double_p),
+        point_y.ctypes.data_as(double_p),
+        point_z.ctypes.data_as(double_p),
+        potential.ctypes.data_as(double_p),
+        accel_x.ctypes.data_as(double_p),
+        accel_y.ctypes.data_as(double_p),
+        accel_z.ctypes.data_as(double_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    actual_acceleration = np.column_stack([accel_x, accel_y, accel_z])
+    np.testing.assert_allclose(
+        potential,
+        expected_potential,
+        rtol=2e-10,
+        atol=0.0,
+    )
+    np.testing.assert_allclose(
+        actual_acceleration,
+        expected_acceleration,
+        rtol=2e-10,
+        atol=0.0,
+    )
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize(
+    ("dark_halo_profile_type", "dark_halo_parameters"),
+    [
+        (0, []),
+        (1, [3.0, 0.8]),
+        (2, [2.0e-58, 2.0e18]),
+        (3, [160.0, 2.0, 0.9, 0.7]),
+    ],
+)
+def test_orblib_cpp_potential_stack_matches_black_hole_and_supported_dark_halos(
+    dark_halo_profile_type,
+    dark_halo_parameters,
+):
+    surf_pc = np.array(
+        [26819.14, 2456.39, 456.8, 645.49, 14.73, 122.85, 1.0],
+        dtype=np.float64,
+    )
+    sigobs_arcsec = np.array(
+        [0.49416, 2.04299, 2.44313, 6.5305, 17.41488, 21.84711, 21.84711],
+        dtype=np.float64,
+    )
+    qobs = np.array(
+        [0.89541, 0.79093, 0.9999, 0.55097, 0.9999, 0.55097, 0.55097],
+        dtype=np.float64,
+    )
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 2.0e9
+    black_hole_softening_arcsec = 0.02
+    points = np.ascontiguousarray(
+        [
+            [1.0e10, -2.0e10, 3.0e10],
+            [3.0e15, 2.0e15, -1.0e15],
+            [5.0e20, -2.0e20, 1.0e20],
+        ],
+        dtype=np.float64,
+    )
+    expected_setup = _expected_triaxial_mge_setup(
+        surf_pc,
+        sigobs_arcsec,
+        qobs,
+        psi_obs,
+        distance,
+        theta,
+        phi,
+        psi,
+        upsilon,
+    )
+    dark_halo_parameters = np.ascontiguousarray(dark_halo_parameters, dtype=np.float64)
+    expected_potential, expected_acceleration = _expected_potential_stack_evaluation(
+        expected_setup,
+        points,
+        black_hole_mass,
+        black_hole_softening_arcsec,
+        dark_halo_profile_type,
+        dark_halo_parameters,
+    )
+    point_x = np.ascontiguousarray(points[:, 0], dtype=np.float64)
+    point_y = np.ascontiguousarray(points[:, 1], dtype=np.float64)
+    point_z = np.ascontiguousarray(points[:, 2], dtype=np.float64)
+
+    potential = np.empty(points.shape[0], dtype=np.float64)
+    accel_x = np.empty(points.shape[0], dtype=np.float64)
+    accel_y = np.empty(points.shape[0], dtype=np.float64)
+    accel_z = np.empty(points.shape[0], dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_potential_stack_evaluate
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+    dark_halo_pointer = (
+        None
+        if dark_halo_parameters.size == 0
+        else dark_halo_parameters.ctypes.data_as(double_p)
+    )
+
+    function(
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(dark_halo_profile_type),
+        ctypes.c_int(dark_halo_parameters.size),
+        dark_halo_pointer,
         ctypes.c_int(points.shape[0]),
         point_x.ctypes.data_as(double_p),
         point_y.ctypes.data_as(double_p),
