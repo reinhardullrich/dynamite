@@ -105,6 +105,10 @@ changes from the original project.
   dense-output sample extraction. `orblib_cpp/include/orbit_classification.hpp`
   and `orblib_cpp/source/orbit_classification.cpp` port the Fortran
   angular-momentum sign-crossing orbit classification and moment formulas.
+  `orblib_cpp/include/orbit_projection.hpp` and
+  `orblib_cpp/source/orbit_projection.cpp` port the Fortran per-symmetry orbit
+  projection and LOS-velocity formulas for non-rotating and rotating-frame
+  sign tables.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -112,7 +116,9 @@ changes from the original project.
   orbit RHS evaluation, single-orbit DOP853 final-state integration, and
   single-orbit dense-output sampling are tested against independent
   NumPy/SciPy implementations of the Fortran formulas. Orbit classification is
-  tested against a Python mirror of the Fortran type and moment formulas.
+  tested against a Python mirror of the Fortran type and moment formulas, and
+  projection is tested against a Python mirror of the Fortran `project_n()`
+  formulas.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
@@ -208,10 +214,10 @@ source files.
   plus the orbit RHS derivative formula for non-rotating and `Omega != 0`
   barred-frame integration, and a single-orbit DOP853 final-state integration
   helper with prescribed dense-output sample extraction using that RHS, plus
-  the orbit classification and moment formulas. The legacy `interpolgrid`
-  disk-cache contract, orbit-start generation, projection/PSF/aperture
-  mapping, LOSVD/qgrid accumulation, and binary output writing are the next
-  unported dependencies.
+  the orbit classification, moment, projection, and LOS-velocity formulas. The
+  legacy `interpolgrid` disk-cache contract, orbit-start generation,
+  PSF/aperture mapping, LOSVD/qgrid accumulation, and binary output writing are
+  the next unported dependencies.
 
 ## Separated Workspaces
 

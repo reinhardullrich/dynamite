@@ -17,6 +17,7 @@ CPP_SOURCES = [
     "include/interpolated_potential.hpp",
     "include/orbit_classification.hpp",
     "include/orbit_integrator.hpp",
+    "include/orbit_projection.hpp",
     "include/orbit_rhs.hpp",
     "include/potential.hpp",
     "include/ran1.hpp",
@@ -26,6 +27,7 @@ CPP_SOURCES = [
     "source/interpolated_potential.cpp",
     "source/orbit_classification.cpp",
     "source/orbit_integrator.cpp",
+    "source/orbit_projection.cpp",
     "source/orbit_rhs.cpp",
     "source/orblib_cpp_api.cpp",
     "source/potential.cpp",
@@ -674,6 +676,174 @@ def _expected_orbit_classification(samples):
         dtype=np.float64,
     )
     return orbit_type, moments, moments2
+
+
+POSITION_SIGNS_NONROTATING = np.array(
+    [
+        [1, 1, 1],
+        [-1, 1, 1],
+        [-1, -1, 1],
+        [1, -1, 1],
+        [1, 1, -1],
+        [-1, 1, -1],
+        [-1, -1, -1],
+        [1, -1, -1],
+    ],
+    dtype=np.float64,
+)
+POSITION_SIGNS_ROTATING = np.array(
+    [
+        [1, 1, 1],
+        [1, 1, 1],
+        [-1, -1, 1],
+        [-1, -1, 1],
+        [1, 1, -1],
+        [1, 1, -1],
+        [-1, -1, -1],
+        [-1, -1, -1],
+    ],
+    dtype=np.float64,
+)
+VELOCITY_SIGNS_NONROTATING = np.array(
+    [
+        [
+            [1, 1, 1],
+            [-1, 1, 1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, -1, -1],
+            [1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [1, -1, 1],
+            [-1, -1, 1],
+            [-1, 1, -1],
+            [-1, -1, -1],
+            [-1, 1, 1],
+        ],
+        [
+            [1, 1, 1],
+            [1, -1, -1],
+            [-1, -1, 1],
+            [-1, 1, -1],
+            [1, 1, -1],
+            [1, -1, 1],
+            [-1, -1, -1],
+            [-1, 1, 1],
+        ],
+        [
+            [1, 1, 1],
+            [-1, 1, 1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, -1],
+            [1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [-1, 1, 1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, -1],
+            [1, -1, -1],
+        ],
+    ],
+    dtype=np.float64,
+)
+VELOCITY_SIGNS_ROTATING = np.array(
+    [
+        [
+            [1, 1, 1],
+            [1, 1, 1],
+            [-1, -1, 1],
+            [-1, -1, 1],
+            [1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [1, 1, 1],
+            [1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, 1],
+            [-1, -1, 1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [1, 1, 1],
+            [-1, -1, 1],
+            [-1, -1, 1],
+            [1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [1, 1, 1],
+            [-1, -1, 1],
+            [-1, -1, 1],
+            [1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ],
+        [
+            [1, 1, 1],
+            [1, 1, 1],
+            [-1, -1, 1],
+            [-1, -1, 1],
+            [1, 1, -1],
+            [1, 1, -1],
+            [-1, -1, -1],
+            [-1, -1, -1],
+        ],
+    ],
+    dtype=np.float64,
+)
+
+
+def _expected_orbit_projection(samples, orbit_type, projection_number, omega, theta, phi):
+    samples = np.asarray(samples, dtype=np.float64)
+    positions = samples[:, :3]
+    velocities = samples[:, 3:]
+    projection_index = projection_number - 1
+    orbit_type_index = orbit_type - 1
+    if omega == 0.0:
+        psgn = POSITION_SIGNS_NONROTATING[projection_index]
+        vsgn = VELOCITY_SIGNS_NONROTATING[orbit_type_index, projection_index]
+    else:
+        psgn = POSITION_SIGNS_ROTATING[projection_index]
+        vsgn = VELOCITY_SIGNS_ROTATING[orbit_type_index, projection_index]
+
+    projected_x = (
+        -np.sin(phi) * psgn[0] * positions[:, 0]
+        + np.cos(phi) * psgn[1] * positions[:, 1]
+    )
+    projected_y = (
+        -np.cos(theta) * np.cos(phi) * psgn[0] * positions[:, 0]
+        - np.cos(theta) * np.sin(phi) * psgn[1] * positions[:, 1]
+        + np.sin(theta) * psgn[2] * positions[:, 2]
+    )
+    los_velocity = (
+        np.sin(theta) * np.cos(phi) * vsgn[0] * velocities[:, 0]
+        + np.sin(theta) * np.sin(phi) * vsgn[1] * velocities[:, 1]
+        + np.cos(theta) * vsgn[2] * velocities[:, 2]
+    )
+    return projected_x, projected_y, los_velocity
 
 
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
@@ -1743,6 +1913,90 @@ def test_orblib_cpp_classifies_orbit_samples_like_fortran(expected_kind):
     assert orbit_type.value == expected_kind
     np.testing.assert_allclose(moments, expected_moments, rtol=2e-14, atol=1e-14)
     np.testing.assert_allclose(moments2, expected_moments2, rtol=2e-14, atol=1e-14)
+
+
+@pytest.mark.orblib_cpp
+@pytest.mark.parametrize("omega", [0.0, 1.5e-16])
+def test_orblib_cpp_projects_orbit_samples_like_fortran(omega):
+    samples = np.ascontiguousarray(
+        [
+            [1.5, -2.0, 3.5, 11.0, -7.0, 5.0],
+            [-4.0, 2.25, -1.5, -3.0, 13.0, -17.0],
+            [2.75, 3.25, 0.5, 19.0, -23.0, 29.0],
+        ],
+        dtype=np.float64,
+    )
+    theta = np.deg2rad(82.444308859)
+    phi = np.deg2rad(84.245110877)
+    state_x = np.ascontiguousarray(samples[:, 0], dtype=np.float64)
+    state_y = np.ascontiguousarray(samples[:, 1], dtype=np.float64)
+    state_z = np.ascontiguousarray(samples[:, 2], dtype=np.float64)
+    state_vx = np.ascontiguousarray(samples[:, 3], dtype=np.float64)
+    state_vy = np.ascontiguousarray(samples[:, 4], dtype=np.float64)
+    state_vz = np.ascontiguousarray(samples[:, 5], dtype=np.float64)
+    projected_x = np.empty(samples.shape[0], dtype=np.float64)
+    projected_y = np.empty(samples.shape[0], dtype=np.float64)
+    los_velocity = np.empty(samples.shape[0], dtype=np.float64)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    function = library.orblib_cpp_api_project_orbit_samples
+    double_p = ctypes.POINTER(ctypes.c_double)
+    function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    function.restype = None
+
+    for orbit_type in range(1, 6):
+        for projection_number in range(1, 9):
+            expected_x, expected_y, expected_los = _expected_orbit_projection(
+                samples,
+                orbit_type,
+                projection_number,
+                omega,
+                theta,
+                phi,
+            )
+            projected_x.fill(np.nan)
+            projected_y.fill(np.nan)
+            los_velocity.fill(np.nan)
+            status.value = -999
+            function(
+                ctypes.c_int(orbit_type),
+                ctypes.c_int(projection_number),
+                ctypes.c_double(omega),
+                ctypes.c_double(theta),
+                ctypes.c_double(phi),
+                ctypes.c_int(samples.shape[0]),
+                state_x.ctypes.data_as(double_p),
+                state_y.ctypes.data_as(double_p),
+                state_z.ctypes.data_as(double_p),
+                state_vx.ctypes.data_as(double_p),
+                state_vy.ctypes.data_as(double_p),
+                state_vz.ctypes.data_as(double_p),
+                projected_x.ctypes.data_as(double_p),
+                projected_y.ctypes.data_as(double_p),
+                los_velocity.ctypes.data_as(double_p),
+                ctypes.byref(status),
+            )
+            assert status.value == 0
+            np.testing.assert_allclose(projected_x, expected_x, rtol=0.0, atol=1e-14)
+            np.testing.assert_allclose(projected_y, expected_y, rtol=0.0, atol=1e-14)
+            np.testing.assert_allclose(los_velocity, expected_los, rtol=0.0, atol=1e-14)
 
 
 @pytest.mark.orblib_cpp

@@ -3,6 +3,7 @@
 #include "interpolated_potential.hpp"
 #include "orbit_classification.hpp"
 #include "orbit_integrator.hpp"
+#include "orbit_projection.hpp"
 #include "orbit_rhs.hpp"
 #include "potential.hpp"
 #include "ran1.hpp"
@@ -675,6 +676,59 @@ extern "C" void orblib_cpp_api_classify_orbit_samples(
         }
         for (int i = 0; i < 3; ++i) {
             moments2[i] = result.moments2[i];
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_project_orbit_samples(
+    int orbit_type,
+    int projection_number,
+    double omega,
+    double theta_radians,
+    double phi_radians,
+    int sample_count,
+    const double* sample_state_x,
+    const double* sample_state_y,
+    const double* sample_state_z,
+    const double* sample_state_vx,
+    const double* sample_state_vy,
+    const double* sample_state_vz,
+    double* projected_x,
+    double* projected_y,
+    double* los_velocity,
+    int* status
+) noexcept {
+    if (sample_count < 0 || sample_state_x == nullptr || sample_state_y == nullptr ||
+        sample_state_z == nullptr || sample_state_vx == nullptr || sample_state_vy == nullptr ||
+        sample_state_vz == nullptr || projected_x == nullptr || projected_y == nullptr ||
+        los_velocity == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::project_orbit_samples(
+                orbit_type,
+                projection_number,
+                omega,
+                theta_radians,
+                phi_radians,
+                sample_count,
+                sample_state_x,
+                sample_state_y,
+                sample_state_z,
+                sample_state_vx,
+                sample_state_vy,
+                sample_state_vz,
+                projected_x,
+                projected_y,
+                los_velocity
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
         }
         set_status(status, kStatusOk);
     } catch (...) {

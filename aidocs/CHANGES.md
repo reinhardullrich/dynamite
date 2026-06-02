@@ -292,3 +292,15 @@ This file is append-only. Add new entries at the bottom.
   orbit-library gaps are now interpolation-grid disk caching if required for
   parity, orbit-start generation, projection/PSF/aperture mapping,
   LOSVD/qgrid accumulation, and binary output writing.
+- Ported the Fortran `project_n()` per-symmetry projection and line-of-sight
+  velocity formulas into C++ as
+  `dynamite::orblib_cpp::project_orbit_samples` in
+  `orblib_cpp/include/orbit_projection.hpp` and
+  `orblib_cpp/source/orbit_projection.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_project_orbit_samples` and opt-in pytest coverage comparing
+  projected coordinates and LOS velocities against a Python mirror of the
+  Fortran formulas for all five orbit types, all eight projection symmetries,
+  and both non-rotating and rotating-frame sign-table paths. The remaining C++
+  orbit-library gaps are now interpolation-grid disk caching if required for
+  parity, orbit-start generation, PSF/aperture mapping, LOSVD/qgrid
+  accumulation, and binary output writing.

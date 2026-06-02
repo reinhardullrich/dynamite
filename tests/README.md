@@ -60,6 +60,9 @@ Current coverage:
   output on the same independent softened black-hole RHS;
 - C++ orbit classification and moment validation against a Python mirror of
   the Fortran `integrator_find_orbtype()` formulas for all five orbit classes;
+- C++ projection and LOS-velocity validation against a Python mirror of the
+  Fortran `project_n()` formulas across all orbit types, all eight projection
+  symmetries, and non-rotating/rotating-frame sign tables;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

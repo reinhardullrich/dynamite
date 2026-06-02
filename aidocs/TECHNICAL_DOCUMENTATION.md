@@ -806,6 +806,7 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_interpolated_potential_evaluate`
 - `orblib_cpp_api_orbit_rhs_evaluate`
 - `orblib_cpp_api_classify_orbit_samples`
+- `orblib_cpp_api_project_orbit_samples`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -879,8 +880,8 @@ The first actual ported Fortran kernels are:
   as `dynamite::orblib_cpp::integrate_orbit_final_state` in
   `orblib_cpp/include/orbit_integrator.hpp` and
   `orblib_cpp/source/orbit_integrator.cpp`. This is not the full orbit-library
-  integrator yet: it does not perform projection, LOSVD binning, qgrid
-  accumulation, or output writing. The test-only C ABI helper
+  integrator yet: it does not perform PSF/aperture mapping, LOSVD binning,
+  qgrid accumulation, or output writing. The test-only C ABI helper
   `orblib_cpp_api_integrate_orbit_final_state` validates the DOP853/RHS wiring
   against SciPy DOP853 on an independent softened black-hole RHS.
 - Prescribed dense-output sample extraction for a single orbit, implemented as
@@ -901,6 +902,15 @@ The first actual ported Fortran kernels are:
   cylindrical velocity-dispersion `moments2` values. The test-only C ABI helper
   `orblib_cpp_api_classify_orbit_samples` validates all five orbit type
   outcomes and moment arrays against a Python mirror of the Fortran formulas.
+- Per-symmetry projection and line-of-sight velocity calculation from
+  `project_n()` in `orblib_f_new_mirror.f90`, implemented as
+  `dynamite::orblib_cpp::project_orbit_samples` in
+  `orblib_cpp/include/orbit_projection.hpp` and
+  `orblib_cpp/source/orbit_projection.cpp`. It preserves the Fortran position
+  and velocity sign tables for all five orbit types, all eight projection
+  symmetries, and both `Omega == 0` and `Omega != 0` paths. The test-only C ABI
+  helper `orblib_cpp_api_project_orbit_samples` validates projected coordinates
+  and LOS velocities against a Python mirror of the Fortran formulas.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python
