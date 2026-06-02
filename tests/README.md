@@ -67,6 +67,8 @@ Current coverage:
   Fortran `psf_gaussian()` and `psf_sigma_map()` branches;
 - C++ boxed aperture pixel-mapping validation against a Python mirror of the
   Fortran `aperture_boxed_find()` strict-bound and 1-based flattening formula;
+- C++ LOSVD velocity-bin and histogram accumulation validation against Python
+  mirrors of the Fortran `histogram_velbin()` and `histogram_store()` formulas;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

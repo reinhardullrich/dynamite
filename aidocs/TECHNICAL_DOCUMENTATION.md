@@ -809,6 +809,8 @@ It writes `orblib_cpp/build/lib/liborblib_cpp.so`. The exported ABI version is
 - `orblib_cpp_api_project_orbit_samples`
 - `orblib_cpp_api_apply_psf`
 - `orblib_cpp_api_find_boxed_aperture_pixels`
+- `orblib_cpp_api_losvd_velocity_bins`
+- `orblib_cpp_api_accumulate_losvd_histogram`
 - `orblib_cpp_api_integrate_orbit_final_state`
 - `orblib_cpp_api_integrate_orbit_samples`
 - `orblib_cpp_api_dop853_harmonic`
@@ -931,6 +933,19 @@ The first actual ported Fortran kernels are:
   test-only C ABI helper `orblib_cpp_api_find_boxed_aperture_pixels` validates
   interior bins, bin transitions, and boundary exclusions against a Python
   mirror of the Fortran formula.
+- LOSVD velocity-bin mapping and per-aperture histogram accumulation from
+  `histogram_velbin()` and `histogram_store()` in `orblib_f_new_mirror.f90`,
+  implemented as `dynamite::orblib_cpp::map_losvd_velocity_bins` and
+  `dynamite::orblib_cpp::accumulate_losvd_histogram` in
+  `orblib_cpp/include/orbit_histogram.hpp` and
+  `orblib_cpp/source/orbit_histogram.cpp`. The port preserves the Fortran
+  lower/upper velocity clamp behavior, strict interior velocity-bin bounds,
+  1-based velocity bins, zero aperture-pixel skip, and full-sample
+  normalization counter increment. Test-only C ABI helpers
+  `orblib_cpp_api_losvd_velocity_bins` and
+  `orblib_cpp_api_accumulate_losvd_histogram` validate those rules against
+  Python mirrors of the Fortran formulas. Bin-order collapsing, normalization,
+  sparse binary LOSVD output, and full orbit-engine wiring remain unported.
 
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python

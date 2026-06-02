@@ -17,6 +17,7 @@ CPP_SOURCES = [
     "include/interpolated_potential.hpp",
     "include/orbit_aperture.hpp",
     "include/orbit_classification.hpp",
+    "include/orbit_histogram.hpp",
     "include/orbit_integrator.hpp",
     "include/orbit_projection.hpp",
     "include/orbit_psf.hpp",
@@ -29,6 +30,7 @@ CPP_SOURCES = [
     "source/interpolated_potential.cpp",
     "source/orbit_aperture.cpp",
     "source/orbit_classification.cpp",
+    "source/orbit_histogram.cpp",
     "source/orbit_integrator.cpp",
     "source/orbit_projection.cpp",
     "source/orbit_psf.cpp",
@@ -962,6 +964,28 @@ def _expected_boxed_aperture_pixels(
             if 0.0 < y < scaled_size[1]:
                 pixels[index] = int(x * idx) + int(y * idy) * bins_x + 1
     return pixels
+
+
+def _expected_losvd_velocity_bins(los_velocity, histogram_width, histogram_center, bin_count):
+    begin = histogram_center - 0.5 * histogram_width
+    end = histogram_center + 0.5 * histogram_width
+    bin_width = histogram_width / bin_count
+    velocity_bins = np.ones(los_velocity.size, dtype=np.int32)
+    for index, velocity in enumerate(los_velocity):
+        if velocity > begin:
+            if velocity < end:
+                velocity_bins[index] = int((velocity - begin) / bin_width) + 1
+            else:
+                velocity_bins[index] = bin_count
+    return velocity_bins
+
+
+def _expected_losvd_histogram(aperture_pixels, velocity_bins, aperture_pixel_count, bin_count):
+    histogram = np.zeros((aperture_pixel_count, bin_count), dtype=np.float64)
+    for pixel, velocity_bin in zip(aperture_pixels, velocity_bins):
+        if pixel != 0:
+            histogram[pixel - 1, velocity_bin - 1] += 1.0
+    return histogram
 
 
 def _expected_interpolation_metadata(setup, rlogmin, rlogmax, n_radius, n_theta, n_phi):
@@ -2280,6 +2304,129 @@ def test_orblib_cpp_maps_boxed_aperture_pixels_like_fortran():
 
     assert status.value == 0
     np.testing.assert_array_equal(pixels, expected)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_accumulates_losvd_histogram_like_fortran():
+    histogram_width = 20.0
+    histogram_center = 5.0
+    bin_count = 5
+    los_velocity = np.ascontiguousarray(
+        [
+            -20.0,
+            -5.0,
+            -4.999,
+            -1.0,
+            -0.999,
+            2.999,
+            3.0,
+            6.999,
+            7.0,
+            10.999,
+            11.0,
+            14.999,
+            15.0,
+            50.0,
+        ],
+        dtype=np.float64,
+    )
+    expected_velocity_bins = _expected_losvd_velocity_bins(
+        los_velocity,
+        histogram_width,
+        histogram_center,
+        bin_count,
+    )
+    np.testing.assert_array_equal(
+        expected_velocity_bins,
+        np.array([1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 5, 5], dtype=np.int32),
+    )
+
+    velocity_bins = np.full(los_velocity.size, -1, dtype=np.int32)
+    status = ctypes.c_int(-999)
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+
+    velocity_function = library.orblib_cpp_api_losvd_velocity_bins
+    velocity_function.argtypes = [
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        int_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    velocity_function.restype = None
+    velocity_function(
+        ctypes.c_double(histogram_width),
+        ctypes.c_double(histogram_center),
+        ctypes.c_int(bin_count),
+        ctypes.c_int(los_velocity.size),
+        los_velocity.ctypes.data_as(double_p),
+        velocity_bins.ctypes.data_as(int_p),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    np.testing.assert_array_equal(velocity_bins, expected_velocity_bins)
+
+    aperture_pixels = np.ascontiguousarray(
+        [1, 2, 0, 3, 2, 4, 5, 5, 1, 0, 4, 2, 3, 5],
+        dtype=np.int32,
+    )
+    aperture_pixel_count = 5
+    expected_histogram = _expected_losvd_histogram(
+        aperture_pixels,
+        expected_velocity_bins,
+        aperture_pixel_count,
+        bin_count,
+    )
+    np.testing.assert_array_equal(
+        expected_histogram,
+        np.array(
+            [
+                [1.0, 0.0, 0.0, 1.0, 0.0],
+                [1.0, 1.0, 0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 0.0, 1.0],
+                [0.0, 1.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 2.0, 0.0, 1.0],
+            ],
+            dtype=np.float64,
+        ),
+    )
+
+    histogram = np.zeros((aperture_pixel_count, bin_count), dtype=np.float64)
+    stored_count = ctypes.c_double(3.5)
+    accumulate_function = library.orblib_cpp_api_accumulate_losvd_histogram
+    accumulate_function.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        int_p,
+        int_p,
+        ctypes.c_int,
+        double_p,
+        ctypes.POINTER(ctypes.c_double),
+        ctypes.POINTER(ctypes.c_int),
+    ]
+    accumulate_function.restype = None
+    status.value = -999
+    accumulate_function(
+        ctypes.c_int(aperture_pixel_count),
+        ctypes.c_int(bin_count),
+        ctypes.c_int(aperture_pixels.size),
+        aperture_pixels.ctypes.data_as(int_p),
+        velocity_bins.ctypes.data_as(int_p),
+        ctypes.c_int(aperture_pixels.size),
+        histogram.ctypes.data_as(double_p),
+        ctypes.byref(stored_count),
+        ctypes.byref(status),
+    )
+
+    assert status.value == 0
+    assert stored_count.value == pytest.approx(3.5 + aperture_pixels.size)
+    np.testing.assert_array_equal(histogram, expected_histogram)
 
 
 @pytest.mark.orblib_cpp

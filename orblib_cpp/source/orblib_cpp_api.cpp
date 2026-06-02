@@ -3,6 +3,7 @@
 #include "interpolated_potential.hpp"
 #include "orbit_aperture.hpp"
 #include "orbit_classification.hpp"
+#include "orbit_histogram.hpp"
 #include "orbit_integrator.hpp"
 #include "orbit_projection.hpp"
 #include "orbit_psf.hpp"
@@ -817,6 +818,75 @@ extern "C" void orblib_cpp_api_find_boxed_aperture_pixels(
                 projected_x,
                 projected_y,
                 pixels
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_losvd_velocity_bins(
+    double histogram_width,
+    double histogram_center,
+    int velocity_bin_count,
+    int sample_count,
+    const double* los_velocity,
+    int* velocity_bins,
+    int* status
+) noexcept {
+    if (sample_count < 0 || los_velocity == nullptr || velocity_bins == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::map_losvd_velocity_bins(
+                histogram_width,
+                histogram_center,
+                velocity_bin_count,
+                sample_count,
+                los_velocity,
+                velocity_bins
+            )) {
+            set_status(status, kStatusInvalidArgument);
+            return;
+        }
+        set_status(status, kStatusOk);
+    } catch (...) {
+        set_status(status, kStatusException);
+    }
+}
+
+extern "C" void orblib_cpp_api_accumulate_losvd_histogram(
+    int aperture_pixel_count,
+    int velocity_bin_count,
+    int sample_count,
+    const int* aperture_pixels,
+    const int* velocity_bins,
+    int total_sample_count,
+    double* histogram,
+    double* stored_count,
+    int* status
+) noexcept {
+    if (sample_count < 0 || aperture_pixels == nullptr || velocity_bins == nullptr ||
+        histogram == nullptr || stored_count == nullptr) {
+        set_status(status, kStatusInvalidArgument);
+        return;
+    }
+
+    try {
+        if (!dynamite::orblib_cpp::accumulate_losvd_histogram(
+                aperture_pixel_count,
+                velocity_bin_count,
+                sample_count,
+                aperture_pixels,
+                velocity_bins,
+                total_sample_count,
+                histogram,
+                stored_count
             )) {
             set_status(status, kStatusInvalidArgument);
             return;

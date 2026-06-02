@@ -324,3 +324,16 @@ This file is append-only. Add new entries at the bottom.
   Fortran formula. The remaining C++ orbit-library gaps are now
   interpolation-grid disk caching if required for parity, orbit-start
   generation, LOSVD/qgrid accumulation, and binary output writing.
+- Ported the Fortran `histogram_velbin()` and `histogram_store()` LOSVD
+  velocity-bin and per-aperture histogram accumulation formulas into C++ as
+  `dynamite::orblib_cpp::map_losvd_velocity_bins` and
+  `dynamite::orblib_cpp::accumulate_losvd_histogram` in
+  `orblib_cpp/include/orbit_histogram.hpp` and
+  `orblib_cpp/source/orbit_histogram.cpp`. Added test-only ABI helpers
+  `orblib_cpp_api_losvd_velocity_bins` and
+  `orblib_cpp_api_accumulate_losvd_histogram` with opt-in pytest coverage for
+  velocity clamp behavior, strict bin-boundary handling, zero aperture-pixel
+  skipping, and normalization-counter increments. Remaining C++ gaps now
+  include interpolation-grid disk caching if required for parity, orbit-start
+  generation, LOSVD bin-order normalization/output, qgrid accumulation, and
+  binary output writing.
