@@ -178,4 +178,24 @@ bool find_inner_boundaries(
     int& type_function_evaluations
 ) noexcept;
 
+bool find_outer_boundaries(
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* outer_boundaries,
+    const double* energies,
+    const double* circular_periods,
+    const double* theta_values,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* middle_boundaries,
+    int* irregular,
+    int* orbit_types,
+    int& width_evaluations,
+    int& type_function_evaluations
+) noexcept;
+
 }  // namespace dynamite::orblib_cpp

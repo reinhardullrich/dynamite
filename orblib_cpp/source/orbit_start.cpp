@@ -1175,4 +1175,219 @@ bool find_inner_boundaries(
     return true;
 }
 
+bool find_outer_boundaries(
+    InterpolatedPotential& potential,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    const double* inner_boundaries,
+    const double* outer_boundaries,
+    const double* energies,
+    const double* circular_periods,
+    const double* theta_values,
+    double integrator_accuracy,
+    int crossing_capacity,
+    int type_sample_count,
+    double* middle_boundaries,
+    int* irregular,
+    int* orbit_types,
+    int& width_evaluations,
+    int& type_function_evaluations
+) noexcept {
+    width_evaluations = 0;
+    type_function_evaluations = 0;
+    if (energy_count <= 0 || i2_count <= 3 || i3_count <= 0 ||
+        inner_boundaries == nullptr || outer_boundaries == nullptr || energies == nullptr ||
+        circular_periods == nullptr || theta_values == nullptr || integrator_accuracy <= 0.0 ||
+        crossing_capacity <= 0 || type_sample_count <= 0 || middle_boundaries == nullptr ||
+        irregular == nullptr || orbit_types == nullptr) {
+        return false;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        if (!std::isfinite(energies[energy]) || !std::isfinite(circular_periods[energy]) ||
+            circular_periods[energy] <= 0.0) {
+            return false;
+        }
+    }
+    for (int i2 = 0; i2 < i2_count; ++i2) {
+        if (!std::isfinite(theta_values[i2])) {
+            return false;
+        }
+    }
+    for (int index = 0; index < energy_count * i2_count; ++index) {
+        if (!std::isfinite(inner_boundaries[index]) ||
+            !std::isfinite(outer_boundaries[index]) || inner_boundaries[index] < 0.0 ||
+            outer_boundaries[index] <= 0.0) {
+            return false;
+        }
+        middle_boundaries[index] = outer_boundaries[index];
+        orbit_types[index] = 5;
+    }
+
+    for (int energy = 0; energy < energy_count; ++energy) {
+        int notubes = 0;
+        int i2 = i2_count - 1;
+        int index = energy * i2_count + i2;
+        double rel_rbi = inner_boundaries[index] / outer_boundaries[index];
+
+        int o1 = 5;
+        double r = 0.0;
+        int k_fortran = 0;
+        int samples_collected = 0;
+        int solver_status = 0;
+        int type_evaluations = 0;
+        for (int k = 1; k <= i3_count * 3; ++k) {
+            k_fortran = k;
+            r = inner_boundaries[index] +
+                (outer_boundaries[index] - inner_boundaries[index]) *
+                    static_cast<double>(k) / static_cast<double>(i3_count * 3 + 1);
+            if (!find_orbit_type(
+                    potential,
+                    r,
+                    theta_values[i2],
+                    energies[energy],
+                    circular_periods[energy],
+                    integrator_accuracy,
+                    type_sample_count,
+                    o1,
+                    samples_collected,
+                    solver_status,
+                    type_evaluations
+                )) {
+                return false;
+            }
+            orbit_types[index] = o1;
+            type_function_evaluations += type_evaluations;
+            if (o1 == 3) {
+                rel_rbi = r / outer_boundaries[index];
+            }
+            if ((o1 == 1 || o1 == 4) && k >= 2) {
+                break;
+            }
+        }
+
+        if (o1 == 3 && k_fortran >= i3_count) {
+            irregular[energy] = 0;
+            notubes = 1;
+        } else {
+            if (o1 == 4 || o1 == 5) {
+                const double bp = r / outer_boundaries[index];
+                bool found_x_tube = false;
+                int break_i2 = -1;
+                for (int scan_i2 = i2_count - 2; scan_i2 >= 0; --scan_i2) {
+                    const int scan_index = energy * i2_count + scan_i2;
+                    if (!find_orbit_type(
+                            potential,
+                            outer_boundaries[scan_index] * bp,
+                            theta_values[scan_i2],
+                            energies[energy],
+                            circular_periods[energy],
+                            integrator_accuracy,
+                            type_sample_count,
+                            o1,
+                            samples_collected,
+                            solver_status,
+                            type_evaluations
+                        )) {
+                        return false;
+                    }
+                    orbit_types[scan_index] = o1;
+                    type_function_evaluations += type_evaluations;
+                    if (o1 == 1) {
+                        found_x_tube = true;
+                        break_i2 = scan_i2;
+                        break;
+                    }
+                }
+                i2 = found_x_tube ? std::min(break_i2 + 1, i2_count - 2) : 0;
+            }
+        }
+
+        if (notubes == 0 && i2 > 0) {
+            middle_boundaries[energy * i2_count + i2] =
+                outer_boundaries[energy * i2_count + i2];
+
+            if (i2 > 1) {
+                double max_inner = inner_boundaries[energy * i2_count];
+                for (int scan_i2 = 1; scan_i2 < i2_count; ++scan_i2) {
+                    max_inner = std::max(max_inner, inner_boundaries[energy * i2_count + scan_i2]);
+                }
+
+                for (int k = i2 - 1; k >= 0; --k) {
+                    const int current_index = energy * i2_count + k;
+                    const int next_index = energy * i2_count + k + 1;
+                    double rbi = std::max(outer_boundaries[current_index] * rel_rbi, max_inner);
+                    double rbu = outer_boundaries[current_index] - 1.0e-6;
+                    rbu = std::min(middle_boundaries[next_index], rbu);
+
+                    double rg = std::max(
+                        std::min(
+                            middle_boundaries[next_index] / outer_boundaries[next_index] *
+                                outer_boundaries[current_index],
+                            rbu
+                        ),
+                        rbi
+                    );
+
+                    r = (1.0 - rel_rbi) / static_cast<double>(i3_count) * 3.0;
+                    rbi = std::max(rg * (1.0 - r), rbi);
+                    if (rbi >= rbu) {
+                        return false;
+                    }
+                    if (rg <= rbi || rg >= rbu) {
+                        rg = 0.5 * (rbi + rbu);
+                    }
+
+                    double width = 0.0;
+                    int trial_width_evaluations = 0;
+                    int crossing_count = 0;
+                    int function_evaluations = 0;
+                    if (!find_tube_radius(
+                            potential,
+                            rbi,
+                            rg,
+                            rbu,
+                            energies[energy],
+                            circular_periods[energy],
+                            theta_values[k],
+                            1,
+                            integrator_accuracy,
+                            crossing_capacity,
+                            middle_boundaries[current_index],
+                            width,
+                            trial_width_evaluations,
+                            solver_status,
+                            crossing_count,
+                            function_evaluations
+                        )) {
+                        return false;
+                    }
+                    width_evaluations += trial_width_evaluations;
+
+                    if (!find_orbit_type(
+                            potential,
+                            middle_boundaries[current_index],
+                            theta_values[k],
+                            energies[energy],
+                            circular_periods[energy],
+                            integrator_accuracy,
+                            type_sample_count,
+                            o1,
+                            samples_collected,
+                            solver_status,
+                            type_evaluations
+                        )) {
+                        return false;
+                    }
+                    orbit_types[current_index] = o1;
+                    type_function_evaluations += type_evaluations;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 }  // namespace dynamite::orblib_cpp

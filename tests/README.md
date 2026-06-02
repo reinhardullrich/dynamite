@@ -91,7 +91,8 @@ Current coverage:
   `findtube()`, plus orbit-start `find_type()` sampling/classifier validation
   against an independent SciPy DOP853 direct black-hole orbit, and inner
   boundary-search loop validation against a Python mirror of Fortran
-  `find_innerboundary()`;
+  `find_innerboundary()`, plus outer boundary-search loop validation against a
+  Python mirror of Fortran `find_outerboundary()`;
 - validation that the experimental C++ generation entry points fail with the
   explicit not-implemented status until the orbit engine is ported;
 - fast coverage for the direct-input orbit-start and full orbit-library

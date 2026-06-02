@@ -520,3 +520,17 @@ This file is append-only. Add new entries at the bottom.
   include interpolation-grid disk caching if required for parity, outer/mid
   orbit-start boundary search/runtime orchestration, full orbit-engine wiring,
   and full-output orchestration.
+- Ported the orbit-start `find_outerboundary()` long-axis-tube boundary loop
+  into C++ as `dynamite::orblib_cpp::find_outer_boundaries` in
+  `orblib_cpp/include/orbit_start.hpp` and
+  `orblib_cpp/source/orbit_start.cpp`. Added test-only ABI helper
+  `orblib_cpp_api_orbitstart_outer_boundaries` with opt-in pytest coverage
+  against a Python mirror of the Fortran loop using the already-tested C++
+  `find_tube_radius()` and `find_orbit_type()` ABI helpers as probe oracles.
+  The port preserves the initial short-axis-to-box scan, `rel_rbi` update
+  rule, no-tubes irregular reset, `bp` transition scan, post-loop `i`
+  adjustment, `max(boundout*rel_rbi, max(boundin(j,:)))` lower-bound formula,
+  and plane-1 thin-tube refinement scan. Updated C++ port documentation and
+  test documentation; remaining C++ gaps now include interpolation-grid disk
+  caching if required for parity, mid-boundary orbit-start search/runtime
+  orchestration, full orbit-engine wiring, and full-output orchestration.

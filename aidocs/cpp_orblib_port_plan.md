@@ -104,6 +104,7 @@ orblib_cpp_api_orbitstart_tube_orbit_width
 orblib_cpp_api_orbitstart_find_tube_radius
 orblib_cpp_api_orbitstart_find_type
 orblib_cpp_api_orbitstart_inner_boundaries
+orblib_cpp_api_orbitstart_outer_boundaries
 orblib_cpp_api_integrate_orbit_final_state
 orblib_cpp_api_integrate_orbit_samples
 orblib_cpp_api_dop853_harmonic
@@ -262,6 +263,14 @@ Current branch status:
   `foundxtubes` condition. ABI tests compare the loop output, irregular flags,
   orbit types, and probe counters against a Python mirror that calls the
   already-tested C++ `find_tube_radius()` and `find_orbit_type()` ABI helpers.
+- The `find_outerboundary()` long-axis-tube outer-boundary loop is ported as
+  `find_outer_boundaries()`. It preserves the initial short-axis-to-box scan,
+  `rel_rbi` update rule, no-tubes irregular reset, `bp` transition scan, the
+  Fortran post-loop `i = min(i+1,nI2-1)` behavior, the
+  `max(boundout*rel_rbi, max(boundin(j,:)))` lower-bound formula, and the
+  plane-1 `findtube()` refinement scan. ABI tests compare middle boundaries,
+  mutated irregular flags, orbit types, and probe counters against a Python
+  mirror using the already-tested C++ tube/type probe ABI helpers.
 - The per-record `make_boxstartpoints()` angular-grid and record construction
   path is ported as `calculate_box_start_record()`, reusing
   `find_equivalent_radius()` and testing the Fortran one-based
@@ -274,8 +283,8 @@ Current branch status:
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
 - The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching, outer/mid orbit-start boundary search,
-  runtime orbit-start orchestration, full orbit-engine wiring, and full-output
+  interpolation-grid disk caching, mid-boundary orbit-start search, runtime
+  orbit-start orchestration, full orbit-engine wiring, and full-output
   orchestration still remain.
 
 ## Known Fortran Parity Notes To Revisit
@@ -435,17 +444,17 @@ mixed with the first C++ parity port.
    serialization, plus population-mass binary serialization and formatted
    orbclass output writing, plus direct-potential orbit-start state
    construction and equivalent-radius bisection, tube-width measurement,
-   tube-radius golden-section minimization, orbit-type probing, and inner
-   boundary search. Still required: legacy interpolation-grid disk caching if
-   C++ parity requires it, outer/mid orbit-start boundary search/array
+   tube-radius golden-section minimization, orbit-type probing, and
+   inner/outer boundary search. Still required: legacy interpolation-grid disk
+   caching if C++ parity requires it, mid-boundary orbit-start search/array
    generation, full-output orchestration, and Fortran-value parity tests for
    full orbit integration.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
    Direct-potential `calc_startpos()`/`findReq()` kernels, tube-width
    measurement, tube-radius minimization, box startpoint records, and tube
-   begin/retrograde record arrays plus orbit-type probing and inner-boundary
-   search are done; outer/mid boundary search and full runtime begin/beginbox
-   orchestration still remain.
+   begin/retrograde record arrays plus orbit-type probing and inner/outer
+   boundary search are done; mid-boundary search and full runtime
+   begin/beginbox orchestration still remain.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
    standalone classification/moment kernel are done; full one-orbit parity
