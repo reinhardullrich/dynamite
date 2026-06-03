@@ -1,5 +1,6 @@
 #include "orbit_output.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <iomanip>
 #include <limits>
 #include <string>
+#include <vector>
 
 namespace dynamite::orblib_cpp {
 namespace {
@@ -100,12 +102,54 @@ bool write_qgrid_file(
     const int* orbit_types,
     const double* qgrids
 ) noexcept {
+    std::vector<int> counts(static_cast<std::size_t>(std::max(orbit_count, 0)), not_regularizable_count);
+    return write_qgrid_file_with_not_regularizable_counts(
+        path,
+        orbit_count,
+        energy_count,
+        i2_count,
+        i3_count,
+        dithering,
+        counts.data(),
+        radius_bin_count,
+        theta_bin_count,
+        phi_bin_count,
+        radius_boundaries,
+        theta_boundaries,
+        phi_boundaries,
+        orbit_types,
+        qgrids
+    );
+}
+
+bool write_qgrid_file_with_not_regularizable_counts(
+    const char* path,
+    int orbit_count,
+    int energy_count,
+    int i2_count,
+    int i3_count,
+    int dithering,
+    const int* not_regularizable_counts,
+    int radius_bin_count,
+    int theta_bin_count,
+    int phi_bin_count,
+    const double* radius_boundaries,
+    const double* theta_boundaries,
+    const double* phi_boundaries,
+    const int* orbit_types,
+    const double* qgrids
+) noexcept {
     if (path == nullptr || orbit_count <= 0 || energy_count <= 0 || i2_count <= 0 ||
-        i3_count <= 0 || dithering <= 0 || not_regularizable_count < 0 ||
+        i3_count <= 0 || dithering <= 0 || not_regularizable_counts == nullptr ||
         radius_bin_count <= 0 || theta_bin_count <= 0 || phi_bin_count <= 0 ||
         radius_boundaries == nullptr || theta_boundaries == nullptr ||
         phi_boundaries == nullptr || orbit_types == nullptr || qgrids == nullptr) {
         return false;
+    }
+    for (int orbit_index = 0; orbit_index < orbit_count; ++orbit_index) {
+        if (not_regularizable_counts[orbit_index] < 0) {
+            return false;
+        }
     }
 
     int expected_orbits = 0;
@@ -161,7 +205,7 @@ bool write_qgrid_file(
             static_cast<std::int32_t>(energy),
             static_cast<std::int32_t>(i2),
             static_cast<std::int32_t>(i3),
-            static_cast<std::int32_t>(not_regularizable_count),
+            static_cast<std::int32_t>(not_regularizable_counts[orbit_index]),
         };
         const std::size_t orbit_type_offset =
             static_cast<std::size_t>(orbit_index) * static_cast<std::size_t>(dither_count);
@@ -230,6 +274,80 @@ bool write_losvd_histogram_file(
             }
             const std::size_t row_offset =
                 static_cast<std::size_t>(row) * static_cast<std::size_t>(velocity_bin_count);
+            const std::size_t count = static_cast<std::size_t>(end_bin - begin_bin + 1);
+            if (!writer.write_array(histograms + row_offset + static_cast<std::size_t>(begin_bin), count)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool write_losvd_histogram_file_mixed(
+    const char* path,
+    int orbit_count,
+    int row_count_per_orbit,
+    int max_velocity_bin_count,
+    const int* row_velocity_bin_counts,
+    double header_velocity_bin_width,
+    const int* begin_offsets,
+    const int* end_offsets,
+    const double* histograms
+) noexcept {
+    if (path == nullptr || orbit_count <= 0 || row_count_per_orbit <= 0 ||
+        max_velocity_bin_count <= 0 || row_velocity_bin_counts == nullptr ||
+        header_velocity_bin_width <= 0.0 || begin_offsets == nullptr ||
+        end_offsets == nullptr || histograms == nullptr ||
+        !std::isfinite(header_velocity_bin_width)) {
+        return false;
+    }
+    for (int row = 0; row < row_count_per_orbit; ++row) {
+        if (row_velocity_bin_counts[row] <= 0 ||
+            row_velocity_bin_counts[row] > max_velocity_bin_count) {
+            return false;
+        }
+    }
+
+    int total_rows = 0;
+    if (!checked_mul_int(orbit_count, row_count_per_orbit, total_rows)) {
+        return false;
+    }
+
+    FortranRecordWriter writer(path);
+    if (!writer.ok()) {
+        return false;
+    }
+
+    const std::int32_t half_bin_count =
+        static_cast<std::int32_t>(static_cast<double>(row_velocity_bin_counts[0]) / 2.0);
+    if (!writer.write_losvd_setup_header(
+            static_cast<std::int32_t>(row_count_per_orbit),
+            half_bin_count,
+            header_velocity_bin_width
+        )) {
+        return false;
+    }
+
+    for (int row = 0; row < total_rows; ++row) {
+        const int row_in_orbit = row % row_count_per_orbit;
+        const int velocity_bin_count = row_velocity_bin_counts[row_in_orbit];
+        const int begin = begin_offsets[row];
+        const int end = end_offsets[row];
+        const std::int32_t sparse_range[2] = {
+            static_cast<std::int32_t>(begin),
+            static_cast<std::int32_t>(end),
+        };
+        if (!writer.write_array(sparse_range, 2)) {
+            return false;
+        }
+        if (begin <= end) {
+            const int begin_bin = begin + velocity_bin_count / 2;
+            const int end_bin = end + velocity_bin_count / 2;
+            if (begin_bin < 0 || end_bin < begin_bin || end_bin >= velocity_bin_count) {
+                return false;
+            }
+            const std::size_t row_offset =
+                static_cast<std::size_t>(row) * static_cast<std::size_t>(max_velocity_bin_count);
             const std::size_t count = static_cast<std::size_t>(end_bin - begin_bin + 1);
             if (!writer.write_array(histograms + row_offset + static_cast<std::size_t>(begin_bin), count)) {
                 return false;

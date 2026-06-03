@@ -347,10 +347,17 @@ Current branch status:
   `[energy, nI2, nI3, 9]` records in Fortran loop order and all-zero noreg
   flags, with ABI tests for output order, per-cell bisection iteration counts,
   and per-energy circular metadata propagation.
-- The orbit-specific C++ engine is still not implemented yet:
-  interpolation-grid disk caching if fixture parity requires it,
-  `orblib_cpp_api_run_orblib_direct`, full orbit-engine wiring, and
-  full-output orchestration still remain.
+- The first orbit-specific C++ engine is implemented in
+  `orblib_cpp/source/orbit_engine.cpp` and exported through
+  `orblib_cpp_api_run_orblib_direct` for the normal complete-library path. It
+  composes legacy begin precision, randomized `SOLOUT` sample cadence,
+  DOP853 integration with the Fortran energy retry rule, classification,
+  intrinsic qgrid accumulation, eight projection symmetries, persistent-RNG
+  PSF convolution, aperture mapping, LOSVD/population histogram accumulation,
+  and qgrid/LOSVD/pops/orbclass output writing. Remaining work: full
+  Fortran-value output parity against fixtures, performance benchmarking,
+  optional legacy interpolation-grid disk caching if parity/performance
+  requires it, and partial/resume-style output support.
 
 ## Known Fortran Parity Notes To Revisit
 
@@ -514,10 +521,16 @@ mixed with the first C++ parity port.
    construction and equivalent-radius bisection, tube-width measurement,
    tube-radius golden-section minimization, orbit-type probing, and
    inner/outer boundary search, plus memory-side `runorbitstart()` start-array
-   orchestration and production C++ orbit-start memory ABI wiring. Still
-   required: legacy interpolation-grid disk caching if C++ parity requires it,
-   `orblib_cpp_api_run_orblib_direct`, full-output orchestration, and
-   Fortran-value parity tests for full orbit integration.
+   orchestration and production C++ orbit-start memory ABI wiring, plus a
+   first full direct orbit-engine orchestration path through
+   `orblib_cpp_api_run_orblib_direct`. A reduced complete-library
+   Fortran-versus-C++ parity fixture now exists for qgrid, LOSVD, pops,
+   orbclass, done markers, and compressed outputs. The compressed-output
+   contract passes; strict value parity currently xfails, first at the qgrid
+   radial-boundary array. Still required: debug and fix full Fortran-value
+   parity, performance benchmarking, optional legacy interpolation-grid disk
+   caching if C++ parity or performance requires it, and partial/resume-style
+   output support.
 6. Port orbit-start generation; test against current begin/beginbox fixtures.
    Direct-potential `calc_startpos()`/`findReq()` kernels, tube-width
    measurement, tube-radius minimization, box startpoint records, and tube
@@ -525,21 +538,24 @@ mixed with the first C++ parity port.
    boundary search are done; full memory-side `runorbitstart()` start-array
    orchestration is done. `orblib_cpp_api_run_orbitstart_memory` production
    wiring is done, and active Fortran memory-ABI parity for non-rotating begin
-   and beginbox records is covered by an opt-in test. Full generated-output
-   parity still remains.
+   and beginbox records is covered by an opt-in test.
 7. Port one-orbit integration and classification; test against Fortran.
    Single-orbit final-state integration, dense sample extraction, and the
-   standalone classification/moment kernel are done; full one-orbit parity
-   still needs the Fortran sampling schedule and downstream wiring.
+   standalone classification/moment kernel are done. The full direct engine
+   now applies the Fortran randomized sample schedule and downstream wiring;
+   full generated-output parity is now covered by an opt-in strict xfail test
+   whose first observed mismatch is in the qgrid radial-boundary array.
 8. Port aperture, histogram, qgrid, and output writing.
    Per-symmetry projection, LOS velocity, PSF convolution, and boxed aperture
    mapping are done, and the LOSVD velocity-bin plus per-aperture histogram
    accumulation core plus memory-side sparse row preparation are done; qgrid
    memory-side accumulation is done; qgrid and LOSVD sparse file serialization
-   are done; population-mass and orbclass output writing are done; full engine
-   orchestration still remains.
-9. Run full generated LOSVD parity against
-   `comparison_losvd_shared_library.npz`.
+   are done; population-mass and orbclass output writing are done. The first
+   full engine orchestration is now wired and smoke-tested through the C ABI.
+9. Debug the full generated-output parity xfail. The current opt-in parity
+   fixture passes the structural contract for compressed qgrid/LOSVD/pops and
+   orbclass outputs, but strict value comparison first fails in the qgrid
+   radial-boundary array.
 10. Only after correctness, benchmark and optimize memory layout, branching,
    allocation, parallelism, and compiler flags.
 

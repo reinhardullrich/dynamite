@@ -36,7 +36,8 @@ OrbitIntegrationResult integrate_orbit_samples(
     int sample_count,
     double final_state[6],
     double* sample_states,
-    int& samples_written
+    int& samples_written,
+    double initial_step = 0.0
 ) noexcept;
 
 }  // namespace dynamite::orblib_cpp

@@ -3,6 +3,7 @@
 #include "interpolated_potential.hpp"
 #include "orbit_aperture.hpp"
 #include "orbit_classification.hpp"
+#include "orbit_engine.hpp"
 #include "orbit_histogram.hpp"
 #include "orbit_integrator.hpp"
 #include "orbit_output.hpp"
@@ -27,7 +28,6 @@ constexpr int kAbiVersion = 1;
 constexpr int kStatusOk = 0;
 constexpr int kStatusInvalidArgument = -1;
 constexpr int kStatusIoError = -2;
-constexpr int kStatusNotImplemented = -100;
 constexpr int kStatusException = -101;
 
 void set_status(int* status, int value) noexcept {
@@ -3397,64 +3397,122 @@ extern "C" void orblib_cpp_api_run_orbitstart_memory(
 }
 
 extern "C" void orblib_cpp_api_run_orblib_direct(
-    int,
-    int,
-    const double*,
-    const double*,
-    const double*,
-    const double*,
-    double,
-    double,
-    double,
-    double,
-    double,
-    double,
-    double,
-    int,
-    double,
-    double,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    int,
-    const double*,
-    int,
-    const double*,
-    const int*,
-    double,
-    int,
-    int,
-    int,
-    double,
-    int,
-    int,
-    const int*,
-    const double*,
-    const double*,
-    int,
-    const double*,
-    const double*,
-    const double*,
-    const int*,
-    const int*,
-    const int*,
-    const int*,
-    const double*,
-    const double*,
-    const int*,
-    int,
-    const int*,
-    const int*,
-    const int*,
-    const char*,
-    const char*,
-    const char*,
-    const char*,
+    int random_seed,
+    int ngauss,
+    const double* surf_pc,
+    const double* sigobs_arcsec,
+    const double* qobs,
+    const double* psi_obs_degrees,
+    double distance_mpc,
+    double theta_degrees,
+    double phi_degrees,
+    double psi_view_degrees,
+    double upsilon,
+    double black_hole_mass,
+    double black_hole_softening_arcsec,
+    int nener,
+    double rlogmin_arcsec,
+    double rlogmax_arcsec,
+    int ni2,
+    int ni3,
+    int orbit_dithering,
+    int n_radius,
+    int n_theta,
+    int n_phi,
+    int dark_halo_profile_type,
+    int dark_halo_parameter_count,
+    const double* dark_halo_parameters,
+    int begin_rows,
+    const double* begin_values,
+    const int* begin_noreg,
+    double orbital_periods,
+    int sampling,
+    int starting_orbit,
+    int number_orbits,
+    double accuracy,
+    int psf_count,
+    int max_psf_gauss,
+    const int* psf_kind,
+    const double* psf_weight,
+    const double* psf_sigma,
+    int aperture_count,
+    const double* ap_begin,
+    const double* ap_size,
+    const double* ap_rot,
+    const int* ap_binx,
+    const int* ap_biny,
+    const int* ap_psf,
+    const int* ap_hist_dim,
+    const double* hist_width,
+    const double* hist_center,
+    const int* hist_bins,
+    int max_bin_size,
+    const int* bin_type,
+    const int* bin_size,
+    const int* bin_order,
+    const char* out_qgrid_path,
+    const char* out_pops_path,
+    const char* out_losvd_path,
+    const char* out_orbclass_path,
     int* status
 ) noexcept {
-    set_status(status, kStatusNotImplemented);
+    dynamite::orblib_cpp::OrblibDirectInput input;
+    input.random_seed = random_seed;
+    input.ngauss = ngauss;
+    input.surf_pc = surf_pc;
+    input.sigobs_arcsec = sigobs_arcsec;
+    input.qobs = qobs;
+    input.psi_obs_degrees = psi_obs_degrees;
+    input.distance_mpc = distance_mpc;
+    input.theta_degrees = theta_degrees;
+    input.phi_degrees = phi_degrees;
+    input.psi_view_degrees = psi_view_degrees;
+    input.upsilon = upsilon;
+    input.black_hole_mass = black_hole_mass;
+    input.black_hole_softening_arcsec = black_hole_softening_arcsec;
+    input.nener = nener;
+    input.rlogmin_arcsec = rlogmin_arcsec;
+    input.rlogmax_arcsec = rlogmax_arcsec;
+    input.ni2 = ni2;
+    input.ni3 = ni3;
+    input.orbit_dithering = orbit_dithering;
+    input.n_radius = n_radius;
+    input.n_theta = n_theta;
+    input.n_phi = n_phi;
+    input.dark_halo_profile_type = dark_halo_profile_type;
+    input.dark_halo_parameter_count = dark_halo_parameter_count;
+    input.dark_halo_parameters = dark_halo_parameters;
+    input.begin_rows = begin_rows;
+    input.begin_values = begin_values;
+    input.begin_noreg = begin_noreg;
+    input.orbital_periods = orbital_periods;
+    input.sampling = sampling;
+    input.starting_orbit = starting_orbit;
+    input.number_orbits = number_orbits;
+    input.accuracy = accuracy;
+    input.psf_count = psf_count;
+    input.max_psf_gauss = max_psf_gauss;
+    input.psf_kind = psf_kind;
+    input.psf_weight = psf_weight;
+    input.psf_sigma = psf_sigma;
+    input.aperture_count = aperture_count;
+    input.ap_begin = ap_begin;
+    input.ap_size = ap_size;
+    input.ap_rot = ap_rot;
+    input.ap_binx = ap_binx;
+    input.ap_biny = ap_biny;
+    input.ap_psf = ap_psf;
+    input.ap_hist_dim = ap_hist_dim;
+    input.hist_width = hist_width;
+    input.hist_center = hist_center;
+    input.hist_bins = hist_bins;
+    input.max_bin_size = max_bin_size;
+    input.bin_type = bin_type;
+    input.bin_size = bin_size;
+    input.bin_order = bin_order;
+    input.out_qgrid_path = out_qgrid_path;
+    input.out_pops_path = out_pops_path;
+    input.out_losvd_path = out_losvd_path;
+    input.out_orbclass_path = out_orbclass_path;
+    set_status(status, dynamite::orblib_cpp::run_orblib_direct_generation(input));
 }

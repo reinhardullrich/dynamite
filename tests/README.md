@@ -24,6 +24,7 @@ DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -
 make -C orblib_cpp shared
 DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_inventory.py tests/test_orblib_api.py -m orblib_cpp
 DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_inventory.py -m "orblib_cpp and orblib_fortran"
+DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_CPP_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -m pytest tests/test_cpp_orblib_parity.py
 ```
 
 Current coverage:
@@ -103,8 +104,15 @@ Current coverage:
   non-rotating begin tube records and `Omega == 0` beginbox box records;
 - validation that the experimental C++ orbit-start memory backend returns
   Python-readable begin/beginbox arrays through the public facade;
-- validation that full C++ orbit-library generation fails with an explicit
-  `NotImplementedError` until the orbit engine is ported;
+- validation that the experimental C++ full-generation backend dispatches tube
+  and box generation through `orblib_cpp_api_run_orblib_direct`, plus an
+  opt-in direct C++ generator smoke test that writes qgrid, LOSVD, and
+  orbclass outputs readable through SciPy `FortranFile`;
+- opt-in active Fortran versus C++ full-library parity coverage for a reduced
+  complete NGC6278 fixture with standalone population apertures. The output
+  contract test verifies tube/box done markers and compressed qgrid,
+  LOSVD, pops, plus plain orbclass outputs. The strict value-parity test currently
+  xfails; the first observed mismatch is the qgrid radial-boundary array;
 - fast coverage for the direct-input orbit-start and full orbit-library
   payload extraction, plus opt-in coverage for the non-bar direct-input
   shared-library orbit-start ABI;

@@ -22,6 +22,7 @@ CPP_SOURCES = [
     "include/interpolated_potential.hpp",
     "include/orbit_aperture.hpp",
     "include/orbit_classification.hpp",
+    "include/orbit_engine.hpp",
     "include/orbit_histogram.hpp",
     "include/orbit_integrator.hpp",
     "include/orbit_output.hpp",
@@ -38,6 +39,7 @@ CPP_SOURCES = [
     "source/interpolated_potential.cpp",
     "source/orbit_aperture.cpp",
     "source/orbit_classification.cpp",
+    "source/orbit_engine.cpp",
     "source/orbit_histogram.cpp",
     "source/orbit_integrator.cpp",
     "source/orbit_output.cpp",
@@ -5862,6 +5864,326 @@ def test_orblib_cpp_orbitstart_memory_api_matches_active_fortran_memory_api(
     np.testing.assert_array_equal(cpp_beginbox_noreg, fortran_beginbox_noreg)
     np.testing.assert_allclose(cpp_begin, fortran_begin, rtol=5e-12, atol=1e-6)
     np.testing.assert_allclose(cpp_beginbox, fortran_beginbox, rtol=5e-12, atol=1e-6)
+
+
+@pytest.mark.orblib_cpp
+def test_orblib_cpp_direct_engine_writes_readable_outputs(tmp_path):
+    surf_pc = np.array(
+        [26819.14, 2456.39, 456.8, 645.49, 14.73, 122.85, 1.0],
+        dtype=np.float64,
+    )
+    sigobs_arcsec = np.array(
+        [0.49416, 2.04299, 2.44313, 6.5305, 17.41488, 21.84711, 21.84711],
+        dtype=np.float64,
+    )
+    qobs = np.array(
+        [0.89541, 0.79093, 0.9999, 0.55097, 0.9999, 0.55097, 0.55097],
+        dtype=np.float64,
+    )
+    psi_obs = np.zeros_like(qobs)
+    theta = 82.444308859
+    psi = 90.021481540
+    phi = 84.245110877
+    distance = 39.9
+    upsilon = 1.0
+    black_hole_mass = 1.0e9
+    black_hole_softening_arcsec = 0.0
+    dark_halo_parameters = np.ascontiguousarray([], dtype=np.float64)
+    energy_count = 2
+    i2_count = 4
+    i3_count = 1
+    orbit_dithering = 1
+    n_radius = 8
+    n_theta = 4
+    n_phi = 4
+    total_records = energy_count * i2_count * i3_count
+
+    double_p = ctypes.POINTER(ctypes.c_double)
+    int_p = ctypes.POINTER(ctypes.c_int)
+    orbitstart_memory_argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        int_p,
+        double_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+    ]
+    orblib_direct_argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        double_p,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        int_p,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_double,
+        ctypes.c_int,
+        ctypes.c_int,
+        int_p,
+        double_p,
+        double_p,
+        ctypes.c_int,
+        double_p,
+        double_p,
+        double_p,
+        int_p,
+        int_p,
+        int_p,
+        int_p,
+        double_p,
+        double_p,
+        int_p,
+        ctypes.c_int,
+        int_p,
+        int_p,
+        int_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.POINTER(ctypes.c_int),
+    ]
+
+    library = ctypes.CDLL(str(ORBLIB_CPP_SHARED_LIBRARY))
+    orbitstart = library.orblib_cpp_api_run_orbitstart_memory
+    orbitstart.argtypes = orbitstart_memory_argtypes
+    orbitstart.restype = None
+
+    begin = np.empty(total_records * 9, dtype=np.float64)
+    beginbox = np.empty(total_records * 9, dtype=np.float64)
+    begin_noreg = np.empty(total_records, dtype=np.int32)
+    beginbox_noreg = np.empty(total_records, dtype=np.int32)
+    rows = ctypes.c_int(-1)
+    box_rows = ctypes.c_int(-1)
+    status = ctypes.c_int(-999)
+    orbitstart(
+        ctypes.c_int(42),
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(energy_count),
+        ctypes.c_double(-3.0),
+        ctypes.c_double(1.0),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_int(orbit_dithering),
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_int(0),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(total_records),
+        begin.ctypes.data_as(double_p),
+        begin_noreg.ctypes.data_as(int_p),
+        beginbox.ctypes.data_as(double_p),
+        beginbox_noreg.ctypes.data_as(int_p),
+        ctypes.byref(rows),
+        ctypes.byref(box_rows),
+        ctypes.byref(status),
+    )
+    assert status.value == 0
+    assert rows.value == total_records
+
+    begin_values = np.asfortranarray(begin.reshape(total_records, 9))
+    begin_noreg = np.ascontiguousarray(begin_noreg, dtype=np.int32)
+    psf_kind = np.ascontiguousarray([1], dtype=np.int32)
+    psf_weight = np.asfortranarray([[1.0]], dtype=np.float64)
+    psf_sigma = np.asfortranarray([[0.0]], dtype=np.float64)
+    ap_begin = np.asfortranarray([[-1.0e6, -1.0e6]], dtype=np.float64)
+    ap_size = np.asfortranarray([[2.0e6, 2.0e6]], dtype=np.float64)
+    ap_rot = np.ascontiguousarray([0.0], dtype=np.float64)
+    ap_binx = np.ascontiguousarray([1], dtype=np.int32)
+    ap_biny = np.ascontiguousarray([1], dtype=np.int32)
+    ap_psf = np.ascontiguousarray([1], dtype=np.int32)
+    ap_hist_dim = np.ascontiguousarray([1], dtype=np.int32)
+    hist_width = np.ascontiguousarray([1.0e7], dtype=np.float64)
+    hist_center = np.ascontiguousarray([0.0], dtype=np.float64)
+    hist_bins = np.ascontiguousarray([5], dtype=np.int32)
+    bin_type = np.ascontiguousarray([1], dtype=np.int32)
+    bin_size = np.ascontiguousarray([1], dtype=np.int32)
+    bin_order = np.asfortranarray([[1]], dtype=np.int32)
+
+    qgrid_path = tmp_path / "orblib_qgrid.dat"
+    pops_path = tmp_path / "orblib_pops.dat"
+    losvd_path = tmp_path / "orblib_losvd_hist.dat"
+    orbclass_path = tmp_path / "orblib.dat_orbclass.out"
+    direct = library.orblib_cpp_api_run_orblib_direct
+    direct.argtypes = orblib_direct_argtypes
+    direct.restype = None
+    status.value = -999
+    direct(
+        ctypes.c_int(42),
+        ctypes.c_int(surf_pc.size),
+        surf_pc.ctypes.data_as(double_p),
+        sigobs_arcsec.ctypes.data_as(double_p),
+        qobs.ctypes.data_as(double_p),
+        psi_obs.ctypes.data_as(double_p),
+        ctypes.c_double(distance),
+        ctypes.c_double(theta),
+        ctypes.c_double(phi),
+        ctypes.c_double(psi),
+        ctypes.c_double(upsilon),
+        ctypes.c_double(black_hole_mass),
+        ctypes.c_double(black_hole_softening_arcsec),
+        ctypes.c_int(energy_count),
+        ctypes.c_double(-3.0),
+        ctypes.c_double(1.0),
+        ctypes.c_int(i2_count),
+        ctypes.c_int(i3_count),
+        ctypes.c_int(orbit_dithering),
+        ctypes.c_int(n_radius),
+        ctypes.c_int(n_theta),
+        ctypes.c_int(n_phi),
+        ctypes.c_int(0),
+        ctypes.c_int(dark_halo_parameters.size),
+        None,
+        ctypes.c_int(total_records),
+        begin_values.ctypes.data_as(double_p),
+        begin_noreg.ctypes.data_as(int_p),
+        ctypes.c_double(1.0),
+        ctypes.c_int(16),
+        ctypes.c_int(1),
+        ctypes.c_int(-1),
+        ctypes.c_double(1.0e-4),
+        ctypes.c_int(1),
+        ctypes.c_int(1),
+        psf_kind.ctypes.data_as(int_p),
+        psf_weight.ctypes.data_as(double_p),
+        psf_sigma.ctypes.data_as(double_p),
+        ctypes.c_int(1),
+        ap_begin.ctypes.data_as(double_p),
+        ap_size.ctypes.data_as(double_p),
+        ap_rot.ctypes.data_as(double_p),
+        ap_binx.ctypes.data_as(int_p),
+        ap_biny.ctypes.data_as(int_p),
+        ap_psf.ctypes.data_as(int_p),
+        ap_hist_dim.ctypes.data_as(int_p),
+        hist_width.ctypes.data_as(double_p),
+        hist_center.ctypes.data_as(double_p),
+        hist_bins.ctypes.data_as(int_p),
+        ctypes.c_int(1),
+        bin_type.ctypes.data_as(int_p),
+        bin_size.ctypes.data_as(int_p),
+        bin_order.ctypes.data_as(int_p),
+        str(qgrid_path).encode(),
+        str(pops_path).encode(),
+        str(losvd_path).encode(),
+        str(orbclass_path).encode(),
+        ctypes.byref(status),
+    )
+    assert status.value == 0
+    assert qgrid_path.is_file()
+    assert losvd_path.is_file()
+    assert not pops_path.exists()
+    assert orbclass_path.is_file()
+
+    qgrid_reader = scipy.io.FortranFile(qgrid_path, "r")
+    try:
+        np.testing.assert_array_equal(
+            qgrid_reader.read_ints(np.int32),
+            np.array([total_records, energy_count, i2_count, i3_count, orbit_dithering], dtype=np.int32),
+        )
+        np.testing.assert_array_equal(
+            qgrid_reader.read_ints(np.int32),
+            np.array([16, n_phi, n_theta, n_radius], dtype=np.int32),
+        )
+        _ = qgrid_reader.read_reals(float)
+        _ = qgrid_reader.read_reals(float)
+        _ = qgrid_reader.read_reals(float)
+        for orbit_number in range(1, total_records + 1):
+            orbit_header = qgrid_reader.read_ints(np.int32)
+            assert orbit_header[0] == orbit_number
+            assert qgrid_reader.read_ints(np.int32).shape == (orbit_dithering**3,)
+            qgrid = qgrid_reader.read_reals(float)
+            assert qgrid.shape == (16 * n_phi * n_theta * n_radius,)
+            assert np.all(np.isfinite(qgrid))
+    finally:
+        qgrid_reader.close()
+
+    losvd_reader = scipy.io.FortranFile(losvd_path, "r")
+    try:
+        header_apertures, header_half_bins, header_bin_width = losvd_reader.read_record(
+            np.int32,
+            np.int32,
+            float,
+        )
+        np.testing.assert_array_equal(header_apertures, np.array([1], dtype=np.int32))
+        np.testing.assert_array_equal(header_half_bins, np.array([2], dtype=np.int32))
+        np.testing.assert_array_equal(header_bin_width, np.array([hist_width[0] / hist_bins[0]], dtype=np.float64))
+        for _orbit in range(total_records):
+            begin_offset, end_offset = losvd_reader.read_ints(np.int32)
+            if begin_offset <= end_offset:
+                values = losvd_reader.read_reals(float)
+                assert values.size == end_offset - begin_offset + 1
+                assert np.all(values >= 0.0)
+    finally:
+        losvd_reader.close()
+
+    orbclass_values = np.fromstring(orbclass_path.read_text(), sep=" ")
+    assert orbclass_values.size == 5 * total_records * orbit_dithering**3
+    assert np.all(np.isfinite(orbclass_values))
 
 
 @pytest.mark.orblib_cpp

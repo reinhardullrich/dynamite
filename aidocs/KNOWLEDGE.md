@@ -79,8 +79,9 @@ changes from the original project.
 - `orblib_cpp/`: experimental C++ orbit-library backend on the
   `fortran-to-cpp` branch. The current branch builds
   `orblib_cpp/build/lib/liborblib_cpp.so`, exports ABI version `1`, implements
-  the C++ orbit-start memory ABI, and keeps full orbit-library generation
-  blocked until the C++ orbit engine orchestration is ported. This branch is
+  the C++ orbit-start memory ABI, and now wires a first full C++ direct
+  orbit-library generator through `orblib_cpp_api_run_orblib_direct`. This
+  branch is
   under a parity freeze: active Fortran
   behavior and Fortran-derived fixtures are the oracle until full C++ parity is
   proven, even when a Fortran comment or local variable name appears to
@@ -154,9 +155,16 @@ changes from the original project.
   irregular-energy dithering expansion, `noreggrid`, tube begin records,
   rotating-frame retrograde beginbox records, and non-rotating box beginbox
   records. The production C++ `orblib_cpp_api_run_orbitstart_memory` entry
-  point now returns those arrays through the Python-compatible memory ABI; the
-  full `orblib_cpp_api_run_orblib_direct` orbit-library generator remains
-  unimplemented.
+  point now returns those arrays through the Python-compatible memory ABI.
+  `orblib_cpp/include/orbit_engine.hpp` and
+  `orblib_cpp/source/orbit_engine.cpp` compose the first full direct
+  C++ orbit-library generator for the normal complete-library path
+  (`starting_orbit == 1`, `number_orbits == -1` or the full orbit count):
+  legacy begin-row precision, DOP853 integration with randomized `SOLOUT`
+  sample cadence and energy-retry fallback, classification, qgrid
+  accumulation, eight projection symmetries, persistent-RNG PSF convolution,
+  aperture mapping, LOSVD/population histogram accumulation, qgrid/LOSVD/pops
+  binary output, and formatted orbclass output.
   `Ran1` is tested against the existing Python/Fortran reference
   sequence; DOP853 is tested through the shared library on harmonic-oscillator
   final-state and dense-output samples; elliptic integrals are tested against
@@ -194,13 +202,23 @@ changes from the original project.
   records. It also has an opt-in active Fortran memory-ABI parity test for
   the non-rotating begin tube records and `Omega == 0` beginbox box records,
   using Fortran's hardcoded 400 crossing samples and 5000 `find_type()`
-  samples.
+  samples. The direct C++ orbit generator has an opt-in smoke test that builds
+  C++ begin rows, runs `orblib_cpp_api_run_orblib_direct` on a small complete
+  library, and reads qgrid/LOSVD/orbclass outputs through SciPy
+  `FortranFile`. A separate opt-in slow Fortran-versus-C++ full-library parity
+  fixture now generates a reduced complete NGC6278 library with standalone
+  population apertures. Its output-contract test passes for tube/box markers
+  and compressed qgrid/LOSVD/pops plus plain orbclass outputs; its strict
+  value-parity test is marked `xfail` because the current C++ output does not
+  yet match active Fortran, with the first observed mismatch in the qgrid
+  radial-boundary array.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
   typed request/result objects, `run_orbit_library()`, the active
   `fortran_shared_library` backend, and the experimental `cpp_shared_library`
   backend. The Fortran backend calls
   `orblib_fortran/build/lib/liborblib_fortran.so` through `ctypes`; the C++
-  backend calls `orblib_cpp/build/lib/liborblib_cpp.so`. Python
+  backend calls `orblib_cpp/build/lib/liborblib_cpp.so` for C++ orbit-start
+  arrays and full direct tube/box orbit-library generation. Python
   passes non-bar MGE/orbit/dark-halo settings, orbit starts, PSF tables,
   aperture geometry, histogram settings, binning maps, and output paths as
   typed arrays/scalars. It no longer creates Fortran `infil/` inputs and no
@@ -208,9 +226,11 @@ changes from the original project.
   backend intentionally preserves legacy text-interface precision for
   `parameters_pot` values and `begin` rows, and uses the generated
   `interpolgrid` in the model directory as an internal cache shared by
-  orbit-start, tube, and box workers. Binary `datfil/` orbit-library outputs
-  remain the active output contract for the existing Python readers and weight
-  solvers.
+  orbit-start, tube, and box workers for the Fortran backend. The C++ backend
+  currently builds its interpolation grid in memory and does not implement the
+  legacy `interpolgrid` disk-cache contract. Binary `datfil/` orbit-library
+  outputs remain the active output contract for the existing Python readers
+  and weight solvers.
 - `tests/`: local pytest baseline for the active orblib Fortran shared-library
   backend, the direct-input Python API facade, and future replacement work. The
   default suite covers fixture contracts, extracted historical workflow facts, small
@@ -221,7 +241,12 @@ changes from the original project.
   generated direct shared-library output both against the historical
   executable-generated fixture with legacy compatibility tolerances and against
   `data/comparison_losvd_shared_library.npz`, a current shared-library fixture
-  with tight per-element `1e-12` tolerance.
+  with tight per-element `1e-12` tolerance. The opt-in C++ full-library parity
+  tests require `DYNAMITE_RUN_SLOW_TESTS=1`,
+  `DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1`, and
+  `DYNAMITE_RUN_ORBLIB_CPP_TESTS=1`; they currently pass the compressed-output
+  contract for qgrid/LOSVD/pops plus orbclass and xfail strict value
+  comparison at the qgrid radial boundaries.
 - `docs/`: upstream Sphinx documentation.
 - `archive/dev_tests/`: archived upstream development tests, notebooks, sample
   configurations, and historical fixtures kept for human reference.
@@ -273,10 +298,10 @@ source files.
   optimize aggressively for speed, allocation behavior, RHS/acceleration
   throughput, cache locality, and reproducible parallel execution. The current
   implementation slices build a C++ shared library and wire
-  `cpp_shared_library` into Python; `run_orbitstart_memory()` now returns C++
-  begin/beginbox arrays, while full generation calls raise a hard
-  `NotImplementedError` because `orblib_cpp_api_run_orblib_direct` is not
-  ported yet. The first actual ported Fortran kernels are `ran1_nr.f`,
+  `cpp_shared_library` into Python; `run_orbitstart_memory()` returns C++
+  begin/beginbox arrays, and `generate_orbit_library()` now runs C++ tube and
+  box generation through `orblib_cpp_api_run_orblib_direct` for complete
+  libraries. The first actual ported Fortran kernels are `ran1_nr.f`,
   implemented as a no-hot-loop-allocation C++ `Ran1` class with ABI test helper
   `orblib_cpp_api_ran1_sequence`, and `numerics/dop853.f`, implemented as a
   reusable C++ `Dop853` solver with preallocated work arrays, dense-output
@@ -306,11 +331,15 @@ source files.
   golden-section minimization plus `find_type()` orbit-type probing and
   `find_innerboundary()`/`find_outerboundary()` boundary orchestration, plus
   memory-side `runorbitstart()` start-array orchestration and production
-  `orblib_cpp_api_run_orbitstart_memory` wiring. The legacy `interpolgrid`
-  disk-cache contract if fixture parity requires it,
-  `orblib_cpp_api_run_orblib_direct`, and full orbit-engine wiring are the
-  next unported dependencies. The current start-array coverage includes direct
-  active Fortran memory-ABI parity for non-rotating begin and beginbox records.
+  `orblib_cpp_api_run_orbitstart_memory` wiring, plus first-pass direct
+  orbit-engine orchestration in `orbit_engine.cpp`. The direct C++ generator
+  currently supports the normal complete-library settings path; partial
+  `starting_orbit`/`number_orbits` resume-style output is still rejected
+  because the active Python readers expect the full orbit count declared in
+  the qgrid header. The legacy `interpolgrid` disk-cache contract remains
+  unported for C++; add it only if fixture parity or performance requires it.
+  The current start-array coverage includes direct active Fortran memory-ABI
+  parity for non-rotating begin and beginbox records.
   A known parity
   note is recorded in `aidocs/cpp_orblib_port_plan.md`: Fortran
   `make_startpoints()` comments describe a "last irregular energy" noreg rule,

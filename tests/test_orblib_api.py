@@ -398,20 +398,86 @@ def test_cpp_orbitstart_backend_returns_memory_arrays(
 
 
 @pytest.mark.orblib_cpp
-def test_cpp_full_generation_fails_until_orbit_engine_is_ported(
+def test_cpp_full_generation_calls_direct_cpp_engine(
     tmp_path,
     monkeypatch,
 ):
     workspace = copy_orblib_fixture_workspace(tmp_path)
-    _model, orbit_library = make_fixture_orbit_library(workspace, monkeypatch)
+    model, orbit_library = make_fixture_orbit_library(workspace, monkeypatch)
 
     backend = orblib_api.SharedLibraryCppOrbitBackend()
+    orbit_start = orblib_api.OrbitStartMemoryResult(
+        begin_values=np.zeros((24, 9), dtype=np.float64),
+        begin_noreg=np.zeros(24, dtype=np.int32),
+        beginbox_values=np.zeros((24, 9), dtype=np.float64),
+        beginbox_noreg=np.zeros(24, dtype=np.int32),
+    )
+    calls = []
 
-    with pytest.raises(
-        NotImplementedError,
-        match="C\\+\\+ full orbit-library generation is not implemented yet",
+    def fake_run_orbitstart_memory(received_orbit_library):
+        assert received_orbit_library is orbit_library
+        return orbit_start
+
+    def fake_call_orblib_direct_function(
+        library_path,
+        model_inputs,
+        library_inputs,
+        fileroot,
+        begin_values,
+        begin_noreg,
+        **kwargs,
     ):
-        backend.generate_orbit_library(orbit_library)
+        calls.append(
+            (
+                library_path,
+                fileroot,
+                begin_values.shape,
+                begin_noreg.shape,
+                kwargs["abi_function_name"],
+                kwargs["orblib_function_name"],
+            ),
+        )
+
+    monkeypatch.setattr(
+        backend,
+        "run_orbitstart_memory",
+        fake_run_orbitstart_memory,
+    )
+    monkeypatch.setattr(
+        orblib_api,
+        "_call_orblib_direct_function",
+        fake_call_orblib_direct_function,
+    )
+    monkeypatch.setattr(
+        orblib_api.SharedLibraryFortranOrbitBackend,
+        "_calculate_python_intrinsic_masses",
+        lambda self, received_orbit_library: None,
+    )
+
+    backend.generate_orbit_library(orbit_library)
+
+    assert calls == [
+        (
+            backend.library_path,
+            "orblib",
+            (24, 9),
+            (24,),
+            "orblib_cpp_api_abi_version",
+            "orblib_cpp_api_run_orblib_direct",
+        ),
+        (
+            backend.library_path,
+            "orblibbox",
+            (24, 9),
+            (24,),
+            "orblib_cpp_api_abi_version",
+            "orblib_cpp_api_run_orblib_direct",
+        ),
+    ]
+    datfil = Path(model.directory_noml) / "datfil"
+    assert (datfil / "tube_done").is_file()
+    assert (datfil / "box_done").is_file()
+    assert (datfil / "tube_box_done").is_file()
 
 
 @pytest.mark.slow

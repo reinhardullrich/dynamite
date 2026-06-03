@@ -138,7 +138,8 @@ OrbitIntegrationResult integrate_orbit_samples(
     int sample_count,
     double final_state[6],
     double* sample_states,
-    int& samples_written
+    int& samples_written,
+    double initial_step
 ) noexcept {
     OrbitIntegrationResult result;
     result.final_time = t_start;
@@ -170,6 +171,7 @@ OrbitIntegrationResult integrate_orbit_samples(
     options.max_steps = max_steps;
     options.stiffness_check_interval = -1;
     options.dense_components = sample_count > 0 ? 6 : 0;
+    options.initial_step = initial_step;
 
     OrbitRhsContext rhs_context;
     rhs_context.potential = &potential;

@@ -987,7 +987,9 @@ The first actual ported Fortran kernels are:
   `orblib_cpp/source/orbit_output.cpp`. The test-only C ABI helper
   `orblib_cpp_api_write_losvd_histogram_file` validates the mixed setup record,
   sparse begin/end records, and optional value records through SciPy
-  `FortranFile`. Full orbit-engine wiring remains unported.
+  `FortranFile`. The direct C++ engine also uses
+  `write_losvd_histogram_file_mixed()` for Fortran-compatible rows whose
+  velocity-bin count can vary by aperture.
 - Intrinsic qgrid boundary setup, moment accumulation, orbit-type channel
   accumulation, and normalization from `qgrid_setup()`, `qgrid_store()`, and
   `qgrid_write()` in `orblib_f_new_mirror.f90`, implemented in
@@ -1008,7 +1010,9 @@ The first actual ported Fortran kernels are:
   `integrator_write()`, and `qgrid_write()` for the split
   `*_qgrid.dat` output files. The test-only C ABI helper
   `orblib_cpp_api_write_qgrid_file` validates the generated file through
-  SciPy `FortranFile`.
+  SciPy `FortranFile`. The direct C++ engine uses
+  `write_qgrid_file_with_not_regularizable_counts()` so the
+  `totalnotregularizable` header field can vary per orbit as in Fortran.
 - Population projected-mass Fortran-record binary serialization, implemented
   as `dynamite::orblib_cpp::write_population_mass_file` in
   `orblib_cpp/include/orbit_output.hpp` and
@@ -1089,14 +1093,40 @@ The first actual ported Fortran kernels are:
   `orblib_api_run_orbitstart_memory` ABI for non-rotating begin tube records
   and `Omega == 0` beginbox box records.
 
+The first full direct C++ orbit-library generator is implemented as
+`dynamite::orblib_cpp::run_orblib_direct_generation` in
+`orblib_cpp/include/orbit_engine.hpp` and
+`orblib_cpp/source/orbit_engine.cpp`, exported through
+`orblib_cpp_api_run_orblib_direct`. It supports the normal complete-library
+path (`starting_orbit == 1` and `number_orbits == -1` or the full orbit
+count). The engine consumes Python-provided begin rows, applies the same
+legacy begin-row precision quantization as the Fortran direct path, integrates
+each dither with the translated DOP853/RHS stack, uses the Fortran randomized
+`SOLOUT` sample cadence and energy-conservation retry rule, classifies
+orbits, accumulates intrinsic qgrid moments, loops all eight non-rotating
+projection symmetries, applies PSF convolution with a persistent `Ran1` stream,
+maps aperture pixels, accumulates LOSVD/population histograms, and writes
+qgrid, LOSVD, optional pops, and orbclass outputs readable by the existing
+Python readers. The C++ engine currently builds the interpolation grid in
+memory and does not implement the Fortran `interpolgrid` disk-cache contract.
+Partial/resume-style generation is still rejected because the active Python
+readers expect a complete orbit count in the qgrid header. Current coverage
+includes an opt-in ABI smoke test with C++-generated begin rows and SciPy
+`FortranFile` checks for qgrid/LOSVD/orbclass output structure, plus an
+opt-in slow active Fortran-versus-C++ complete-library fixture with standalone
+population apertures. The parity fixture verifies tube/box done markers and
+compressed qgrid/LOSVD/pops plus plain orbclass outputs. Its strict value-parity
+test is marked `xfail`; the first observed mismatch is the qgrid
+radial-boundary array.
+
 The Python API facade accepts backend name `cpp_shared_library`. Read-only
 requests with `generate_if_missing=False` can use the same existing Python
 orbit-library readers as the Fortran backend. `run_orbitstart_memory()` now
 uses the C++ shared library and returns begin/beginbox arrays. Full generation
-calls still raise a Python `NotImplementedError`, because
-`orblib_cpp_api_run_orblib_direct` and the full orbit-engine orchestration are
-not implemented yet. This is intentional and prevents a partial orbit-start
-implementation from silently masquerading as complete orbit-library generation.
+now calls C++ orbit-start memory, runs tube and box generation through
+`orblib_cpp_api_run_orblib_direct`, compresses the generated split binary
+outputs, and then relies on the existing Python readers. The backend remains
+experimental until generated-output parity and performance are proven.
 
 The default backend remains `fortran_shared_library` until the C++ backend
 matches the Fortran-derived fixtures and passes the planned parity tests.

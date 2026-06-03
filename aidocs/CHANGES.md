@@ -591,3 +591,30 @@ This file is append-only. Add new entries at the bottom.
   `orblib_cpp_api_run_orblib_direct` and the full orbit engine are ported.
   Updated canonical knowledge, the C++ port plan, technical documentation, and
   test documentation.
+- Implemented the first full direct C++ orbit-library generator. Added
+  `orblib_cpp/include/orbit_engine.hpp` and
+  `orblib_cpp/source/orbit_engine.cpp`, wired
+  `orblib_cpp_api_run_orblib_direct`, and updated the Python
+  `cpp_shared_library` backend so full generation runs C++ orbit-start memory,
+  tube generation, box generation, output compression, and existing Python
+  readers. The engine supports the normal complete-library path and composes
+  legacy begin precision, Fortran-style randomized sample cadence,
+  DOP853/energy retry integration, classification, qgrid accumulation,
+  projection, persistent-RNG PSF convolution, aperture mapping,
+  LOSVD/population histograms, and qgrid/LOSVD/pops/orbclass output writing.
+  Extended C++ output writers for per-orbit qgrid noreg flags and mixed LOSVD
+  velocity-bin counts, and exposed the DOP853 initial-step guess in the orbit
+  sample wrapper. Added opt-in C++ tests for Python backend dispatch and a
+  direct-engine output smoke read through SciPy `FortranFile`. Updated
+  canonical knowledge, the C++ port plan, technical documentation, and test
+  documentation.
+- Added an opt-in full active Fortran-versus-C++ orbit-library parity fixture.
+  New `tests/test_cpp_orblib_parity.py` generates a reduced complete NGC6278
+  library with a standalone population aperture under both the Fortran and C++
+  shared-library backends. It verifies the output contract for tube/box done
+  markers, compressed qgrid/LOSVD/pops files, and plain orbclass files, and includes
+  a strict value-parity comparison for qgrid, LOSVD, pops, and orbclass. The
+  value-parity test is marked strict `xfail` because current C++ output first
+  diverges from active Fortran in the qgrid radial-boundary array. Updated
+  canonical knowledge, the C++ port plan, technical documentation, and test
+  documentation.

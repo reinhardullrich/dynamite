@@ -347,6 +347,7 @@ class SharedLibraryCppOrbitBackend:
 
     def __init__(self, library_path: Path | None = None):
         self.library_path = Path(library_path or _default_cpp_shared_library_path())
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
     def run(self, request: OrbitLibraryRequest) -> OrbitLibraryResult:
         orbit_library = _make_legacy_orbit_library(request)
@@ -365,12 +366,38 @@ class SharedLibraryCppOrbitBackend:
                 "the active orbit-library API. Use NNLS instead."
             )
         self._require_library()
-        raise NotImplementedError(
-            "C++ full orbit-library generation is not implemented yet. "
-            "The C++ orbit-start memory API is implemented, but "
-            "orblib_cpp_api_run_orblib_direct still needs the full orbit "
-            "engine orchestration."
+        (mod_dir / "datfil").mkdir(parents=True, exist_ok=True)
+
+        orbit_start = self.run_orbitstart_memory(orbit_library)
+
+        if orbit_library.orblibs_in_parallel:
+            self.logger.info(
+                "cpp_shared_library backend runs tube and box libraries "
+                "sequentially in the first full-generator implementation."
+            )
+        self._run_orbit_library_part_direct(
+            mod_dir,
+            "orblib",
+            orbit_library,
+            orbit_start.begin_values,
+            orbit_start.begin_noreg,
         )
+        self._run_orbit_library_part_direct(
+            mod_dir,
+            "orblibbox",
+            orbit_library,
+            orbit_start.beginbox_values,
+            orbit_start.beginbox_noreg,
+        )
+
+        SharedLibraryFortranOrbitBackend._calculate_python_intrinsic_masses(
+            self,
+            orbit_library,
+        )
+        tube_done = (mod_dir / "datfil" / "tube_done").is_file()
+        box_done = (mod_dir / "datfil" / "box_done").is_file()
+        if tube_done and box_done:
+            done_file.touch()
 
     def run_orbitstart_memory(self, orbit_library: Any) -> OrbitStartMemoryResult:
         self._require_library()
@@ -382,6 +409,43 @@ class SharedLibraryCppOrbitBackend:
             backend_label="C++",
             orbitstart_function_name="orblib_cpp_api_run_orbitstart_memory",
         )
+
+    def _run_orbit_library_part_direct(
+        self,
+        mod_dir: Path,
+        fileroot: str,
+        orbit_library: Any,
+        begin_values: np.ndarray,
+        begin_noreg: np.ndarray,
+    ) -> None:
+        datfil = mod_dir / "datfil"
+        done_file = datfil / ("tube_done" if fileroot == "orblib" else "box_done")
+        SharedLibraryFortranOrbitBackend._remove_orbit_library_outputs(
+            self,
+            datfil,
+            fileroot,
+        )
+        model_inputs = _orbitstart_memory_inputs(orbit_library)
+        library_inputs = _direct_orblib_inputs(orbit_library)
+        with _working_directory(mod_dir):
+            _call_orblib_direct_function(
+                self.library_path,
+                model_inputs,
+                library_inputs,
+                fileroot,
+                begin_values,
+                begin_noreg,
+                abi_function_name="orblib_cpp_api_abi_version",
+                expected_abi_version=CPP_SHARED_LIBRARY_ABI_VERSION,
+                backend_label="C++",
+                orblib_function_name="orblib_cpp_api_run_orblib_direct",
+            )
+        for suffix in ("qgrid", "pops", "losvd_hist"):
+            SharedLibraryFortranOrbitBackend._compress_fortran_output(
+                self,
+                datfil / f"{fileroot}_{suffix}.dat",
+            )
+        done_file.touch()
 
     def _require_library(self) -> None:
         if not self.library_path.is_file():
