@@ -43,7 +43,7 @@ def set_weight_solver(config_path, solver_type, nnls_solver):
         yaml.safe_dump(config, handle, sort_keys=False)
 
 
-def generate_losvd_histogram(workspace, monkeypatch):
+def generate_orbit_library(workspace, monkeypatch):
     import dynamite as dyn
 
     monkeypatch.chdir(workspace)
@@ -58,7 +58,7 @@ def generate_losvd_histogram(workspace, monkeypatch):
     register_fixture_model(config, model, parset)
     orbit_library = model.get_orblib()
     orbit_library.read_losvd_histograms()
-    return orbit_library.losvd_histograms[0]
+    return orbit_library
 
 
 def register_fixture_model(config, model, parset):
@@ -114,6 +114,58 @@ def assert_losvd_matches_shared_library_reference(actual, reference_path):
     np.testing.assert_allclose(actual.y, expected_y, rtol=1e-12, atol=1e-12)
 
 
+def assert_intrinsic_moments_match_shared_library_reference(
+    orbit_library,
+    reference_path,
+):
+    intmoms, grid = orbit_library.read_orbit_intrinsic_moments(cache=False)
+    reference = np.load(reference_path)
+
+    assert intmoms.shape == reference["intmoms"].shape
+    assert np.all(np.isfinite(intmoms))
+    np.testing.assert_array_equal(grid[0], reference["grid_r"])
+    np.testing.assert_array_equal(grid[1], reference["grid_th"])
+    np.testing.assert_array_equal(grid[2], reference["grid_ph"])
+    np.testing.assert_allclose(
+        intmoms,
+        reference["intmoms"],
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def assert_orbclass_outputs_have_standard_shape(workspace):
+    with (workspace / "user_test_config.yaml").open() as handle:
+        config = yaml.safe_load(handle)
+    settings = config["orblib_settings"]
+    n_orbits = settings["nE"] * settings["nI2"] * settings["nI3"]
+    n_dither = settings["dithering"] ** 3
+    expected_values = 5 * n_dither * n_orbits
+
+    orbclass_files = sorted(
+        (workspace / "NGC6278_output").glob(
+            "models/**/datfil/orblib*.dat_orbclass.out",
+        ),
+    )
+    assert [path.name for path in orbclass_files] == [
+        "orblib.dat_orbclass.out",
+        "orblibbox.dat_orbclass.out",
+    ]
+
+    for orbclass_file in orbclass_files:
+        data = np.fromiter(
+            (
+                float(value)
+                for line in orbclass_file.read_text().splitlines()
+                for value in line.split()
+            ),
+            dtype=float,
+        )
+        assert data.size == expected_values
+        reshaped = data.reshape((5, n_dither, n_orbits), order="F")
+        assert np.all(np.isfinite(reshaped))
+
+
 @pytest.fixture(scope="module")
 def generated_shared_library_losvd(tmp_path_factory):
     workspace = copy_orblib_fixture_workspace(
@@ -122,9 +174,10 @@ def generated_shared_library_losvd(tmp_path_factory):
     set_orbit_random_seed(workspace / "user_test_config.yaml", seed=4242)
 
     with pytest.MonkeyPatch.context() as monkeypatch:
-        actual = generate_losvd_histogram(workspace, monkeypatch)
+        orbit_library = generate_orbit_library(workspace, monkeypatch)
+        actual = orbit_library.losvd_histograms[0]
 
-    return actual, workspace
+    return actual, workspace, orbit_library
 
 
 def test_configuration_rejects_archived_legacy_weight_solver(tmp_path, monkeypatch):
@@ -151,7 +204,7 @@ def test_configuration_rejects_archived_legacy_weight_solver(tmp_path, monkeypat
 def test_fortran_orblib_losvd_output_matches_reference_fixture(
     generated_shared_library_losvd,
 ):
-    actual, workspace = generated_shared_library_losvd
+    actual, workspace, _ = generated_shared_library_losvd
 
     output_dir = workspace / "NGC6278_output"
     assert output_dir.is_dir()
@@ -166,9 +219,36 @@ def test_fortran_orblib_losvd_output_matches_reference_fixture(
 def test_fortran_orblib_losvd_output_matches_shared_library_fixture(
     generated_shared_library_losvd,
 ):
-    actual, workspace = generated_shared_library_losvd
+    actual, workspace, _ = generated_shared_library_losvd
 
     assert_losvd_matches_shared_library_reference(
         actual,
         workspace / "data" / "comparison_losvd_shared_library.npz",
     )
+
+
+@pytest.mark.slow
+@pytest.mark.orblib_fortran
+def test_fortran_orblib_orbclass_outputs_keep_standard_shape(
+    generated_shared_library_losvd,
+):
+    _, workspace, _ = generated_shared_library_losvd
+
+    assert_orbclass_outputs_have_standard_shape(workspace)
+
+
+@pytest.mark.slow
+@pytest.mark.orblib_fortran
+def test_fortran_orblib_intrinsic_moments_match_shared_library_fixture(
+    generated_shared_library_losvd,
+):
+    _, workspace, orbit_library = generated_shared_library_losvd
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.chdir(workspace)
+        assert_intrinsic_moments_match_shared_library_reference(
+            orbit_library,
+            workspace
+            / "data"
+            / "comparison_intrinsic_moments_shared_library.npz",
+        )

@@ -69,17 +69,13 @@ changes from the original project.
     runtime optimization and output-size opportunities.
   - `change-guide.md`: high-risk changes, parity requirements, tests, and
     update checklists.
-- `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
-- `aidocs/audits/dynamite_fortran_audit.md`: Fortran-side audit findings.
-- `aidocs/audits/dynamite_scientific_correctness_audit.md`: scientific
-  correctness audit.
-- `aidocs/audits/full-audit-2026-06-01/`: completed full audit run, split by
+- `aidocs/audits/full-audit-2026-06-04/`: current full audit package, split by
   repository/build, configuration, physical model, data ingestion, model
   iteration, orbit-library boundary, weight solving, Fortran backend,
-  analysis/plotting/coloring, tests/docs, scientific correctness, and
-  operational risk. It also includes an improvement-focused continuation in
-  `14_improvement_opportunities.md`. Start with `SUMMARY.md` for the
-  prioritized results.
+  analysis/plotting/coloring, tests/docs, scientific correctness, operational
+  risk, active runtime verification, improvement opportunities, and active
+  NNLS solver policy. Start with `SUMMARY.md` for the prioritized current
+  findings.
 
 ## Main Project Layout
 
@@ -139,21 +135,12 @@ changes from the original project.
 The local audit notes are generated documentation only; they are not upstream
 source files.
 
-- Python audit: found packaging, dependency, runtime-validation,
-  orbit-library failure-detection, and dark-halo method risks.
-- Fortran audit: found legacy failure-handling, solver-status, build-system,
-  and uninitialized-data risks.
-- Scientific audit: found the core non-rotating triaxial
-  Schwarzschild/MGE modelling chain scientifically grounded, with caveats
-  around convergence, barred-model benchmarking, cored-log halo density
-  domains, and modelling priors.
-- Full 2026-06-01 audit: this is now an adapted historical audit baseline. The
-  original run found CI coverage gaps, unsafe output-state mutation, weak
-  Python-to-Fortran failure detection, solver-result validation gaps, physical
-  parameter domain gaps, and non-atomic model/cache writes. After the local
-  Fortran cleanup, active orbit generation uses the direct shared-library API,
-  active pytest coverage lives under `tests/`, and Python `NNLS` is the active
-  weight-solver path.
+- Full audit package: `aidocs/audits/full-audit-2026-06-04/` is current as of
+  2026-06-04. Current high-priority findings are configuration/model
+  constructors that mutate output state, non-atomic model/cache/weight writes,
+  incomplete Python solver-result validation, physical/log-parameter domain
+  validation gaps, tolerance-based model identity checks, and plotting/coloring
+  runtime risks.
 - Active runtime verification: `13_active_runtime_verification.md` documents
   the current shared-library build, direct Python-input API, binary `datfil/`
   output contract, Python `NNLS` solver contract, pytest coverage, verification
@@ -211,6 +198,8 @@ asking first.
 Current local audit environment:
 
 - Python dependencies are installed in `.venv/`.
+- Current package metadata requires Python 3.10 or newer. CI covers Python
+  3.10, 3.11, and 3.12.
 - `pip check` passed after the local editable install.
 - GNU Fortran 13.3.0 at `/usr/bin/gfortran` was used for the active
   no-GALAHAD Fortran build.

@@ -312,13 +312,14 @@ contains
             if (regurizable(temporbit) == 1) totalnotregularizable = 1
             !print*,"  * Starting integrating :",integrator_current,dith,temporbit
             call real_integrator(temporbit, pos, vel)
-            call integrator_find_orbtype(otype, moments, moments2, pos, vel) ! (BT)
+            call integrator_find_orbtype(otype, moments, pos, vel) ! (BT)
             integrator_orbittypes(dith) = otype
             integrator_moments(:, dith) = moments
             done = .false.
 
             ! write orbit information  in case of figure rotation (BT)
             if (Omega /= 0.0_dp ) then
+               call integrator_find_rotating_moments(moments2, pos, vel)
                r_mean = moments(4)*conversion_factor**(-1.0_dp)
                lz2    = moments(3)*conversion_factor**(-1.0_dp)
                !cir = moments(3)/( SQRT(moments(5))*moments(4) )
@@ -720,13 +721,11 @@ contains
     END SUBROUTINE SOLOUT
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    subroutine integrator_find_orbtype(type, moments, moments2, pos, vel) ! (BT)
+    subroutine integrator_find_orbtype(type, moments, pos, vel) ! (BT)
         integer(kind=i4b), intent(out) :: type
-        real(kind=dp), intent(out), dimension(:) :: moments, moments2 ! (BT)
+        real(kind=dp), intent(out), dimension(:) :: moments ! (BT)
         real(kind=dp), intent(in), dimension(:, :) :: pos
         real(kind=dp), intent(in), dimension(size(pos, 1), 3) :: vel
-        real (kind=dp),dimension(size(pos,1)) :: vr, vt, vz ! (BT)
-        real (kind=dp) :: sd_vr, sd_vt, sd_vz, mean_vr, mean_vt, mean_vz, n ! (BT)
         !----------------------------------------------------------------------
         real(kind=dp) :: lxc, lyc, lzc
         real(kind=dp), dimension(size(pos, 1)) :: t
@@ -772,6 +771,15 @@ contains
 
         !print*,moments(3),moments(5),moments(3)/moments(4)/sqrt(moments(5))
 
+    end subroutine integrator_find_orbtype
+
+    subroutine integrator_find_rotating_moments(moments2, pos, vel) ! (BT)
+        real(kind=dp), intent(out), dimension(:) :: moments2 ! (BT)
+        real(kind=dp), intent(in), dimension(:, :) :: pos
+        real(kind=dp), intent(in), dimension(size(pos, 1), 3) :: vel
+        real(kind=dp), dimension(size(pos, 1)) :: vr, vt, vz ! (BT)
+        real(kind=dp) :: sd_vr, sd_vt, sd_vz, mean_vr, mean_vt, mean_vz, n ! (BT)
+        !----------------------------------------------------------------------
         ! convert velocity to cylinderical  (anisotropy) (BT)
         vr = ( pos(:,1) * vel(:,1) +  pos(:,2) * vel(:,2) ) / sqrt(pos(:,1)**2+pos(:,2)**2)
         vt = ( pos(:,1) * vel(:,2) +  pos(:,2) * vel(:,1) ) / sqrt(pos(:,1)**2+pos(:,2)**2)
@@ -791,7 +799,7 @@ contains
         moments2(2) =  sd_vt
         moments2(3) =  sd_vz
 
-    end subroutine integrator_find_orbtype
+    end subroutine integrator_find_rotating_moments
 
     subroutine computer_energy(Y, E)
       use initial_parameters, only: Omega ! (BT)

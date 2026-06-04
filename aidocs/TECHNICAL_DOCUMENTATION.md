@@ -941,11 +941,8 @@ scientifically grounded. The main caveats from the local audits are:
 - solver status should be checked carefully
 - build and dependency environments matter
 
-For detailed audit notes, see:
-
-- `aidocs/audits/dynamite_python_audit.md`
-- `aidocs/audits/dynamite_fortran_audit.md`
-- `aidocs/audits/dynamite_scientific_correctness_audit.md`
+For detailed audit notes, see
+`aidocs/audits/full-audit-2026-06-04/SUMMARY.md`.
 
 ## Development And Modification Guidance
 

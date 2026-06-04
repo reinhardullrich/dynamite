@@ -57,85 +57,114 @@ processes.
 
 ### PF-01: Skip Rotating-Frame-Only Moment Work In Non-Rotating Runs
 
-Finding: `integrator_find_orbtype()` computes cylindrical velocity-dispersion
-moments `moments2` for every integrated trajectory, but active non-bar
-triaxial runs only write those values inside the `Omega /= 0.0_dp` branch.
+Status: implemented on 2026-06-04.
+
+Original finding: `integrator_find_orbtype()` computed cylindrical
+velocity-dispersion moments `moments2` for every integrated trajectory, but
+active non-bar triaxial runs only write those values inside the
+`Omega /= 0.0_dp` branch.
 
 Evidence:
 
-- `orbit_integrator.f90:315` always calls
-  `integrator_find_orbtype(otype, moments, moments2, pos, vel)`.
-- `orbit_integrator.f90:320-340` uses `moments2` only when
-  `Omega /= 0.0_dp`.
-- `orbit_integrator.f90:775-792` computes `vr`, `vt`, `vz`, means, and
-  standard deviations over all sampled points.
+- `orbit_integrator.f90` now calls
+  `integrator_find_orbtype(otype, moments, pos, vel)` for standard orbit
+  classification and five standard orbit-property moments.
+- `orbit_integrator.f90` now calls
+  `integrator_find_rotating_moments(moments2, pos, vel)` only inside the
+  existing `Omega /= 0.0_dp` branch.
+- The rotating helper contains the old `vr`, `vt`, `vz`, mean, and standard
+  deviation calculations unchanged.
 - Python orbit-property reading expects five standard columns from
   `orbclass.out`, not these rotating-frame extras:
   `dynamite/orblib.py:1120-1151`.
 
-Improvement: split `integrator_find_orbtype()` into always-needed orbit type
-and five `moments` columns, plus optional rotating-frame diagnostics. In normal
-`Omega == 0` runs, do not compute `moments2`.
+Implementation: split the always-needed orbit type and five `moments` columns
+from the rotating-frame diagnostics. In normal `Omega == 0` runs, the backend
+does not compute `moments2`. In rotating runs, the same `moments2` formulas are
+still called before writing the rotating-frame diagnostic line.
 
 Potential payoff: medium. It removes several full-array passes over
 `integrator_points` per dithered trajectory. With `sampling: 50000`, this is
 not tiny.
 
-Risk: low/medium. The main risk is accidentally changing `orbclass.out` or
-orbit classification. Tests must compare generated LOSVD/qgrid outputs and
-`orbclass.out` structure before and after.
+Risk after implementation: low for normal non-rotating runs if generated
+LOSVD/qgrid parity tests pass, because the standard orbit-classification and
+five standard moment formulas are unchanged. Rotating-frame behavior still
+needs a dedicated test before treating this path as scientifically verified.
 
 ### PF-02: Replace QGrid Eight-Way Positive-Octant Search
 
-Finding: `qgrid_store()` loops over all eight symmetry projections for every
-sampled point, but the comment says the test passes only once per point.
+Status: implemented on 2026-06-04.
+
+Original finding: `qgrid_store()` looped over all eight symmetry projections
+for every sampled point, but the comment said the test passes only once per
+point.
 
 Evidence:
 
-- `intrinsic_qgrid.f90:182-218` loops `i = 1, size(proj, 1)` and then
-  `j = 1, 8`.
-- `intrinsic_qgrid.f90:185-186` says it finds the one projection in the
-  positive octant and that doing this with a loop is stupid.
-- Only the branch at `intrinsic_qgrid.f90:194-217` stores anything.
+- `intrinsic_qgrid.f90` now calls
+  `qgrid_positive_octant_projection_index(...)` once per sampled point.
+- The helper uses table-driven mappings to return the exact projection slot
+  previously selected by the first successful loop iteration.
+- Non-rotating models preserve all eight sign combinations.
+- Rotating models preserve the old four-fold/eight-slot convention: only slots
+  1, 3, 5, and 7 can be selected because the old rotating position-sign table
+  duplicated slots in pairs.
+- Boundary behavior is preserved: points with `x == 0` or `z == 0` are not
+  stored; non-rotating `y == 0` uses the positive-y sign slot; rotating
+  `y == 0` follows the sign of `x`.
 
-Improvement: compute the needed sign projection directly from the signs of
-`x`, `y`, and `z`, then apply the matching velocity sign row. For rotating
-models, preserve the four-fold/eight-slot convention currently selected by
-`Omega`.
+Implementation: compute the needed projection index directly from the signs of
+`x`, `y`, and `z`, then apply the existing position and velocity sign rows once.
+The old `psgn1`, `psgn2`, `vsgn1`, and `vsgn2` tables remain the source of
+truth for coordinate and velocity sign application.
 
 Potential payoff: medium to high inside qgrid work. It removes up to seven
 failed branch tests and sign multiplications per sampled point. Total-run
 payoff depends on how much time is qgrid versus DOP853 integration.
 
-Risk: medium. Symmetry conventions affect scientific output. Implement only
-with a table-driven mapping and parity tests against existing generated qgrid
-and LOSVD fixtures.
+Risk after implementation: medium in general because symmetry conventions
+affect scientific output. The normal non-rotating fixture now checks both LOSVD
+and full intrinsic qgrid moments against generated reference data. A dedicated
+rotating-frame qgrid fixture is still needed before treating the `Omega /= 0`
+path as scientifically regression-tested.
 
 ### PF-03: Precompute Sign Tables Once Per Setup
 
-Finding: both `qgrid_store()` and `project_n()` declare full sign tables,
-assign `vsgn=vsgn1`, `psgn=psgn1`, and branch on `Omega` inside routines that
-are called repeatedly.
+Status: implemented on 2026-06-04.
+
+Original finding: both `qgrid_store()` and `project_n()` declared full sign
+tables, assigned `vsgn=vsgn1`, `psgn=psgn1`, and branched on `Omega` inside
+routines that are called repeatedly.
 
 Evidence:
 
-- `intrinsic_qgrid.f90:104-164` builds/selects qgrid sign tables inside
-  `qgrid_store()`.
-- `projection.f90:100-158` builds/selects projection sign tables inside
-  `project_n()`.
-- `projection.f90:36-47` has a setup routine where these choices could be
-  established once.
+- `projection.f90` now stores the non-rotating and rotating projection sign
+  tables as module-level parameters.
+- `projection_setup()` now selects `projection_psgn` and `projection_vsgn`
+  once from `Omega`.
+- `project_n()` no longer imports `Omega`, declares full sign tables, or copies
+  selected sign arrays.
+- `intrinsic_qgrid.f90` now stores the non-rotating and rotating qgrid sign
+  tables as module-level parameters.
+- `qgrid_setup()` now selects `qgrid_psgn`, `qgrid_vsgn`, and
+  `qgrid_rotating_frame` once from `Omega`.
+- `qgrid_store()` no longer imports `Omega`, declares full sign tables, or
+  copies selected sign arrays.
 
-Improvement: move selected sign tables to module state during setup, or expose
-a shared sign-table module. `project_n()` and `qgrid_store()` should only index
-already-selected arrays.
+Implementation: selected sign tables are module state in their existing
+modules. No new shared module was introduced, so the change avoids build-order
+and interface churn while removing the per-call setup work. The existing sign
+values were moved, not changed.
 
 Potential payoff: low to medium. The table copies are small, but the calls are
 frequent. This is mostly cleanup that removes avoidable work and reduces the
 chance of inconsistent sign-table edits.
 
-Risk: low/medium. Parity tests still required because sign tables are
-scientifically sensitive.
+Risk after implementation: low/medium. Normal non-rotating generated qgrid and
+LOSVD parity tests cover the active fixture. A dedicated rotating-frame fixture
+is still needed before treating the `Omega /= 0` sign-table path as
+scientifically regression-tested.
 
 ### PF-04: Precompute PSF To Aperture Dispatch
 
@@ -221,15 +250,39 @@ Evidence:
 - `dynamite/orblib.py:767-774` decompresses LOSVD to a temp file.
 - `dynamite/orblib.py:871-875` decompresses pops to a temp file.
 
-Improvement: test whether `FortranFile` can read a suitable file-like object
-backed by decompressed bytes or a streaming wrapper. If not, keep the current
-path for correctness. This is more about disk churn and read latency than final
-stored size.
+Checked result, 2026-06-04: SciPy `FortranFile` cannot directly replace the
+temporary files with `io.BytesIO` or `bz2.BZ2File`.
 
-Potential payoff: low to medium, depending on output size and filesystem.
+- `FortranFile.__init__` accepts objects with `.seek`.
+- `FortranFile.read_record()` still calls `np.fromfile(self._fp, ...)`.
+- `io.BytesIO` fails because it has no real file descriptor.
+- `bz2.BZ2File` has a file descriptor, but `np.fromfile()` reads compressed
+  bytes from the underlying descriptor rather than decompressed bytes, corrupting
+  Fortran record markers.
 
-Risk: medium. `FortranFile` expects Fortran record markers and may require
-seekable behavior. Do not replace without tests on large files.
+Feasible alternative: a small custom Fortran-record reader that uses
+`file.read(n)` and `np.frombuffer(...)` can stream from `bz2.open(...)`
+correctly. A synthetic check with default-qgrid-sized records verified
+correctness. On a 36.9 MB raw / 0.68 MB `.bz2` synthetic file, the current
+temp-file path was slightly faster in a local micro-benchmark:
+
+```text
+temp bunzip2 + scipy FortranFile: best ~2.15 s
+streaming bz2 + custom reader:   best ~2.40 s
+```
+
+Improvement: do not replace this blindly. If disk churn or temp-file collisions
+become a practical problem, prototype a small internal record reader behind
+tests and benchmark it on real DYNAMITE `datfil/` outputs. This is more about
+temporary disk use and shell/subprocess cleanup than guaranteed wall-time
+improvement.
+
+Potential payoff: low to medium, depending on output size, filesystem, and
+whether avoiding temporary files matters more than raw read speed.
+
+Risk: medium. A custom reader must exactly preserve Fortran record-marker
+handling, mixed-record reads, dtype behavior, EOF/error behavior, and large-file
+performance. Do not replace without tests on large real files.
 
 ## Output-Size Findings
 
@@ -404,4 +457,3 @@ DYNAMITE_RUN_SLOW_TESTS=1 DYNAMITE_RUN_ORBLIB_FORTRAN_TESTS=1 .venv/bin/python -
 
 For output-format changes, add a new explicit format-version test and keep
 legacy-reader coverage until old outputs are intentionally unsupported.
-

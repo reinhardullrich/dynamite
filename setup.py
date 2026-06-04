@@ -11,7 +11,11 @@ with open("README.md", "r") as fh:
 
 # load the package requirements from requirements.txt
 with open("requirements.txt", "r") as fp:
-    required = fp.read().splitlines()
+    required = [
+        line.strip()
+        for line in fp
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
 
 orblib_fortran = [
     "../orblib_fortran/build/lib/liborblib_fortran.so",

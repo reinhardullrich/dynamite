@@ -29,16 +29,75 @@ module projection
     integer(kind=i4b), public, parameter :: projection_symmetry = 1
 
     real(kind=dp), public :: theta_proj, phi_proj, psi_proj
+    real(kind=dp), private, dimension(3, 8, 5) :: projection_vsgn
+    real(kind=dp), private, dimension(3, 8) :: projection_psgn
+
+    ! Signs of the (vx,vy,vz) for each Projection and type of Orbit.
+    real(kind=dp), private, dimension(3, 8, 5), &
+        parameter :: projection_vsgn_nonrotating = reshape((/ &
+                                    ! X tubes
+                                    1, 1, 1, -1, 1, 1, 1, 1, -1, -1, 1, -1, &
+                                    -1, -1, 1, 1, -1, 1, -1, -1, -1, 1, -1, -1, &
+                                    ! Y tubes
+                                    1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, &
+                                    -1, -1, 1, -1, 1, -1, -1, -1, -1, -1, 1, 1, &
+                                    ! Z tubes
+                                    1, 1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, &
+                                    1, 1, -1, 1, -1, 1, -1, -1, -1, -1, 1, 1, &
+                                    ! Boxed
+                                    1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
+                                    1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, &
+                                    ! Stochastic
+                                    1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
+                                    1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1/), (/3, 8, 5/))
+
+    ! Signs of the x,y,z for each projection: psgn([x,y,z], project).
+    real(kind=dp), private, dimension(3, 8), &
+        parameter :: projection_psgn_nonrotating = reshape((/ &
+                                    1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
+                                    1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1/), (/3, 8/))
+
+    ! Signs of the (vx,vy,vz) for each Projection and type of Orbit.
+    ! 4-fold symmetry in case of rotating frame.
+    real(kind=dp), private, dimension(3, 8, 5), &
+        parameter :: projection_vsgn_rotating = reshape((/  &
+             ! X tubes
+             1 , 1 , 1    ,1 , 1 , 1  ,  -1 , -1 ,1  ,   -1 , -1 , 1 , &
+             1 ,1 , -1    ,1 ,1 , -1  , -1 ,-1 ,-1  ,  -1 ,-1 , -1 , &
+             ! Y tubes
+             1 , 1 , 1    , 1 , 1 ,1  ,  1 , 1 ,-1  ,  1 , 1 , -1 , &
+             -1 , -1 , 1   ,-1 , -1 ,1  , -1 ,-1 ,-1  , -1 ,-1 , -1 , &
+             ! Z tubes
+             1 , 1 , 1    , 1 ,1 , 1  , -1 ,-1 , 1  , -1 , -1 , 1 , &
+             1 , 1 ,-1    , 1 ,1 ,-1  , -1 ,-1 ,-1  , -1 , -1 ,-1 , &
+             ! Boxed
+             1 , 1 , 1    ,1 , 1 , 1  , -1 ,-1 , 1  ,  -1 ,-1 , 1 , &
+             1 , 1 ,-1    ,1 , 1 ,-1  , -1 ,-1 ,-1  ,  -1 ,-1 ,-1 , &
+             ! Stochastic
+             1 , 1 , 1    ,1 , 1 , 1  , -1 ,-1 , 1  ,  -1 ,-1 , 1 , &
+             1 , 1 ,-1    ,1 , 1 ,-1  , -1 ,-1 ,-1  ,  -1 ,-1 ,-1 /),(/3,8,5/))
+
+    ! Signs of the x,y,z for each projection: psgn([x,y,z], project).
+    real(kind=dp), private, dimension(3, 8), &
+        parameter :: projection_psgn_rotating = reshape((/  &
+             1 , 1 , 1   , 1 , 1 , 1   , -1 , -1 , 1 ,  -1 , -1 , 1 , &
+             1 , 1 ,-1   , 1 , 1 ,-1  , -1 , -1 ,-1 ,  -1 , -1 ,-1 /),(/3,8/))
 
 contains
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine projection_setup()
-        use initial_parameters, only: theta_view, phi_view, psi_view
+        use initial_parameters, only: Omega, theta_view, phi_view, psi_view
         !----------------------------------------------------------------------
         print *, "  ** Projection setup"
         print *, "  * 8 Projections for Triaxial model"
         proj_number = 8
+        projection_vsgn = projection_vsgn_nonrotating
+        projection_psgn = projection_psgn_nonrotating
+        if (Omega /= 0.0_dp) then
+            projection_vsgn = projection_vsgn_rotating
+            projection_psgn = projection_psgn_rotating
+        end if
         print *, "  * Inclination of the model is (theta,phi): ", theta_view, phi_view, psi_view
         theta_proj = theta_view
         phi_proj = phi_view
@@ -83,7 +142,6 @@ contains
 
     !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     subroutine project_n(type, pos, vel, proj, losvel, n)
-      use initial_parameters, only :  Omega ! (BT)
         ! use initial_parameters, only : theta_view, phi_view
         ! pos( :, (r,z) )
         real(kind=dp), intent(in), dimension(:, :)   :: pos
@@ -97,66 +155,6 @@ contains
         !----------------------------------------------------------------------
         real(kind=dp)              :: t1, t2, t3, theta, phi
 
-        real (kind=dp),dimension(3,8,5) ::vsgn          ! (BT)
-        real (kind=dp),dimension(3,8) ::psgn            ! (BT)
-
-        ! Signs of the (vx,vy,vz) for each Projection and type of Orbit
-        real(kind=dp), dimension(3, 8, 5), &
-            parameter :: vsgn1 = reshape((/ &
-                                        ! X tubes
-                                        1, 1, 1, -1, 1, 1, 1, 1, -1, -1, 1, -1, &
-                                        -1, -1, 1, 1, -1, 1, -1, -1, -1, 1, -1, -1, &
-                                        ! Y tubes
-                                        1, 1, 1, 1, -1, -1, 1, 1, -1, 1, -1, 1, &
-                                        -1, -1, 1, -1, 1, -1, -1, -1, -1, -1, 1, 1, &
-                                        ! Z tubes
-                                        1, 1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, &
-                                        1, 1, -1, 1, -1, 1, -1, -1, -1, -1, 1, 1, &
-                                        ! Boxed
-                                        1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
-                                        1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1, &
-                                        ! Stochastic
-                                        1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
-                                        1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1/), (/3, 8, 5/))
-
-        !Signs of the x,y,z for each projection  :psgn( [x,y,z], project )
-        real(kind=dp), dimension(3, 8), &
-            parameter :: psgn1 = reshape((/ &
-                                        1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, &
-                                        1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1/), (/3, 8/))
-
-
-        ! Signs of the (vx,vy,vz) for each Projection and type of Orbit
-        ! (BT) 4-fold symmetry same as before
-        real (kind=dp),dimension(3,8,5),parameter :: vsgn2= reshape((/  &
-             ! X tubes
-             1 , 1 , 1    ,1 , 1 , 1  ,  -1 , -1 ,1  ,   -1 , -1 , 1 , &
-             1 ,1 , -1    ,1 ,1 , -1  , -1 ,-1 ,-1  ,  -1 ,-1 , -1 , &
-             ! Y tubes
-             1 , 1 , 1    , 1 , 1 ,1  ,  1 , 1 ,-1  ,  1 , 1 , -1 , &
-             -1 , -1 , 1   ,-1 , -1 ,1  , -1 ,-1 ,-1  , -1 ,-1 , -1 , &
-             ! Z tubes
-             1 , 1 , 1    , 1 ,1 , 1  , -1 ,-1 , 1  , -1 , -1 , 1 , &
-             1 , 1 ,-1    , 1 ,1 ,-1  , -1 ,-1 ,-1  , -1 , -1 ,-1 , &
-             ! Boxed
-             1 , 1 , 1    ,1 , 1 , 1  , -1 ,-1 , 1  ,  -1 ,-1 , 1 , &
-             1 , 1 ,-1    ,1 , 1 ,-1  , -1 ,-1 ,-1  ,  -1 ,-1 ,-1 , &
-             ! Stochastic
-             1 , 1 , 1    ,1 , 1 , 1  , -1 ,-1 , 1  ,  -1 ,-1 , 1 , &
-             1 , 1 ,-1    ,1 , 1 ,-1  , -1 ,-1 ,-1  ,  -1 ,-1 ,-1 /),(/3,8,5/))
-        !Signs of the x,y,z for each projection  :psgn( [x,y,z], project )
-        real (kind=dp),dimension(3,8),parameter :: psgn2= reshape((/  &
-             1 , 1 , 1   , 1 , 1 , 1   , -1 , -1 , 1 ,  -1 , -1 , 1 , &
-             1 , 1 ,-1   , 1 , 1 ,-1  , -1 , -1 ,-1 ,  -1 , -1 ,-1 /),(/3,8/))
-
-        ! Use 8-fold for non-rotating, but 4-fold for rotating (BT)
-        vsgn=vsgn1
-        psgn=psgn1
-        if (Omega /= 0.0_dp ) then
-           vsgn=vsgn2
-           psgn=psgn2
-        endif
-
         theta = theta_proj
         phi = phi_proj
 
@@ -167,20 +165,20 @@ contains
         ! Using the inverse (transpose) of the projection (eq. 4) of Thesis Ellen.
 
         ! x'
-        t1 = -sin(phi)*psgn(1, n)
-        t2 = cos(phi)*psgn(2, n)
+        t1 = -sin(phi)*projection_psgn(1, n)
+        t2 = cos(phi)*projection_psgn(2, n)
         proj(:, 1) = t1*pos(:, 1) + t2*pos(:, 2)
 
         ! y'
-        t1 = -cos(theta)*cos(phi)*psgn(1, n)
-        t2 = -cos(theta)*sin(phi)*psgn(2, n)
-        t3 = sin(theta)*psgn(3, n)
+        t1 = -cos(theta)*cos(phi)*projection_psgn(1, n)
+        t2 = -cos(theta)*sin(phi)*projection_psgn(2, n)
+        t3 = sin(theta)*projection_psgn(3, n)
         proj(:, 2) = t1*pos(:, 1) + t2*pos(:, 2) + t3*pos(:, 3)
 
         ! v_LOS
-        t1 = sin(theta)*cos(phi)*vsgn(1, n, type)
-        t2 = sin(theta)*sin(phi)*vsgn(2, n, type)
-        t3 = cos(theta)*vsgn(3, n, type)
+        t1 = sin(theta)*cos(phi)*projection_vsgn(1, n, type)
+        t2 = sin(theta)*sin(phi)*projection_vsgn(2, n, type)
+        t3 = cos(theta)*projection_vsgn(3, n, type)
         losvel(:) = t1*vel(:, 1) + t2*vel(:, 2) + t3*vel(:, 3)
 
         !xaa = (-sin(phi)*x+cos(phi)*y)*sin(psi)-(-cos(theta)*cos(phi)*x-cos(theta)*sin(phi)*y+sin(theta)*z)*cos(psi);

@@ -61,7 +61,7 @@ the Python `NNLS` weight-solver path.
 - `aidocs/fortran_orbit_library_engine.md`: earlier long-form engine analysis,
   including replacement risks and performance notes.
 - `aidocs/TECHNICAL_DOCUMENTATION.md`: full repository technical overview.
-- `aidocs/audits/full-audit-2026-06-01/13_active_runtime_verification.md`:
+- `aidocs/audits/full-audit-2026-06-04/13_active_runtime_verification.md`:
   audit-era verification of the active runtime.
-- `aidocs/audits/full-audit-2026-06-01/15_active_nnls_solver_benchmark.md`:
+- `aidocs/audits/full-audit-2026-06-04/15_active_nnls_solver_benchmark.md`:
   solver policy and NNLS benchmark context.

@@ -42,12 +42,8 @@ project's Sphinx documentation tree.
     output-size review for active Fortran runtime and qgrid/LOSVD files.
   - `fortran/change-guide.md`: high-risk changes, parity requirements, tests,
     and update checklists.
-- `audits/dynamite_python_audit.md`: Python-side audit notes.
-- `audits/dynamite_fortran_audit.md`: Fortran-side audit notes.
-- `audits/dynamite_scientific_correctness_audit.md`: scientific-correctness
-  audit notes.
-- `audits/full-audit-2026-06-01/`: full audit package. Start with
-  `SUMMARY.md`.
+- `audits/full-audit-2026-06-04/`: current full audit package. Start with
+  `SUMMARY.md`; this package keeps current open findings only.
 
 ## Boundary
 
