@@ -36,7 +36,7 @@ end program ran1_driver
     executable = compile_fortran_driver(
         tmp_path,
         driver,
-        [ORBLIB_FORTRAN_DIR / "source" / "ran1_nr.f"],
+        [ORBLIB_FORTRAN_DIR / "source" / "numerics" / "ran1_nr.f90"],
         "ran1_driver",
     )
     seed = -4242

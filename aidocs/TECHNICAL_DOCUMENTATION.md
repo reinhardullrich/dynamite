@@ -1,6 +1,6 @@
 # How DYNAMITE Works
 
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
 This is an internal AI/agent guide for the local DYNAMITE fork. It is written
 to make future work easier without modifying upstream source, upstream docs,
@@ -87,8 +87,10 @@ YAML config
 
 ```text
 dynamite/
-  AGENTS.md             Local agent instructions for this fork
+  AGENTS.md             Intentionally empty local project instruction file
   aidocs/               Local AI/agent docs and audit notes
+    INDEX.md            Router for AI/agent documentation
+    fortran/            Detailed active Fortran backend documentation
   README.md             Upstream project README
   setup.py              Python packaging metadata
   requirements.txt      Python runtime dependencies
@@ -96,8 +98,10 @@ dynamite/
   dynamite/             Python package
   orblib_fortran/       Active orbit-library Fortran backend
     source/             Human-written Fortran source
+      potential/         Stellar/dark/interpolated potential modules
+      orbit_library/     Split orbit integration/projection/output modules
       numerics/         Bundled numerical routines
-      unused/           Inactive retained Fortran sources
+    unused/             Inactive retained Fortran sources
     build/lib/          Ignored generated shared library
   docs/                 Upstream Sphinx docs and tutorial notebooks
   archive/dev_tests/    Archived upstream development tests, configs, sample data
@@ -759,17 +763,18 @@ Active roles:
 - integrate tube and box orbits
 - build orbit libraries
 
-Executable driver sources are retained under `orblib_fortran/source/unused/`
+Executable driver sources are retained under `orblib_fortran/unused/`
 for historical reference. They are not part of the supported build, and normal
 builds no longer create `orblib_fortran/bin/`.
 
 The shared-library target is built with:
 
 ```bash
-make -C orblib_fortran all
+make -C orblib_fortran shared
 ```
 
-`make -C orblib_fortran shared` is equivalent. It writes
+`make`, `make all`, and `make nogal` also resolve to the shared-library build.
+It writes
 `orblib_fortran/build/lib/liborblib_fortran.so`. The exported ABI version is
 `2` and includes `orblib_api_abi_version`,
 `orblib_api_run_orbitstart_memory`, and `orblib_api_run_orblib_direct`.
@@ -782,6 +787,9 @@ mass-helper sources are archived under `archive/legacy_nnls_fortran/`. The
 untested `orbgen`/`partgen` utilities are archived under
 `archive/legacy_orbgen_partgen/`. They are not part of the active
 `orblib_fortran` build.
+
+For detailed agent-facing Fortran backend documentation, start with
+`aidocs/fortran/INDEX.md`.
 
 ## Weight Solving
 
@@ -943,7 +951,7 @@ For detailed audit notes, see:
 
 When modifying this fork:
 
-1. Read `AGENTS.md`.
+1. Read `aidocs/INDEX.md`.
 2. Read `aidocs/KNOWLEDGE.md`.
 3. Keep local AI notes in `aidocs/`.
 4. Avoid editing upstream `docs/` unless explicitly asked.
@@ -1023,8 +1031,9 @@ For a normal code task:
 3. Read `aidocs/KNOWLEDGE.md`.
 4. Read the relevant source module.
 5. Make the smallest scoped edit.
-6. Update `aidocs/KNOWLEDGE.md` and `aidocs/CHANGES.md` if behavior,
-   workflow, architecture, dependencies, or operational knowledge changed.
+6. Update `aidocs/KNOWLEDGE.md` if behavior, workflow, architecture,
+   dependencies, or operational knowledge changed. Update `aidocs/CHANGES.md`
+   only when a human-readable historical record is useful.
 7. Run focused tests or static checks if code changed.
 8. Report exactly what changed and what was not tested.
 
@@ -1032,15 +1041,15 @@ For a documentation-only task like this one:
 
 1. Keep edits in `aidocs/`.
 2. Do not touch upstream `docs/`, package code, orblib Fortran, or dev tests.
-3. Update the local index and current-state files.
+3. Update `aidocs/INDEX.md` and current-state files when documentation
+   navigation or current project knowledge changes.
 4. Verify no forbidden paths changed with `git status --short`.
 
 ## Current Local State After This Documentation Pass
 
-Expected local untracked documentation additions:
+The initial documentation pass created durable local documentation under:
 
 ```text
-AGENTS.md
 aidocs/
 ```
 

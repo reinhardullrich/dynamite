@@ -9,25 +9,42 @@ from conftest import (
 
 
 FORTRAN_NUMERICS_SOURCES = [
-    "source/orbitstart_f.f90",
-    "source/orblib_f_new_mirror.f90",
-    "source/orblib_api.f90",
-    "source/ran1_nr.f",
+    "source/orblib_c_api.f90",
+    "source/initial_parameters.f90",
+    "source/orbit_start_library.f90",
+    "source/orbit_library/aperture_base.f90",
+    "source/orbit_library/aperture_boxed.f90",
+    "source/orbit_library/aperture_dispatch.f90",
+    "source/orbit_library/intrinsic_qgrid.f90",
+    "source/orbit_library/losvd_histograms.f90",
+    "source/orbit_library/orbit_integrator.f90",
+    "source/orbit_library/orbit_library_runner.f90",
+    "source/orbit_library/orbit_output.f90",
+    "source/orbit_library/projection.f90",
+    "source/orbit_library/psf.f90",
+    "source/orbit_library/random_gauss_generator.f90",
+    "source/orbit_library/spatial_binning.f90",
+    "source/potential/dark_halo_potential.f90",
+    "source/potential/interpolated_potential.f90",
+    "source/potential/triaxial_stellar_potential.f90",
     "source/numerics/dop853.f",
     "source/numerics/dqxgs.f",
     "source/numerics/ellipint.f90",
     "source/numerics/numeric_kinds_f.f90",
     "source/numerics/numrec_arloc.f",
+    "source/numerics/ran1_nr.f90",
     "source/numerics/specfunc_beta.f90",
 ]
 
 FORTRAN_UNUSED_SOURCES = [
-    "source/unused/dopri5.f",
-    "source/unused/orbitstart.f90",
-    "source/unused/orbitstart_bar.f90",
-    "source/unused/orblibprogram.f90",
-    "source/unused/orblibprogram_bar.f90",
-    "source/unused/pij.f90",
+    "unused/Changelog.txt",
+    "unused/cutest_makefile",
+    "unused/dopri5.f",
+    "unused/orbitstart.f90",
+    "unused/orbitstart_bar.f90",
+    "unused/orblibprogram.f90",
+    "unused/orblibprogram_bar.f90",
+    "unused/pij.f90",
 ]
 
 ARCHIVED_NNLS_FORTRAN_FILES = [

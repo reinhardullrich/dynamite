@@ -195,7 +195,7 @@ The current local README describes a two-stage active installation:
 The active Fortran build writes only the shared library to
 `orblib_fortran/build/lib/`. Temporary object/module directories may be created
 during compilation, but they are not runtime artifacts. Executable driver
-sources are retained in `orblib_fortran/source/unused/` for reference.
+sources are retained in `orblib_fortran/unused/` for reference.
 
 ## Things To Know Before Working On It
 

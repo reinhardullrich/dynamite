@@ -2,9 +2,17 @@
 
 Date: 2026-06-02
 
+Current-state note, 2026-06-04: the former single file
+`orblib_fortran/source/orblib_f_new_mirror.f90` has been split by existing
+Fortran module into files under `orblib_fortran/source/orbit_library/`.
+The C ABI file is now `orblib_fortran/source/orblib_c_api.f90`. Module names
+were not changed. Treat the line-number references in this older analysis as
+historical anchors from before that mechanical split; use
+`aidocs/fortran/source-map.md` for current file names.
+
 Scope: `orblib_fortran/source/orblib_f_new_mirror.f90`, the shared-library ABI
 in `orblib_fortran/source/orblib_api.f90`, the inactive legacy executable
-drivers retained under `orblib_fortran/source/unused/`, and the Python runtime
+drivers retained under `orblib_fortran/unused/`, and the Python runtime
 boundary in
 `dynamite/orblib.py`, `dynamite/orblib_api.py`, and
 `dynamite/model_iterator.py`.
@@ -108,8 +116,8 @@ Key source points:
 `orblib_f_new_mirror.f90` is one large source file with many modules. The
 inactive legacy driver programs are thin:
 
-- `source/unused/orblibprogram.f90` calls `setup()`, `run()`, and `stob()`.
-- `source/unused/orblibprogram_bar.f90` calls `setup_bar()`, `run()`, and `stob()`.
+- `unused/orblibprogram.f90` calls `setup()`, `run()`, and `stob()`.
+- `unused/orblibprogram_bar.f90` calls `setup_bar()`, `run()`, and `stob()`.
 
 The main in-file coordinator is `module high_level`.
 

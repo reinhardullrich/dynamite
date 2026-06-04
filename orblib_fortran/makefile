@@ -2,34 +2,30 @@
 ##############################################################
 #
 # This file builds the Python-facing shared library using a standard Fortran
-# compiler. Executable driver sources are retained under source/unused for
-# reference, but they are not part of the supported runtime build.
+# compiler. Executable driver sources are retained under unused/ for reference
+# only. Never use unused/ code in the supported runtime build.
 # This makefile was written by Remco van den Bosch, using the
 # Leiden, 2009
 #
 ##############################################################
 FAST=TRUE
 #PROFILE=TRUE
-ABEL_NO_INTERPOL=true
-#FORTRAN=path/to/gfortran
-FORTRAN ?= gfortran
-compilername=gfortran
-#flags=-fno-use-linker-plugin
+compiler=gfortran
 
 #PROFILEDIR=~/profile/
 
 BUILDDIR ?= build
 SRCDIR ?= source
 NUMERICSDIR := $(SRCDIR)/numerics
-UNUSEDDIR := $(SRCDIR)/unused
+UNUSEDDIR := unused
+POTENTIALDIR := $(SRCDIR)/potential
+ORBITLIBDIR := $(SRCDIR)/orbit_library
 OBJDIR := $(BUILDDIR)/obj
 MODDIR := $(BUILDDIR)/mod
 LIBDIR := $(BUILDDIR)/lib
 BUILD_DIRS := $(OBJDIR) $(MODDIR) $(LIBDIR)
 
-flags += -Wuninitialized
-
-ifeq ($(compilername),ifort)
+ifeq ($(compiler),ifort)
 ifdef FAST
   #flags = -fast
   flags += -O3 -IPO -xT -prefetch -pad
@@ -53,32 +49,32 @@ endif
 endif
 
 
-fortran90 = $(FORTRAN) $(flags)     -c
-fortran77 = $(FORTRAN) $(flags) -W0 -c
-link      = $(FORTRAN) $(flags)     -o
+fortran90 = $(compiler) $(flags)     -c
+fortran77 = $(compiler) $(flags) -W0 -c
+link      = $(compiler) $(flags)     -o
 endif
 
-ifeq ($(compilername),F)
+ifeq ($(compiler),F)
   fortran90 = F -ieee=stop -C -O4   -c
   fortran77 = g77.old -O2   -c
   link = F -ieee=stop -C -O4   -o
 endif
 
-ifeq ($(compilername),g95)
+ifeq ($(compiler),g95)
   fortran90 = ~/local/bin/g95 -c -O3 -m64  -c
   fortran77 = ~/local/bin/g95 -c -O3 -m64  -c
   link = ~/local/bin/g95 -o -O3 -m64 -o
 endif
 
-ifeq ($(compilername),gfortran)
+ifeq ($(compiler),gfortran)
   ifdef FAST
-   flags +=    -ffast-math -O3 -march=native -fomit-frame-pointer -m64
+   flags =    -ffast-math -O3 -march=native -fomit-frame-pointer -m64
    flags +=    -funroll-loops -ftree-loop-linear
 #   flags += -fno-protect-parens
 #   flags +=  -fwhole-file #-fwhole-program # -flto
    flags += -std=legacy
   else
-   flags +=  -m64 -g  -ggdb -fbounds-check -fcheck-array-temporaries
+   flags =  -m64 -g  -ggdb -fbounds-check -fcheck-array-temporaries
    #flags = -m64   -g -ffast-math -O3 -march=native -fomit-frame-pointer -m64
   endif
 
@@ -97,11 +93,10 @@ ifeq ($(compilername),gfortran)
   flags += -fexternal-blas
 
   modflags = -J$(MODDIR) -I$(MODDIR)
-  fortran90 = $(FORTRAN) $(flags) $(modflags) -c
-  fortran77 = $(FORTRAN) $(flags) $(modflags) -c
-  link = $(FORTRAN) $(flags) $(modflags) -o
-  shared_link = $(FORTRAN) $(flags) $(modflags) -fPIC -shared -o
-#  link = gfortran $(flags) -o
+  fortran90 = gfortran $(flags) $(modflags) -c
+  fortran77 = gfortran $(flags) $(modflags) -c
+  link = gfortran $(flags) $(modflags) -o
+  shared_link = gfortran $(flags) $(modflags) -fPIC -shared -o
 endif
 
 ##########################################################
@@ -119,8 +114,8 @@ $(BUILD_DIRS):
 #
 #########################################################
 
-RCS : Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90 $(SRCDIR)/dmpotent.f90
-	ci -q -l -mcompile Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/interpolpotent.f90 $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90 $(SRCDIR)/dmpotent.f90
+RCS : makefile $(SRCDIR)/initial_parameters.f90 $(ORBITLIB_SOURCES) $(POTENTIALDIR)/triaxial_stellar_potential.f90 $(POTENTIALDIR)/interpolated_potential.f90 $(SRCDIR)/orbit_start_library.f90 $(SRCDIR)/orblib_c_api.f90 $(POTENTIALDIR)/dark_halo_potential.f90
+	ci -q -l -mcompile makefile $(SRCDIR)/initial_parameters.f90 $(ORBITLIB_SOURCES) $(POTENTIALDIR)/triaxial_stellar_potential.f90 $(POTENTIALDIR)/interpolated_potential.f90 $(SRCDIR)/orbit_start_library.f90 $(SRCDIR)/orblib_c_api.f90 $(POTENTIALDIR)/dark_halo_potential.f90
 
 ##########################################################
 #
@@ -131,7 +126,8 @@ RCS : Makefile $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/orblib_f_new_mirror.f90 $(SRCD
 #
 ##########################################################
 
-# DOPRI5 is kept in source/unused as an inactive alternate integrator.
+# DOPRI5 is kept in unused/ as archived reference code only.
+# Never switch active builds to unused/ without explicit user approval.
 #DOPCDE = $(UNUSEDDIR)/dopri5.f
 #DOPOBJ = $(OBJDIR)/dopri5.o
 
@@ -145,20 +141,20 @@ DOPOBJ = $(OBJDIR)/dop853.o
 #
 ######################################################
 
-MGECDE = $(SRCDIR)/ran1_nr.f $(NUMERICSDIR)/numeric_kinds_f.f90 $(NUMERICSDIR)/dqxgs.f $(NUMERICSDIR)/ellipint.f90 $(SRCDIR)/iniparam_f.f90 $(SRCDIR)/triaxpotent.f90 $(SRCDIR)/dmpotent.f90 $(SRCDIR)/interpolpotent.f90 $(NUMERICSDIR)/specfunc_beta.f90
-MGEOBJ = $(OBJDIR)/ran1_nr.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/dqxgs.o $(OBJDIR)/iniparam_f.o $(OBJDIR)/triaxpotent.o $(OBJDIR)/dmpotent.o $(OBJDIR)/interpolpotent.o $(OBJDIR)/ellipint.o $(OBJDIR)/specfunc_beta.o
+MGECDE = $(NUMERICSDIR)/ran1_nr.f90 $(NUMERICSDIR)/numeric_kinds_f.f90 $(NUMERICSDIR)/dqxgs.f $(NUMERICSDIR)/ellipint.f90 $(SRCDIR)/initial_parameters.f90 $(POTENTIALDIR)/triaxial_stellar_potential.f90 $(POTENTIALDIR)/dark_halo_potential.f90 $(POTENTIALDIR)/interpolated_potential.f90 $(NUMERICSDIR)/specfunc_beta.f90
+MGEOBJ = $(OBJDIR)/ran1_nr.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/dqxgs.o $(OBJDIR)/initial_parameters.o $(OBJDIR)/triaxial_stellar_potential.o $(OBJDIR)/dark_halo_potential.o $(OBJDIR)/interpolated_potential.o $(OBJDIR)/ellipint.o $(OBJDIR)/specfunc_beta.o
 
-$(OBJDIR)/iniparam_f.o: $(SRCDIR)/iniparam_f.f90 $(OBJDIR)/numeric_kinds_f.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/iniparam_f.f90
+$(OBJDIR)/initial_parameters.o: $(SRCDIR)/initial_parameters.f90 $(OBJDIR)/numeric_kinds_f.o | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(SRCDIR)/initial_parameters.f90
 
-$(OBJDIR)/triaxpotent.o : $(SRCDIR)/triaxpotent.f90 $(OBJDIR)/ellipint.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/iniparam_f.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/triaxpotent.f90
+$(OBJDIR)/triaxial_stellar_potential.o : $(POTENTIALDIR)/triaxial_stellar_potential.f90 $(OBJDIR)/ellipint.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/initial_parameters.o | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(POTENTIALDIR)/triaxial_stellar_potential.f90
 
-$(OBJDIR)/dmpotent.o : $(SRCDIR)/dmpotent.f90 $(OBJDIR)/triaxpotent.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/iniparam_f.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/dmpotent.f90
+$(OBJDIR)/dark_halo_potential.o : $(POTENTIALDIR)/dark_halo_potential.f90 $(OBJDIR)/triaxial_stellar_potential.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/initial_parameters.o | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(POTENTIALDIR)/dark_halo_potential.f90
 
-$(OBJDIR)/interpolpotent.o : $(SRCDIR)/interpolpotent.f90 $(OBJDIR)/triaxpotent.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/iniparam_f.o | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/interpolpotent.f90
+$(OBJDIR)/interpolated_potential.o : $(POTENTIALDIR)/interpolated_potential.f90 $(OBJDIR)/triaxial_stellar_potential.o $(OBJDIR)/numeric_kinds_f.o $(OBJDIR)/initial_parameters.o | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(POTENTIALDIR)/interpolated_potential.f90
 
 #####################################################
 #
@@ -166,8 +162,8 @@ $(OBJDIR)/interpolpotent.o : $(SRCDIR)/interpolpotent.f90 $(OBJDIR)/triaxpotent.
 #
 ###################################################
 
-$(OBJDIR)/ran1_nr.o : $(SRCDIR)/ran1_nr.f | $(BUILD_DIRS)
-	$(fortran77) -o $@ $(SRCDIR)/ran1_nr.f
+$(OBJDIR)/ran1_nr.o : $(NUMERICSDIR)/ran1_nr.f90 | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(NUMERICSDIR)/ran1_nr.f90
 
 $(OBJDIR)/numeric_kinds_f.o : $(NUMERICSDIR)/numeric_kinds_f.f90 | $(BUILD_DIRS)
 	$(fortran90) -o $@ $(NUMERICSDIR)/numeric_kinds_f.f90
@@ -199,23 +195,33 @@ $(OBJDIR)/specfunc_beta.o : $(NUMERICSDIR)/specfunc_beta.f90 $(OBJDIR)/numeric_k
 #
 #######################################################
 
-ORBLIBNMCDE= $(MGECDE) $(NUMERICSDIR)/numrec_arloc.f $(DOPCDE) $(SRCDIR)/orblib_f_new_mirror.f90
-ORBLIBNMOBJ= $(MGEOBJ) $(OBJDIR)/numrec_arloc.o $(DOPOBJ) $(OBJDIR)/orblib_f_new_mirror.o
-ORBLIBAPICDE= $(ORBLIBNMCDE) $(SRCDIR)/orbitstart_f.f90 $(SRCDIR)/orblib_api.f90
+ORBITLIB_SOURCES = $(ORBITLIBDIR)/random_gauss_generator.f90 \
+	$(ORBITLIBDIR)/orbit_integrator.f90 \
+	$(ORBITLIBDIR)/projection.f90 \
+	$(ORBITLIBDIR)/psf.f90 \
+	$(ORBITLIBDIR)/aperture_base.f90 \
+	$(ORBITLIBDIR)/aperture_boxed.f90 \
+	$(ORBITLIBDIR)/aperture_dispatch.f90 \
+	$(ORBITLIBDIR)/spatial_binning.f90 \
+	$(ORBITLIBDIR)/losvd_histograms.f90 \
+	$(ORBITLIBDIR)/intrinsic_qgrid.f90 \
+	$(ORBITLIBDIR)/orbit_output.f90 \
+	$(ORBITLIBDIR)/orbit_library_runner.f90
+
+ORBLIBNMCDE= $(MGECDE) $(NUMERICSDIR)/numrec_arloc.f $(DOPCDE) $(ORBITLIB_SOURCES)
+ORBLIBNMOBJ= $(MGEOBJ) $(OBJDIR)/numrec_arloc.o $(DOPOBJ)
+ORBLIBAPICDE= $(ORBLIBNMCDE) $(SRCDIR)/orbit_start_library.f90 $(SRCDIR)/orblib_c_api.f90
 
 ifeq ($(FAST),TRUE)
   ORBLIBNMOBJ=$(ORBLIBNMCDE)
 endif
 
-$(OBJDIR)/orblib_f_new_mirror.o : $(SRCDIR)/orblib_f_new_mirror.f90 $(MGEOBJ) $(OBJDIR)/numrec_arloc.o $(DOPOBJ) | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/orblib_f_new_mirror.f90
-
 $(LIBDIR)/liborblib_fortran.so : $(ORBLIBAPICDE)
 	mkdir -p $(MODDIR) $(LIBDIR)
 	$(shared_link) $@ $(ORBLIBAPICDE)
 
-$(OBJDIR)/orbitstart_f.o : $(ORBLIBNMOBJ) $(MGEOBJ) $(SRCDIR)/orbitstart_f.f90 | $(BUILD_DIRS)
-	$(fortran90) -o $@ $(SRCDIR)/orbitstart_f.f90
+$(OBJDIR)/orbit_start_library.o : $(ORBLIBNMOBJ) $(MGEOBJ) $(SRCDIR)/orbit_start_library.f90 | $(BUILD_DIRS)
+	$(fortran90) -o $@ $(SRCDIR)/orbit_start_library.f90
 
 ##########################################
 #

@@ -28,7 +28,7 @@ Current coverage:
 - embedded LOSVD, chi-square, and random-number values extracted from the
   historical example fixtures;
 - Python `MyRand` against the saved legacy random sequence;
-- compiled Fortran `ran1_nr.f` against Python `MyRand`;
+- compiled Fortran `ran1_nr.f90` against Python `MyRand`;
 - compiled archived Fortran `nnls95.f` against `scipy.optimize.nnls` for
   several reference NNLS cases;
 - fast unit coverage for the Python-facing direct-input shared-library

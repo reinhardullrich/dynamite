@@ -1,6 +1,6 @@
 # Project Knowledge
 
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
 This file is the canonical current-state overview for the local DYNAMITE fork
 at `/home/reinhard/projects/thomas/dynamite`.
@@ -27,26 +27,48 @@ changes from the original project.
 - `docs/`: upstream DYNAMITE Sphinx documentation. Do not put local AI/agent
   notes here.
 - `aidocs/`: local AI/agent documentation and generated review notes.
-- `AGENTS.md`: root-level agent instructions. It points to this file and
-  `aidocs/CHANGES.md`.
+- `AGENTS.md`: intentionally empty local project instruction file. Active
+  user-level agent instructions live outside this repository.
 
 ## Local AI Documentation
 
-- `aidocs/README.md`: index for local AI/agent documentation.
+- `aidocs/INDEX.md`: index for local AI/agent documentation.
 - `aidocs/KNOWLEDGE.md`: current project state for local agent work.
-- `aidocs/CHANGES.md`: append-only change log for local agent work.
+- `aidocs/CHANGES.md`: historical local change log. Update it only when a
+  human-readable historical record is useful.
 - `aidocs/TECHNICAL_DOCUMENTATION.md`: technical explanation of repository
   structure, configuration, runtime flow, model lifecycle, orbit libraries,
   weight solving, outputs, and safe modification boundaries.
+- `aidocs/ASTRO_PHYSICS_PROGRAMMING_OVERVIEW.md`: fast conceptual bridge
+  between the astronomy/physics ideas and the programming workflow: models,
+  orbits, ODE integration, projection, orbit-library data, and NNLS weights.
 - `aidocs/dynamite_overview.md`: high-level overview of the upstream DYNAMITE
   repository.
 - `aidocs/dynamite_code_map.md`: map of major DYNAMITE modules and
   responsibilities.
 - `aidocs/fortran_orbit_library_engine.md`: detailed analysis of the active
-  Fortran orbit-library backend in
-  `orblib_fortran/source/orblib_f_new_mirror.f90`,
-  including module responsibilities, runtime connections, compute hotspots,
-  multiprocessing boundaries, and replacement risks.
+  Fortran orbit-library backend that now lives as split modules under
+  `orblib_fortran/source/orbit_library/`, including module responsibilities,
+  runtime connections, compute hotspots, multiprocessing boundaries, and
+  replacement risks.
+- `aidocs/fortran_backend_python_contract.md`: operational reference for the
+  active Fortran shared-library backend and pointer to the detailed
+  `aidocs/fortran/` documentation set.
+- `aidocs/fortran/`: detailed agent-facing documentation for the active
+  Fortran backend:
+  - `INDEX.md`: read order and topic map.
+  - `python-contract.md`: Python call graph, shared-library ABI, worker
+    isolation, direct input arrays, and precision compatibility.
+  - `source-map.md`: active Fortran source files/modules and retained inactive
+    sources.
+  - `runtime-flow.md`: orbit-start, tube/box runs, DOP853 integration,
+    projection, PSF, aperture, LOSVD, qgrid, and output flow.
+  - `output-contract.md`: generated `datfil/` files, compression, completion
+    markers, cache files, and Python readers.
+  - `performance-output-size-review.md`: current static review of Fortran
+    runtime optimization and output-size opportunities.
+  - `change-guide.md`: high-risk changes, parity requirements, tests, and
+    update checklists.
 - `aidocs/audits/dynamite_python_audit.md`: Python-side static audit findings.
 - `aidocs/audits/dynamite_fortran_audit.md`: Fortran-side audit findings.
 - `aidocs/audits/dynamite_scientific_correctness_audit.md`: scientific
@@ -65,10 +87,14 @@ changes from the original project.
   is normal for this Python project and should not be flattened.
 - `orblib_fortran/`: active Fortran backend for orbit starts, orbit
   integration, and orbit-library construction. Human-written Fortran source
-  lives under `orblib_fortran/source/`, with bundled numerical routine sources
-  under `orblib_fortran/source/numerics/` and inactive retained Fortran sources
-  under `orblib_fortran/source/unused/`; the supported build target writes only
-  the shared library to ignored `orblib_fortran/build/lib/`. Legacy
+  lives under `orblib_fortran/source/`; larger groups live in `potential/`,
+  `orbit_library/`, and `numerics/`, while one-file API, parameter, and
+  orbit-start sources stay directly under `source/`; inactive retained
+  reference files live under `orblib_fortran/unused/`; the supported build
+  target writes only the shared library to ignored `orblib_fortran/build/lib/`.
+  `orblib_fortran/unused/` is archive/reference-only. Do not use code
+  from `orblib_fortran/unused/` in active builds, refactors, replacement work, tests,
+  or new runtime paths unless the user explicitly reverses this rule. Legacy
   `triaxmass*` mass-helper sources are archived and are not part of the active
   build.
 - `dynamite/orblib_api.py`: Python-facing orbit-library API facade. It provides
@@ -188,7 +214,7 @@ Current local audit environment:
 - `pip check` passed after the local editable install.
 - GNU Fortran 13.3.0 at `/usr/bin/gfortran` was used for the active
   no-GALAHAD Fortran build.
-- `orblib_fortran/Makefile` and `orblib_fortran/Makefile.linux` treat the
+- `orblib_fortran/makefile` and `orblib_fortran/makefile.linux` treat the
   shared library as the only supported runtime build product. `make`,
   `make all`, `make nogal`, and `make shared` build
   `orblib_fortran/build/lib/liborblib_fortran.so`; temporary object/module

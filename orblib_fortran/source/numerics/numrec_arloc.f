@@ -1,32 +1,34 @@
-      SUBROUTINE HUNTPOS(xx,n,x,jbin)
-C
-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
-C
-C Find the bin jbin in which to store a datapoint x, given an array
-C xx(1:n). Based on the Numerical Recipes Routine hunt. At input jbin must
-C be an initial guess.
-C
-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
-C
-      IMPLICIT REAL*8 (a-h,o-z)
-      REAL*8 x,xx(n)
-C
-C Find the point jbin, such that x is between xx(jbin) and xx(jbin+1)
-C
-      Stop " functuon huntpos used !"
-      CALL HUNT(xx,n,x,jbin)
-C
-C Find the correct bin
-C
-      IF (jbin.EQ.0) THEN
-        jbin = 1
-      ELSE IF (jbin.NE.n) THEN
-        IF (ABS(x-xx(jbin)).GT.(0.5D0*ABS(xx(jbin+1)-xx(jbin)))) THEN
-          jbin = jbin+1
-        END IF
-      END IF
-C
-      END
+C INACTIVE LEGACY ROUTINE: huntpos is not called by the active direct ABI path.
+C It also intentionally stopped if called; retained as comments for reference.
+C      SUBROUTINE HUNTPOS(xx,n,x,jbin)
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+CC Find the bin jbin in which to store a datapoint x, given an array
+CC xx(1:n). Based on the Numerical Recipes Routine hunt. At input jbin must
+CC be an initial guess.
+CC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CC
+C      IMPLICIT REAL*8 (a-h,o-z)
+C      REAL*8 x,xx(n)
+CC
+CC Find the point jbin, such that x is between xx(jbin) and xx(jbin+1)
+CC
+C      Stop " functuon huntpos used !"
+C      CALL HUNT(xx,n,x,jbin)
+CC
+CC Find the correct bin
+CC
+C      IF (jbin.EQ.0) THEN
+C        jbin = 1
+C      ELSE IF (jbin.NE.n) THEN
+C        IF (ABS(x-xx(jbin)).GT.(0.5D0*ABS(xx(jbin+1)-xx(jbin)))) THEN
+C          jbin = jbin+1
+C        END IF
+C      END IF
+CC
+C      END
 
 
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -78,4 +80,3 @@ CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
       endif
       goto 3
       END
-

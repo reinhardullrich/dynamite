@@ -11,7 +11,9 @@ module interpolpot
     public:: ip_accel
 
     ! setup the constants for the potential
-    public:: ip_setup, ip_setup_bar, ip_set_cache_enabled
+    public:: ip_setup
+    ! Inactive bar/cache-control helpers are kept below as comments.
+    ! The active Python direct path uses ip_setup with the model-local cache.
 
     ! setup the constants for the potential
     public:: ip_stop
@@ -57,34 +59,38 @@ contains
         print *, "  * Potential interpolation setup"
     end subroutine ip_setup
 
-    subroutine ip_setup_bar() ! this subroutine exists purely so we can call tp_setup_bar instead of tp_setup
-        use dmpotent, only: dm_setup
-        use triaxpotent, only: tp_setup_bar
-        use initial_parameters, only: conversion_factor
-        integer(kind=i4b) :: error
+    ! INACTIVE LEGACY ROUTINE: Inactive legacy bar interpolation setup: active direct shared-library path uses ip_setup.
+    ! Retained as comments for reference; do not call from active direct ABI path.
+!     subroutine ip_setup_bar() ! this subroutine exists purely so we can call tp_setup_bar instead of tp_setup
+!         use dmpotent, only: dm_setup
+!         use triaxpotent, only: tp_setup_bar
+!         use initial_parameters, only: conversion_factor
+!         integer(kind=i4b) :: error
+! 
+!         error = 1
+! 
+!         allocate (grid(3, nphi, ntheta, nradius))
+! 
+!         call tp_setup_bar()
+!         call dm_setup()
+!         if (ip_cache_enabled) call ip_read(error)
+!         if (error == 0) call ip_testaccuracy(error)
+!         if (error /= 0) then
+!             call ip_setup_grid()
+!             if (ip_cache_enabled) call ip_save()
+!             call ip_testaccuracy(error)
+!             if (error /= 0) stop "failed to setup interpolation grid"
+!         end if
+! 
+!         print *, "  * Potential interpolation setup"
+!     end subroutine ip_setup_bar
 
-        error = 1
-
-        allocate (grid(3, nphi, ntheta, nradius))
-
-        call tp_setup_bar()
-        call dm_setup()
-        if (ip_cache_enabled) call ip_read(error)
-        if (error == 0) call ip_testaccuracy(error)
-        if (error /= 0) then
-            call ip_setup_grid()
-            if (ip_cache_enabled) call ip_save()
-            call ip_testaccuracy(error)
-            if (error /= 0) stop "failed to setup interpolation grid"
-        end if
-
-        print *, "  * Potential interpolation setup"
-    end subroutine ip_setup_bar
-
-    subroutine ip_set_cache_enabled(enabled)
-        logical, intent(in) :: enabled
-        ip_cache_enabled = enabled
-    end subroutine ip_set_cache_enabled
+    ! INACTIVE LEGACY ROUTINE: Inactive cache-control helper: active Python path relies on model-local interpolgrid convention.
+    ! Retained as comments for reference; do not call from active direct ABI path.
+!     subroutine ip_set_cache_enabled(enabled)
+!         logical, intent(in) :: enabled
+!         ip_cache_enabled = enabled
+!     end subroutine ip_set_cache_enabled
 
 
     subroutine ip_stop()
